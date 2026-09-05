@@ -9,21 +9,25 @@ class Database
     private function __construct()
     {
 
- /*       ============CONEXION SERVIDOR ============
-        $host = 'ga-be.net';
-        $db   = 'gabe_system';
-        $user = 'ga-be_system';
-        $pass = '8[2cYiY5g)c4OD';
-        $charset = 'utf8mb4';
+        // Las credenciales viven en config/credenciales.local.php, que no se
+        // versiona. Así el mismo código sirve en local y en el hosting sin que
+        // ninguna contraseña llegue al repositorio.
+        // Para configurarlo: copia credenciales.example.php como
+        // credenciales.local.php y edita los valores.
+        $archivo = __DIR__ . '/credenciales.local.php';
 
-        $dsn = "mysql:host={$host};dbname={$db};charset={$charset}";
-*/
+        if (!file_exists($archivo)) {
+            die('Falta config/credenciales.local.php. Copia credenciales.example.php '
+                . 'con ese nombre y pon ahí los datos de tu base de datos.');
+        }
 
-        $host = 'localhost';
-        $db   = 'gabe_system';
-        $user = 'root';
-        $pass = '';
-        $charset = 'utf8mb4';
+        $cfg = require $archivo;
+
+        $host    = $cfg['host'];
+        $db      = $cfg['db'];
+        $user    = $cfg['user'];
+        $pass    = $cfg['pass'];
+        $charset = $cfg['charset'];
 
         $dsn = "mysql:host={$host};dbname={$db};charset={$charset}";
 
