@@ -1,0 +1,18 @@
+# La base de datos vive en el hosting, no en el repo: esquema, datos y
+# respaldos se quedan fuera.
+database/
+*.sql.zip
+*.dump
+
+# Archivos de los proveedores (fuente de la importación)
+*.xlsx
+*.xls
+
+# Locales
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+# Credenciales reales (nunca se suben)
+config/credenciales.local.php

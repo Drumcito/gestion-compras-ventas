@@ -17,7 +17,7 @@ try {
 
     // Insertar Usuario Empleado
     $stmt2 = $pdo->prepare("INSERT INTO usuarios (numero_empleado, nombre, apellido, numero_telefono, rol, password) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt2->execute(['EMP-002', 'Carlos', 'Mendoza', '5559876543', 'usuario', $hashSeguro]);
+    $stmt2->execute(['EMP-002', 'Carlos', 'Mendoza', '5559876543', 'vendedor', $hashSeguro]);
 
     echo "<h2 style='color:green;'>¡Usuarios creados con éxito!</h2>";
     echo "<p>Contraseña para ambos: <b>admin123</b></p>";
