@@ -1,295 +1,517 @@
-:root {
-    --clr-orange: #D9531E;
-    --clr-orange-dark: #B8451A;
-    --clr-orange-light: #F0A878;
-    --clr-bg: #EDEDED;
-    --clr-panel: #F4F4F4;
-    --clr-field: #D6D6D6;
-    --clr-field-text: #6B6B6B;
-    --clr-text-dark: #333333;
-    --clr-white: #FFFFFF;
-    --radius-lg: 24px;
-    --radius-field: 10px;
-    --font-main: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-}
-
+/* ==========================================================================
+   ESTILOS GENERALES Y LAYOUT BASE
+   ========================================================================== */
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 body {
-    font-family: var(--font-main);
-    background: var(--clr-bg);
-    min-height: 100vh;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    min-height: 100vh;
+    background-color: #2A2312;
     overflow-x: hidden;
-}
-
-.login-wrapper {
-    width: 100%;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    overflow: hidden;
-}
-
-/* ----------------- Contenedor Principal ----------------- */
-.login-panel {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    max-width: 900px;
-    min-height: 520px;
 }
 
-/* ----------------- Lado de Marca (Curva Óvalo) ----------------- */
-.brand-side {
-    position: relative;
+/* ==========================================================================
+   DESKTOP: SEMICÍRCULO IZQUIERDO Y BRANDING
+   ========================================================================== */
+.circle-container {
+    position: fixed;
+    top: -10vh;
+    left: -15vw;
+    width: 55vw;
+    height: 120vh;
+    background: linear-gradient(135deg, #c97500, #ffbb5b);
+    border-radius: 0 50% 50% 0;
     z-index: 1;
-    flex: 0 0 auto;
-    width: clamp(280px, 35vw, 420px);
-    height: clamp(380px, 48vw, 540px);
+    box-shadow: 10px 0 30px rgba(255, 85, 0, 0.25);
     display: flex;
     align-items: center;
     justify-content: center;
-}
-
-.brand-circle {
-    position: absolute;
-    top: 0;
-    left: -40%; /* Desplaza el centro para mostrar solo la curva derecha */
-    width: 140%;
-    height: 100%;
-    border-radius: 50%; /* Crea la elipse perfecta */
-    background: linear-gradient(155deg, var(--clr-orange) 0%, var(--clr-orange-dark) 100%);
-    box-shadow: 0 20px 40px rgba(184, 69, 26, 0.25);
+    padding-left: 10vw; /* Centrado visual dentro de la curva */
 }
 
 .brand-content {
-    position: relative;
-    z-index: 2;
-    width: 100%;
-    padding-left: 20%; /* Centra visualmente el contenido en la zona visible del arco */
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 16px;
     text-align: center;
+    color: #ffffff;
+    z-index: 2;
+    max-width: 320px;
 }
 
 .brand-logo {
-    width: clamp(60px, 8vw, 95px);
-    height: clamp(60px, 8vw, 95px);
+    width: 140px;
+    height: auto;
     object-fit: contain;
-    filter: brightness(0) invert(1);
+    margin-bottom: 1.25rem;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+    transition: all 0.3s ease;
 }
 
-.brand-name {
-    color: var(--clr-white);
-    font-size: clamp(0.9rem, 1.4vw, 1.25rem);
+.brand-title {
+    font-size: 1.5rem;
     font-weight: 800;
-    text-align: center;
-    line-height: 1.25;
-    letter-spacing: 0.5px;
+    letter-spacing: 1.5px;
+    line-height: 1.3;
+    text-transform: uppercase;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: opacity 0.3s ease;
 }
 
-/* ----------------- Lado del Formulario ----------------- */
-.form-side {
-    flex: 0 1 360px;
-    max-width: 360px;
-    margin-left: -40px; /* Traslapa ligeramente con la curva */
+/* ==========================================================================
+   FORMULARIO Y TARJETA DE ACCESO
+   ========================================================================== */
+.login-wrapper {
+    position: relative;
     z-index: 2;
-}
-
-.form-card {
-    background: var(--clr-panel);
-    border: 1px solid #dcdcdc;
-    border-radius: var(--radius-lg);
-    padding: 40px 32px 40px;
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
     display: flex;
-    flex-direction: column;
+    justify-content: flex-end;
     align-items: center;
-    gap: 24px;
-}
-
-.form-avatar {
-    width: 56px;
-    height: 56px;
-    color: var(--clr-text-dark);
-}
-
-.form-avatar svg {
     width: 100%;
-    height: 100%;
+    padding-right: 12%;
 }
 
-.form-error {
+.login-card {
+    background: #ffffff;
+    padding: 2.5rem 2.25rem;
+    border-radius: 18px;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.08);
     width: 100%;
-    text-align: center;
-    background: #FBE3DC;
-    color: var(--clr-orange-dark);
+    max-width: 400px;
+}
+
+.login-header {
+    margin-bottom: 2rem;
+}
+
+.login-header h2 {
+    color: #1a1a1a;
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+.login-header p {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-top: 0.35rem;
+}
+
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.4rem;
     font-size: 0.85rem;
     font-weight: 600;
-    padding: 10px 14px;
-    border-radius: var(--radius-field);
+    color: #4a5568;
 }
 
-.login-form {
+.form-group input {
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 22px;
-}
-
-.field {
-    position: relative;
-    display: flex;
-    align-items: center;
-    background: var(--clr-field);
-    border-radius: var(--radius-field);
-    padding: 0 16px;
-    height: 48px;
-    transition: box-shadow 0.2s ease;
-}
-
-.field:focus-within {
-    box-shadow: 0 0 0 2px var(--clr-orange-light);
-}
-
-.field-icon {
-    width: 20px;
-    height: 20px;
-    color: var(--clr-field-text);
-    flex-shrink: 0;
-}
-
-.field input {
-    flex: 1;
-    border: none;
-    background: transparent;
+    padding: 0.8rem 1rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 9px;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
     outline: none;
-    padding: 0 12px;
-    font-size: 0.85rem;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    color: var(--clr-text-dark);
 }
 
-.field input::placeholder {
-    color: var(--clr-field-text);
-    font-weight: 700;
+.form-group input:focus {
+    border-color: #ff5500;
+    box-shadow: 0 0 0 3px rgba(255, 85, 0, 0.15);
 }
 
-.toggle-password {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--clr-field-text);
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    flex-shrink: 0;
-}
-
-.toggle-password svg {
+.btn-submit {
     width: 100%;
-    height: 100%;
-}
-
-.btn-login {
-    margin-top: 12px;
-    align-self: center;
-    width: 60%;
-    min-width: 180px;
-    height: 44px;
+    padding: 0.85rem;
+    background: linear-gradient(135deg, #ffbb5b, #c97500);
+    color: #ffffff;
     border: none;
-    border-radius: 999px;
-    background: linear-gradient(135deg, var(--clr-orange-light), var(--clr-orange));
-    color: var(--clr-white);
-    font-weight: 800;
-    font-size: 0.9rem;
-    letter-spacing: 0.5px;
+    border-radius: 9px;
+    font-size: 1rem;
+    font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 10px 20px rgba(217, 83, 30, 0.3);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: background 0.2s ease, transform 0.1s ease;
+    margin-top: 0.5rem;
 }
 
-.btn-login:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 14px 24px rgba(217, 83, 30, 0.35);
+.btn-submit:hover {
+    background: #d48b25;
 }
 
-.btn-login:active {
-    transform: translateY(0);
+.btn-submit:active {
+    transform: scale(0.99);
 }
 
-/* ----------------- Tablet: recorte un poco mas chico ----------------- */
-@media (max-width: 900px) {
-    .brand-side {
-        width: clamp(95px, 11vw, 125px);
-        height: clamp(160px, 19vw, 200px);
-    }
-
-    .brand-circle {
-        width: clamp(160px, 19vw, 200px);
-    }
-}
-
-/* ----------------- Responsive: Móvil (Apilado de nuevo) ----------------- */
+/* ==========================================================================
+   RESPONSIVO: DISPOSITIVOS MÓVILES (PANTALLAS ≤ 768px)
+   ========================================================================== */
 @media (max-width: 768px) {
-    .login-wrapper {
-        padding: 24px 16px;
-    }
-
-    .login-panel {
+    body {
         flex-direction: column;
-        justify-content: flex-start;
-        min-height: auto;
-        max-width: 340px;
-        gap: 0;
+        justify-content: center;
+        align-items: center;
+        padding: 2rem 1rem;
     }
 
-    .brand-side {
-        width: 120px;
-        height: 120px;
-        margin: 0 auto;
-    }
-
-    .brand-circle {
+    /* Transformación a Círculo Completo Pequeño centrado sobre la Card */
+    .circle-container {
+        position: relative;
+        top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
-        border-radius: 50%;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%; /* Círculo perfecto */
+        padding-left: 0;
+        margin-bottom: -45px; /* Sombra/flotado encajado sobre el card */
+        box-shadow: 0 8px 20px rgba(255, 85, 0, 0.3);
+        flex-shrink: 0;
     }
 
     .brand-content {
-        padding-left: 0;
-        gap: 4px;
+        max-width: 100%;
+        justify-content: center;
     }
 
-    .brand-logo {
-        width: 48px;
-        height: 48px;
-    }
-
-    .brand-name {
+    /* Oculta el texto en móviles */
+    .brand-title {
         display: none;
     }
 
-    .form-side {
-        margin-left: 0;
-        margin-top: -24px;
+    /* Ajusta el logo para encajar perfecto en el círculo de 100px */
+    .brand-logo {
+        width: 55px;
+        height: 55px;
+        margin-bottom: 0;
+    }
+
+    .login-wrapper {
+        justify-content: center;
+        padding-right: 0;
         width: 100%;
-        max-width: 100%;
+        max-width: 400px;
+    }
+
+    .login-card {
+        padding-top: 3.75rem; /* Espacio interno para dar lugar al círculo superpuesto */
+    }
+
+    .login-header {
+        text-align: center;
+    }
+}
+
+/* ==========================================
+   LAYOUT GENERAL DEL DASHBOARD
+   ========================================== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body.dashboard-body {
+    display: flex;
+    min-height: 100vh;
+    background-color: #e5e5e5;
+}
+
+/* --- SIDEBAR (PC y Tablets) --- */
+.sidebar {
+    width: 240px;
+    background-color: #d9531e;
+    padding-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    color: #ffffff;
+    flex-shrink: 0;
+}
+
+.user-profile {
+    text-align: center;
+    padding: 0 1rem 2rem 1rem;
+}
+
+.user-profile i.profile-icon {
+    font-size: 3.5rem;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+
+.user-profile h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.user-profile p {
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+
+.sidebar-menu {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-left: 1rem;
+}
+
+.sidebar-menu li a {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #ffffff;
+    text-decoration: none;
+    padding: 0.8rem 1.2rem;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.sidebar-menu li.active a {
+    background-color: #e5e5e5;
+    color: #000000;
+    border-top-left-radius: 25px;
+    border-bottom-left-radius: 25px;
+    font-weight: 600;
+}
+
+.sidebar-menu li a:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-top-left-radius: 20px;
+    border-bottom-left-radius: 20px;
+}
+
+/* --- CONTENIDO PRINCIPAL --- */
+.main-content {
+    flex-grow: 1;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.page-title {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: #000000;
+}
+
+/* --- TARJETA DE FORMULARIO --- */
+.card-form {
+    background: #e0e0e0;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    border: 1px solid #cccccc;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 650px;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: #222222;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    border: 1px solid #aaaaaa;
+    background-color: #f7f7f7;
+    font-size: 1rem;
+    outline: none;
+}
+
+.search-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.search-container input {
+    padding-right: 2.5rem;
+}
+
+.search-container i.search-icon {
+    position: absolute;
+    right: 4.5rem;
+    font-size: 1.2rem;
+    color: #555555;
+}
+
+.btn-add {
+    background-color: #08660b;
+    color: #ffffff;
+    border: none;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+
+.product-summary-row {
+    display: grid;
+    grid-template-columns: 1fr 2fr 1.2fr;
+    align-items: center;
+    gap: 1rem;
+    margin: 2rem 0;
+    text-align: left;
+}
+
+.summary-item h4 {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: #333333;
+}
+
+.quantity-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.input-qty {
+    width: 45px;
+    height: 38px;
+    text-align: center;
+    border-radius: 8px;
+    border: 1px solid #aaaaaa;
+    background: #ffffff;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.btn-remove {
+    background-color: #e53935;
+    color: #ffffff;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.card-footer-action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2rem;
+}
+
+.total-price {
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.btn-save {
+    background-color: #08660b;
+    color: #ffffff;
+    border: none;
+    padding: 0.75rem 2.5rem;
+    border-radius: 20px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Ocultar barra móvil en escritorio */
+.bottom-nav {
+    display: none;
+}
+
+/* ==========================================
+   DISEÑO RESPONSIVO (MÓVIL / TELÉFONOS)
+   ========================================== */
+@media (max-width: 768px) {
+    body.dashboard-body {
+        flex-direction: column;
+        padding-bottom: 70px; /* Margen para que el menú inferior no tape contenido */
+    }
+
+    /* Ocultar Sidebar lateral en celular */
+    .sidebar {
+        display: none;
+    }
+
+    .main-content {
+        padding: 1rem;
+    }
+
+    .page-title {
+        font-size: 1.8rem;
+        margin-bottom: 1rem;
+    }
+
+    .card-form {
+        padding: 1.5rem;
+    }
+
+    /* Reorganizar filas internas del producto */
+    .product-summary-row {
+        grid-template-columns: 1fr;
+        gap: 1.2rem;
+        background-color: #f0f0f0;
+        padding: 1rem;
+        border-radius: 12px;
+    }
+
+    /* MENÚ INFERIOR TIPO APP (Bottom Navigation) */
+    .bottom-nav {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 60px;
+        background-color: #d9531e;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        z-index: 1000;
+    }
+
+    .bottom-nav a {
+        color: rgba(255, 255, 255, 0.7);
+        text-decoration: none;
+        font-size: 1.6rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        transition: color 0.2s ease;
+    }
+
+    .bottom-nav a.active {
+        color: #ffffff;
+        font-size: 1.9rem;
     }
 }
