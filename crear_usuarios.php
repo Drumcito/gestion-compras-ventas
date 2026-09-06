@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config/connectionDB.php';
+require_once __DIR__ . '/config/conexionBD.php';
 
 try {
     $pdo = Database::getConnection();

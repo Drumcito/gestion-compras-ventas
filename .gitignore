@@ -4,6 +4,7 @@ database/
 *.sql.zip
 *.dump
 
+
 # Archivos de los proveedores (fuente de la importación)
 *.xlsx
 *.xls
@@ -15,4 +16,6 @@ Thumbs.db
 desktop.ini
 
 # Credenciales reales (nunca se suben)
-config/credenciales.local.php
+app/config/credenciales.local.php
+crear_usuarios.php
+app/config/seed/consultas.sql
