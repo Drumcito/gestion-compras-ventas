@@ -6,8 +6,14 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+require_once __DIR__ . '/../../config/conexionBD.php';
+
 $nombreUsuario = $_SESSION['user_name'] ?? 'Usuario';
 $rolUsuario = ucfirst($_SESSION['user_role'] ?? 'Rol');
+
+$casas = Database::getConnection()
+    ->query('SELECT codigo_casa, nombre FROM casas WHERE activo = 1 ORDER BY codigo_casa')
+    ->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -24,55 +30,32 @@ $rolUsuario = ucfirst($_SESSION['user_role'] ?? 'Rol');
 </head>
 <body class="dashboard-body">
 
-    <!-- SIDEBAR (Pantallas Medianas y Grandes) -->
-    <aside class="sidebar">
-        <div class="user-profile">
-            <!-- LOGO OFICIAL GA-BE -->
-            <img src="../../public/img/GA-BE_logo_blanco.png" alt="Logo Comercializadora GA-BE" class="brand-logo">
-            <h3><?php echo htmlspecialchars($nombreUsuario); ?></h3>
-            <p><?php echo htmlspecialchars($rolUsuario); ?></p>
-        </div>
+    <?php $seccionActiva = 'venta'; include __DIR__ . '/../partials/menu.php'; ?>
 
-        <ul class="sidebar-menu">
-            <li class="active">
-                <a href="index.php"><i class="ph ph-currency-dollar-simple"></i> Venta</a>
-            </li>
-            <li>
-                <a href="#"><i class="ph ph-chart-line-up"></i> Dashboard</a>
-            </li>
-            <li>
-                <a href="#"><i class="ph ph-clock-counter-clockwise"></i> Historial</a>
-            </li>
-            <li>
-                <a href="../users/index.php"><i class="ph ph-user-circle"></i> Usuarios</a>
-            </li>
-            <li>
-                <a href="#"><i class="ph ph-shopping-cart"></i> Inventario</a>
-            </li>
-            <li style="margin-top: 2rem;">
-                <a href="../auth/logout.php" style="color: #ffcccc;"><i class="ph ph-sign-out"></i> Cerrar Sesión</a>
-            </li>
-        </ul>
-    </aside>
 
     <!-- CONTENIDO PRINCIPAL -->
     <main class="main-content">
         <h1 class="page-title">Venta</h1>
 
         <div class="card-form">
-            <form action="#" method="POST">
+            <form id="form-venta" autocomplete="off">
                 <!-- Cliente -->
                 <div class="form-group">
                     <label for="cliente">Cliente:</label>
-                    <input type="text" id="cliente" name="cliente" class="form-control">
+                    <input type="text" id="cliente" name="cliente" class="form-control"
+                           maxlength="150" placeholder="Ej. Juan Pérez o Tlapalería X">
                 </div>
 
                 <!-- Proveedor (Casa) -->
                 <div class="form-group">
                     <label for="proveedor">Proveedor (Casa):</label>
                     <select id="proveedor" name="proveedor" class="form-control">
-                        <option value="Tlapa">Tlapa</option>
-                        <option value="Matriz">Matriz</option>
+                        <option value="TODAS">Todas las casas (buscar en todo el catálogo)</option>
+                        <?php foreach ($casas as $casa): ?>
+                            <option value="<?= htmlspecialchars($casa['codigo_casa'], ENT_QUOTES, 'UTF-8') ?>">
+                                <?= htmlspecialchars($casa['nombre'], ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -80,53 +63,53 @@ $rolUsuario = ucfirst($_SESSION['user_role'] ?? 'Rol');
                 <div class="form-group">
                     <label for="piezas">Piezas:</label>
                     <div class="search-container">
-                        <input type="text" id="piezas" name="piezas" class="form-control" placeholder="Buscar producto...">
+                        <input type="text" id="piezas" class="form-control"
+                               placeholder="Buscar por nombre o código..." autocomplete="off">
                         <i class="ph ph-magnifying-glass search-icon"></i>
-                        <button type="button" class="btn-add"><i class="ph ph-plus"></i></button>
+                    </div>
+                    <div id="resultados" class="search-results" hidden></div>
+                </div>
+
+                <!-- Productos agregados (dinámico) -->
+                <div id="lista-items" class="venta-items">
+                    <p class="venta-vacia">Aún no has agregado piezas a esta venta.</p>
+                </div>
+
+                <!-- Tipo de pago -->
+                <div class="form-group">
+                    <label for="tipo_pago">Tipo de pago:</label>
+                    <select id="tipo_pago" name="tipo_pago" class="form-control">
+                        <option value="contado">Contado</option>
+                        <option value="credito">Crédito</option>
+                    </select>
+                </div>
+
+                <div id="campos-credito" hidden>
+                    <div class="form-group">
+                        <label for="pago_inicial">Pago inicial (puede ser 0):</label>
+                        <input type="number" id="pago_inicial" class="form-control"
+                               min="0" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_vencimiento">Fecha de vencimiento:</label>
+                        <input type="date" id="fecha_vencimiento" class="form-control">
                     </div>
                 </div>
 
-                <!-- Detalle del Producto -->
-                <div class="product-summary-row">
-                    <div class="summary-item">
-                        <h4>Precio C/U:</h4>
-                        <p style="font-size: 1.1rem; font-weight: 500;">$25</p>
-                    </div>
-
-                    <div class="summary-item">
-                        <h4>Piezas:</h4>
-                        <p style="font-weight: 500;">Candado | Phillips, 63mm</p>
-                    </div>
-
-                    <div class="summary-item">
-                        <h4>Cantidad:</h4>
-                        <div class="quantity-control">
-                            <input type="number" value="7" class="input-qty" readonly>
-                            <button type="button" class="btn-remove"><i class="ph ph-minus"></i></button>
-                        </div>
-                    </div>
-                </div>
+                <div id="aviso-venta" class="aviso" hidden></div>
 
                 <!-- Footer del Formulario -->
                 <div class="card-footer-action">
                     <div class="total-price">
-                        Total: &nbsp;&nbsp;$175
+                        Total: &nbsp;&nbsp;<span id="total-venta">$0.00</span>
                     </div>
-                    <button type="submit" class="btn-save">Guardar</button>
+                    <button type="submit" class="btn-save" id="btn-guardar">Guardar</button>
                 </div>
             </form>
         </div>
     </main>
 
-    <!-- MENÚ INFERIOR MÓVIL (Puros íconos fijados abajo) -->
-    <nav class="bottom-nav">
-        <a href="index.php" class="active" title="Venta"><i class="ph ph-currency-dollar-simple"></i></a>
-        <a href="#" title="Dashboard"><i class="ph ph-chart-line-up"></i></a>
-        <a href="#" title="Historial"><i class="ph ph-clock-counter-clockwise"></i></a>
-        <a href="../users/index.php" title="Usuarios"><i class="ph ph-user-circle"></i></a>
-        <a href="#" title="Inventario"><i class="ph ph-shopping-cart"></i></a>
-        <a href="../auth/logout.php" title="Salir" style="color: #ffaaaa;"><i class="ph ph-sign-out"></i></a>
-    </nav>
 
+    <script src="../../public/js/venta.js"></script>
 </body>
 </html>

@@ -14,7 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo = Database::getConnection();
 
-        $stmt = $pdo->prepare('SELECT id, numero_empleado, nombre, apellido, rol, password FROM usuarios WHERE numero_empleado = :num_empleado LIMIT 1');
+        // activo = 1: un usuario dado de baja no debe poder entrar.
+        $stmt = $pdo->prepare('SELECT id, numero_empleado, nombre, apellido, rol, password FROM usuarios WHERE numero_empleado = :num_empleado AND activo = 1 LIMIT 1');
         $stmt->execute(['num_empleado' => $numEmpleado]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
