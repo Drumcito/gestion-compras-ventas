@@ -616,6 +616,15 @@ body.dashboard-body {
     border-bottom: 1px solid #eeeeee;
     cursor: pointer;
     font-family: inherit;
+    font-size: 1rem;
+    color: #222222;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.search-result-item:focus-visible,
+.venta-fila:focus-visible {
+    outline: 2px solid #08660b;
+    outline-offset: -2px;
 }
 
 .search-result-item:hover {
@@ -863,6 +872,9 @@ body.dashboard-body {
     padding: 0.9rem 1rem;
     cursor: pointer;
     font-family: inherit;
+    font-size: 1rem;
+    color: #222222;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .venta-fila:hover {

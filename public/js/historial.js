@@ -137,10 +137,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         datos.ventas.forEach((v) => {
-            const fila = document.createElement('button');
-            fila.type = 'button';
+            // <div> y no <button>: dentro de un boton, Firefox y Safari no
+            // respetan el layout de los hijos y la fila se ve amontonada.
+            const fila = document.createElement('div');
             fila.className = 'venta-fila';
             fila.dataset.id = v.id;
+            fila.setAttribute('role', 'button');
+            fila.tabIndex = 0;
 
             const etiquetaPago = v.estado_pago === 'devolucion'
                 ? '<span class="etiqueta etiqueta-devolucion">Devolución ' + money(v.devolucion) + '</span>'
@@ -452,6 +455,15 @@ document.addEventListener('DOMContentLoaded', () => {
     lista.addEventListener('click', (e) => {
         const fila = e.target.closest('.venta-fila');
         if (fila) verDetalle(fila.dataset.id);
+    });
+
+    lista.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const fila = e.target.closest('.venta-fila');
+        if (fila) {
+            e.preventDefault();
+            verDetalle(fila.dataset.id);
+        }
     });
 
     contenido.addEventListener('click', async (e) => {

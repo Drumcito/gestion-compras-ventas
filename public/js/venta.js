@@ -75,9 +75,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         productos.forEach((p) => {
-            const fila = document.createElement('button');
-            fila.type = 'button';
+            // Va como <div> y no como <button>: Firefox, Safari y Chrome de
+            // Android ignoran el display:block de los hijos de un boton y
+            // amontonan los tres renglones en uno solo.
+            const fila = document.createElement('div');
             fila.className = 'search-result-item';
+            fila.setAttribute('role', 'button');
+            fila.tabIndex = 0;
 
             const precios = [];
             if (p.precio_menudeo !== null) precios.push('Menudeo ' + money(Number(p.precio_menudeo)));
@@ -91,6 +95,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<span class="res-precio">' + (precios.join(' | ') || 'Sin precio') + '</span>';
 
             fila.addEventListener('click', () => agregarItem(p));
+
+            // Al dejar de ser <button> hay que reponer el teclado a mano.
+            fila.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    agregarItem(p);
+                }
+            });
+
             resultados.appendChild(fila);
         });
 
