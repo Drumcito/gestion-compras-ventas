@@ -15,9 +15,10 @@ database/
 Thumbs.db
 desktop.ini
 
-# Credenciales reales (nunca se suben)
+# Credenciales reales (nunca se suben): .local en tu maquina, .prod en el servidor
 app/config/credenciales.local.php
 config/credenciales.local.php
+config/credenciales.prod.php
 crear_usuarios.php
 app/config/seed/consultas.sql
 app/config/migrations/gabe_system_hosting.sql

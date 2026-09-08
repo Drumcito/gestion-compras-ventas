@@ -9,16 +9,27 @@ class Database
     private function __construct()
     {
 
-        // Las credenciales viven en config/credenciales.local.php, que no se
-        // versiona. Así el mismo código sirve en local y en el hosting sin que
-        // ninguna contraseña llegue al repositorio.
-        // Para configurarlo: copia credenciales.example.php como
-        // credenciales.local.php y edita los valores.
-        $archivo = __DIR__ . '/credenciales.local.php';
+        // Las credenciales viven fuera del repositorio (ver .gitignore), así el
+        // mismo código sirve en local y en el hosting sin que ninguna contraseña
+        // llegue a Git. Se acepta cualquiera de los dos nombres: .local en tu
+        // máquina y .prod en el servidor. Si existen ambos, gana .local.
+        $posibles = [
+            __DIR__ . '/credenciales.local.php',
+            __DIR__ . '/credenciales.prod.php',
+        ];
 
-        if (!file_exists($archivo)) {
-            die('Falta config/credenciales.local.php. Copia credenciales.example.php '
-                . 'con ese nombre y pon ahí los datos de tu base de datos.');
+        $archivo = null;
+        foreach ($posibles as $ruta) {
+            if (file_exists($ruta)) {
+                $archivo = $ruta;
+                break;
+            }
+        }
+
+        if ($archivo === null) {
+            die('Falta el archivo de credenciales. Copia config/credenciales.example.php '
+                . 'como credenciales.local.php (o credenciales.prod.php en el servidor) '
+                . 'y pon ahí los datos de tu base de datos.');
         }
 
         $cfg = require $archivo;
