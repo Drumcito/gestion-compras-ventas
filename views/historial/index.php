@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/../partials/assets.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
@@ -17,7 +18,7 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Historial de Ventas - Comercializadora GA-BE</title>
 
-    <link rel="stylesheet" href="../../public/css/style.css">
+    <link rel="stylesheet" href="<?= recurso('css/style.css') ?>">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body class="dashboard-body">
@@ -79,6 +80,6 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
 
     <script>window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;</script>
-    <script src="../../public/js/historial.js"></script>
+    <script src="<?= recurso('js/historial.js') ?>"></script>
 </body>
 </html>

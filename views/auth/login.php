@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/../partials/assets.php'; ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -5,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar Sesión - Comercializadora GA-BE</title>
     <!-- Vinculación del CSS modular -->
-    <link rel="stylesheet" href="../../public/css/style.css">
+    <link rel="stylesheet" href="<?= recurso('css/style.css') ?>">
     <style>
         .alert-error {
             background-color: #fee2e2;

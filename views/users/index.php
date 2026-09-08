@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/../partials/assets.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
@@ -19,7 +20,7 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Usuarios - Comercializadora GA-BE</title>
 
-    <link rel="stylesheet" href="../../public/css/style.css">
+    <link rel="stylesheet" href="<?= recurso('css/style.css') ?>">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body class="dashboard-body">
@@ -51,6 +52,6 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
         </div>
     </div>
 
-    <script src="../../public/js/usuarios.js"></script>
+    <script src="<?= recurso('js/usuarios.js') ?>"></script>
 </body>
 </html>

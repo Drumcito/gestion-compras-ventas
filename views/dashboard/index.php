@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/../partials/assets.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
@@ -23,7 +24,7 @@ $casas = Database::getConnection()
     <title>Venta - Comercializadora GA-BE</title>
     
     <!-- CSS Modular -->
-    <link rel="stylesheet" href="../../public/css/style.css">
+    <link rel="stylesheet" href="<?= recurso('css/style.css') ?>">
     
     <!-- Librería de Íconos -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -110,6 +111,6 @@ $casas = Database::getConnection()
     </main>
 
 
-    <script src="../../public/js/venta.js"></script>
+    <script src="<?= recurso('js/venta.js') ?>"></script>
 </body>
 </html>
