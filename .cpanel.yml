@@ -1,5 +1,6 @@
 ---
-deployment;
+deployment:
   tasks:
-    - export DEPLOYPATH=/home/gabenet/public_html/
+    - export DEPLOYPATH=/home/gabenet/public_html/GABE/
+    - /bin/mkdir -p $DEPLOYPATH
     - /bin/cp -R * $DEPLOYPATH

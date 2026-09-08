@@ -21,3 +21,5 @@ config/credenciales.local.php
 crear_usuarios.php
 app/config/seed/consultas.sql
 app/config/migrations/gabe_system_hosting.sql
+# Herramienta local para generar hashes (nunca al servidor)
+generar_hash.php
