@@ -152,9 +152,11 @@ body {
 }
 
 /* ==========================================================================
-   RESPONSIVO: DISPOSITIVOS MÓVILES (PANTALLAS ≤ 768px)
+   RESPONSIVO: MÓVIL Y TABLET EN VERTICAL
+   La tablet en vertical usa el mismo diseño apilado del celular; en
+   horizontal se queda con el diseño de escritorio.
    ========================================================================== */
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-width: 1024px) and (orientation: portrait) {
     body {
         flex-direction: column;
         justify-content: center;
@@ -206,6 +208,53 @@ body {
 
     .login-header {
         text-align: center;
+    }
+}
+
+/* ==========================================================================
+   LOGIN EN TABLET HORIZONTAL (769px - 1280px, apaisado)
+   En estas pantallas el semicirculo de 120vh no alcanza a salirse por arriba
+   y por abajo, asi que su curva queda visible dentro del encuadre y la marca
+   se ve como una pelota flotando con esquinas oscuras. Aqui se convierte en
+   un panel pegado a los bordes izquierdo, superior e inferior, y solo el
+   lado derecho conserva la curva.
+   ========================================================================== */
+@media (min-width: 769px) and (max-width: 1280px) and (orientation: landscape) {
+    .circle-container {
+        top: 0;
+        left: 0;
+        width: 44vw;
+        height: 100vh;
+        border-radius: 0 45% 45% 0 / 0 50% 50% 0;
+        padding-left: 0;
+        box-shadow: 8px 0 24px rgba(255, 85, 0, 0.22);
+    }
+
+    .brand-content {
+        max-width: 260px;
+    }
+
+    .brand-logo {
+        width: 105px;
+        margin-bottom: 1rem;
+    }
+
+    .brand-title {
+        font-size: 1.2rem;
+        letter-spacing: 1px;
+    }
+
+    .login-wrapper {
+        padding-right: 6%;
+    }
+
+    .login-card {
+        max-width: 370px;
+        padding: 2rem 1.75rem;
+    }
+
+    .login-header {
+        margin-bottom: 1.5rem;
     }
 }
 
@@ -448,9 +497,11 @@ body.dashboard-body {
 }
 
 /* ==========================================
-   DISEÑO RESPONSIVO (MÓVIL / TELÉFONOS)
+   DISEÑO RESPONSIVO: MÓVIL Y TABLET EN VERTICAL
+   Misma regla que el login: vertical = diseño de celular (menú inferior),
+   horizontal = diseño de escritorio (menú lateral).
    ========================================== */
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-width: 1024px) and (orientation: portrait) {
     body.dashboard-body {
         flex-direction: column;
         padding-bottom: 70px; /* Margen para que el menú inferior no tape contenido */
@@ -498,6 +549,9 @@ body.dashboard-body {
         z-index: 1000;
     }
 
+    /* flex:1 reparte el ancho disponible en partes iguales. Con width:100%
+       cada enlace pedia el ancho completo (6 x 100% = 600%) y el menu
+       terminaba desbordando la pantalla. min-width:0 permite que encojan. */
     .bottom-nav a {
         color: rgba(255, 255, 255, 0.7);
         text-decoration: none;
@@ -505,7 +559,8 @@ body.dashboard-body {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 100%;
+        flex: 1 1 0;
+        min-width: 0;
         height: 100%;
         transition: color 0.2s ease;
     }
@@ -514,4 +569,607 @@ body.dashboard-body {
         color: #ffffff;
         font-size: 1.9rem;
     }
+
+    /* Las tablas del detalle son mas anchas que un celular: se desplazan
+       dentro de su propia caja en vez de estirar toda la pagina. */
+    .tabla-detalle {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .tabla-detalle td:first-child,
+    .tabla-detalle th:first-child {
+        white-space: normal;
+        min-width: 140px;
+    }
+}
+
+/* En pantallas muy angostas los iconos se achican para que quepan los 6. */
+@media (max-width: 360px) {
+    .bottom-nav a {
+        font-size: 1.35rem;
+    }
+
+    .bottom-nav a.active {
+        font-size: 1.6rem;
+    }
+}
+/* ===== VENTA: buscador de productos y renglones del ticket ===== */
+
+.search-results {
+    margin-top: 0.5rem;
+    max-height: 280px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #aaaaaa;
+    border-radius: 12px;
+}
+
+.search-result-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.7rem 1rem;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #eeeeee;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.search-result-item:hover {
+    background-color: #f0f7f0;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.res-nombre {
+    display: block;
+    font-weight: 600;
+    color: #222222;
+}
+
+.res-meta {
+    display: block;
+    font-size: 0.8rem;
+    color: #666666;
+    margin-top: 0.15rem;
+}
+
+.res-precio {
+    display: block;
+    font-size: 0.85rem;
+    color: #08660b;
+    font-weight: 600;
+    margin-top: 0.15rem;
+}
+
+.sin-resultados {
+    padding: 0.9rem 1rem;
+    color: #666666;
+    margin: 0;
+}
+
+.venta-items {
+    margin: 1.5rem 0;
+}
+
+.venta-vacia {
+    text-align: center;
+    color: #777777;
+    padding: 1.5rem 0;
+    margin: 0;
+}
+
+.venta-item {
+    display: grid;
+    grid-template-columns: 2fr 1.3fr 1.1fr 0.8fr;
+    align-items: center;
+    gap: 1rem;
+    background: #f7f7f7;
+    border: 1px solid #cccccc;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.item-nombre {
+    font-weight: 600;
+    margin: 0;
+    color: #222222;
+}
+
+.item-meta {
+    font-size: 0.8rem;
+    color: #666666;
+    margin: 0.15rem 0 0;
+}
+
+.select-precio {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.85rem;
+    border-radius: 8px;
+}
+
+.item-unitario {
+    display: block;
+    font-size: 0.8rem;
+    color: #555555;
+    margin-top: 0.3rem;
+}
+
+.item-cantidad {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.input-cantidad {
+    width: 60px;
+}
+
+.item-subtotal {
+    text-align: right;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #08660b;
+}
+
+.aviso {
+    padding: 0.8rem 1rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    font-weight: 500;
+}
+
+.aviso-ok {
+    background-color: #e3f4e4;
+    color: #08660b;
+    border: 1px solid #08660b;
+}
+
+.aviso-error {
+    background-color: #fdecea;
+    color: #b71c1c;
+    border: 1px solid #e53935;
+}
+
+@media (max-width: 640px) {
+    .venta-item {
+        grid-template-columns: 1fr 1fr;
+        row-gap: 0.75rem;
+    }
+
+    .item-datos {
+        grid-column: 1 / -1;
+    }
+
+    .item-subtotal {
+        text-align: left;
+    }
+}
+
+/* ===== HISTORIAL DE VENTAS ===== */
+
+.card-historial {
+    max-width: 900px;
+}
+
+.res-casa {
+    display: inline-block;
+    background: #08660b;
+    color: #ffffff;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: 6px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+.filtros {
+    border-bottom: 1px solid #cccccc;
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.filtros-rapidos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.chip {
+    background: #f7f7f7;
+    border: 1px solid #aaaaaa;
+    border-radius: 20px;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-family: inherit;
+    color: #333333;
+}
+
+.chip:hover {
+    background: #eaeaea;
+}
+
+.chip-activo {
+    background: #08660b;
+    border-color: #08660b;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.filtros-rango {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.campo-fecha label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+    color: #333333;
+}
+
+.campo-fecha .form-control {
+    width: auto;
+    padding: 0.5rem 0.75rem;
+}
+
+.btn-filtrar {
+    padding: 0.55rem 1.5rem;
+    border-radius: 12px;
+    font-size: 1rem;
+}
+
+.resumen-periodo {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    color: #444444;
+}
+
+.resumen-periodo strong {
+    color: #08660b;
+    font-size: 1.1rem;
+}
+
+.lista-ventas {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.venta-fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    text-align: left;
+    background: #f7f7f7;
+    border: 1px solid #cccccc;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.venta-fila:hover {
+    background: #f0f7f0;
+    border-color: #08660b;
+}
+
+.venta-fila-cliente {
+    font-weight: 600;
+    margin: 0;
+    color: #222222;
+}
+
+.icono-editable {
+    color: #08660b;
+    margin-left: 0.4rem;
+    font-size: 0.9rem;
+}
+
+.venta-fila-meta {
+    font-size: 0.8rem;
+    color: #666666;
+    margin: 0.2rem 0 0;
+}
+
+.venta-fila-derecha {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+    flex-shrink: 0;
+}
+
+.venta-fila-total {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #08660b;
+}
+
+.etiqueta {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.55rem;
+    border-radius: 20px;
+    text-transform: capitalize;
+}
+
+.etiqueta-pagado   { background: #e3f4e4; color: #08660b; border: 1px solid #08660b; }
+.etiqueta-parcial  { background: #fff4e0; color: #a35c00; border: 1px solid #d98b00; }
+.etiqueta-pendiente{ background: #fdecea; color: #b71c1c; border: 1px solid #e53935; }
+
+/* ----- Modal de detalle ----- */
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 1000;
+}
+
+/* display:flex le gana al atributo hidden, hay que anularlo a mano. */
+.modal[hidden] {
+    display: none;
+}
+
+.modal-caja {
+    position: relative;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 680px;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.modal-cerrar {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #555555;
+    line-height: 1;
+}
+
+.detalle-titulo {
+    margin: 0 0 1rem;
+    color: #08660b;
+}
+
+.detalle-cabecera p {
+    margin: 0.3rem 0;
+    color: #333333;
+}
+
+.tabla-detalle {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.25rem 0;
+    font-size: 0.9rem;
+}
+
+.tabla-detalle th,
+.tabla-detalle td {
+    padding: 0.6rem 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    text-align: left;
+    vertical-align: top;
+}
+
+.tabla-detalle th {
+    background: #f2f2f2;
+    font-weight: 600;
+}
+
+.tabla-detalle .num {
+    text-align: right;
+}
+
+.tabla-detalle tfoot td {
+    border-bottom: none;
+    border-top: 2px solid #08660b;
+    font-size: 1rem;
+}
+
+.detalle-sub {
+    display: block;
+    font-size: 0.78rem;
+    color: #777777;
+    margin-top: 0.15rem;
+}
+
+.detalle-credito {
+    background: #fffaf0;
+    border: 1px solid #d98b00;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.detalle-credito h3 {
+    margin: 0 0 0.5rem;
+    color: #a35c00;
+}
+
+.lista-abonos {
+    margin: 0.5rem 0 0;
+    padding-left: 1.2rem;
+    font-size: 0.9rem;
+}
+
+.detalle-acciones {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+@media (max-width: 640px) {
+    .venta-fila {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .venta-fila-derecha {
+        align-items: flex-start;
+        flex-direction: row;
+    }
+
+    .modal-caja {
+        padding: 1.5rem 1rem;
+    }
+
+    .tabla-detalle {
+        font-size: 0.8rem;
+    }
+}
+
+/* ----- Auditoría de cambios ----- */
+
+.detalle-auditoria {
+    background: #f2f6ff;
+    border: 1px solid #7a9cc6;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.detalle-auditoria h3 {
+    margin: 0 0 0.5rem;
+    color: #2c4a70;
+}
+
+.lista-auditoria {
+    margin: 0;
+    padding-left: 1.2rem;
+    font-size: 0.88rem;
+}
+
+.lista-auditoria li {
+    margin-bottom: 0.5rem;
+}
+
+.aud-campo {
+    font-weight: 600;
+    color: #2c4a70;
+}
+
+.aud-antes {
+    color: #b71c1c;
+    text-decoration: line-through;
+}
+
+.aud-despues {
+    color: #08660b;
+    font-weight: 600;
+}
+
+.detalle-acciones {
+    gap: 0.75rem;
+}
+
+/* ----- Devoluciones (el negocio le debe dinero al cliente) ----- */
+
+.etiqueta-devolucion {
+    background: #ede7f6;
+    color: #4527a0;
+    border: 1px solid #5e35b1;
+}
+
+.detalle-devolucion {
+    background: #f3effa;
+    border: 1px solid #5e35b1;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.detalle-devolucion h3 {
+    margin: 0 0 0.5rem;
+    color: #4527a0;
+}
+
+.detalle-devolucion strong {
+    color: #4527a0;
+}
+
+.aviso-devolucion {
+    background-color: #f3effa;
+    color: #4527a0;
+    border: 1px solid #5e35b1;
+}
+
+.resumen-devolucion {
+    color: #4527a0;
+    font-weight: 600;
+}
+
+/* ===== GESTIÓN DE USUARIOS (solo admin) ===== */
+
+.usuario-fila {
+    cursor: default;
+}
+
+.usuario-fila:hover {
+    background: #f7f7f7;
+    border-color: #cccccc;
+}
+
+.usuario-inactivo {
+    opacity: 0.65;
+}
+
+.etiqueta-admin {
+    background: #fdf0e6;
+    color: #b34700;
+    border: 1px solid #d9531e;
+}
+
+.usuario-etiquetas,
+.usuario-acciones {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.usuario-acciones {
+    margin-top: 0.4rem;
+}
+
+.chip-peligro {
+    border-color: #e53935;
+    color: #b71c1c;
+}
+
+.chip-peligro:hover {
+    background: #fdecea;
+}
+
+#btn-nuevo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
 }
