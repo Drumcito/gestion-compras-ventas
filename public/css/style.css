@@ -275,6 +275,9 @@ body.dashboard-body {
 }
 
 /* --- SIDEBAR (PC y Tablets) --- */
+/* sticky + align-self:flex-start lo dejan fijo mientras el contenido baja, sin
+   sacarlo del flujo: asi no hay que compensar con margenes en .main-content.
+   Si el menu llegara a ser mas alto que la pantalla, se desplaza por dentro. */
 .sidebar {
     width: 240px;
     background-color: #d9531e;
@@ -283,6 +286,11 @@ body.dashboard-body {
     flex-direction: column;
     color: #ffffff;
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .user-profile {
@@ -1199,4 +1207,178 @@ body.dashboard-body {
     color: #1c4b7a;
     border: 1px solid #7a9cc6;
     font-weight: 400;
+}
+
+/* ==========================================================================
+   TABLET EN VERTICAL (769px - 1024px)
+   Conserva el diseño apilado del celular, pero con los componentes bastante
+   más grandes: en una pantalla de 10-13" los tamaños de teléfono se ven
+   diminutos y obligan a forzar la vista.
+   ========================================================================== */
+@media (min-width: 769px) and (max-width: 1024px) and (orientation: portrait) {
+    body.dashboard-body {
+        padding-bottom: 104px;   /* el menú inferior es más alto aquí */
+    }
+
+    .main-content {
+        padding: 2.5rem 1.5rem;
+    }
+
+    .page-title {
+        font-size: 3.2rem;
+        margin-bottom: 2rem;
+    }
+
+    .card-form {
+        max-width: 780px;
+        padding: 3rem 2.5rem;
+        border-radius: 24px;
+    }
+
+    /* --- Formularios --- */
+    .form-group {
+        margin-bottom: 2.25rem;
+    }
+
+    .form-group label {
+        font-size: 1.5rem;
+        margin-bottom: 0.7rem;
+    }
+
+    /* Se nombra el elemento (input/select) porque la hoja del login trae
+       ".form-group input", mas especifico que ".form-control": sin esto los
+       campos de texto se quedaban chicos y solo crecian los desplegables. */
+    .form-control,
+    .form-group input.form-control,
+    .form-group select.form-control {
+        padding: 1.25rem 1.35rem;
+        font-size: 1.4rem;
+        border-radius: 16px;
+    }
+
+    .search-container i.search-icon {
+        font-size: 1.8rem;
+        right: 1.35rem;
+    }
+
+    /* --- Resultados de la búsqueda --- */
+    .search-results {
+        max-height: 520px;
+        border-radius: 16px;
+    }
+
+    .search-result-item {
+        padding: 1.25rem 1.5rem;
+    }
+
+    .res-nombre  { font-size: 1.4rem; }
+    .res-meta    { font-size: 1.1rem; margin-top: 0.3rem; }
+    .res-precio  { font-size: 1.2rem; margin-top: 0.3rem; }
+    .res-casa    { font-size: 0.95rem; padding: 0.2rem 0.7rem; }
+
+    /* --- Piezas agregadas al ticket --- */
+    /* Con la letra más grande el nombre del producto se partía en tres
+       renglones, así que esa columna se lleva más ancho. */
+    .venta-item {
+        grid-template-columns: 2.4fr 1.4fr 1.05fr 0.85fr;
+        padding: 1.4rem 1.25rem;
+        gap: 1rem;
+        border-radius: 16px;
+    }
+
+    .item-nombre     { font-size: 1.35rem; }
+    .item-meta       { font-size: 1.1rem; }
+    .item-unitario   { font-size: 1.1rem; }
+    .item-subtotal   { font-size: 1.5rem; }
+    .select-precio   { font-size: 1.05rem; padding: 0.6rem 0.5rem; }
+
+    .input-qty {
+        width: 78px;
+        height: 56px;
+        font-size: 1.4rem;
+    }
+
+    .btn-remove {
+        width: 48px;
+        height: 48px;
+        font-size: 1.7rem;
+    }
+
+    /* --- Pie del formulario --- */
+    .total-price {
+        font-size: 2rem;
+    }
+
+    .btn-save {
+        padding: 1.1rem 3.5rem;
+        font-size: 1.5rem;
+        border-radius: 26px;
+    }
+
+    .venta-vacia {
+        font-size: 1.35rem;
+        padding: 2.5rem 0;
+    }
+
+    .aviso {
+        font-size: 1.25rem;
+        padding: 1.25rem 1.4rem;
+        border-radius: 14px;
+    }
+
+    /* --- Historial --- */
+    .chip {
+        font-size: 1.25rem;
+        padding: 0.7rem 1.5rem;
+        border-radius: 26px;
+    }
+
+    .campo-fecha label       { font-size: 1.2rem; }
+    .resumen-periodo         { font-size: 1.3rem; }
+    .resumen-periodo strong  { font-size: 1.6rem; }
+
+    .venta-fila {
+        padding: 1.4rem 1.5rem;
+        border-radius: 16px;
+    }
+
+    .venta-fila-cliente { font-size: 1.4rem; }
+    .venta-fila-meta    { font-size: 1.1rem; margin-top: 0.35rem; }
+    .venta-fila-total   { font-size: 1.6rem; }
+    .etiqueta           { font-size: 1rem; padding: 0.3rem 0.85rem; }
+
+    /* --- Detalle de la venta --- */
+    .modal-caja {
+        max-width: 94vw;
+        padding: 3rem 2.5rem;
+        border-radius: 24px;
+    }
+
+    .modal-cerrar        { font-size: 2rem; }
+    .detalle-titulo      { font-size: 2rem; }
+    .detalle-cabecera p  { font-size: 1.3rem; margin: 0.45rem 0; }
+    .tabla-detalle       { font-size: 1.25rem; }
+    .detalle-sub         { font-size: 1.05rem; }
+    .detalle-credito h3,
+    .detalle-auditoria h3 { font-size: 1.5rem; }
+    .lista-abonos,
+    .lista-auditoria     { font-size: 1.15rem; }
+
+    .tabla-detalle th,
+    .tabla-detalle td {
+        padding: 1rem 0.7rem;
+    }
+
+    .btn-precio {
+        font-size: 1.05rem;
+        padding: 0.45rem 1rem;
+    }
+
+    /* --- Menú inferior --- */
+    .bottom-nav {
+        height: 94px;
+    }
+
+    .bottom-nav a          { font-size: 2.7rem; }
+    .bottom-nav a.active   { font-size: 3.1rem; }
 }
