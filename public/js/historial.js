@@ -201,6 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<td class="num">' + money(i.precio_aplicado) + '</td>' +
                 '<td class="num">' + i.cantidad + '</td>' +
                 '<td class="num">' + money(i.subtotal) + '</td>' +
+                '<td><button type="button" class="chip btn-precio" ' +
+                    'data-codigo="' + i.codigo_interno_producto + '" ' +
+                    'data-venta="' + v.id + '" ' +
+                    'title="Cambiar el precio de este producto en el catálogo">Editar precio</button></td>' +
             '</tr>'
         ).join('');
 
@@ -263,15 +267,133 @@ document.addEventListener('DOMContentLoaded', () => {
             '</div>' +
             '<table class="tabla-detalle">' +
                 '<thead><tr><th>Producto</th><th>Precio</th><th class="num">C/U</th>' +
-                '<th class="num">Cant.</th><th class="num">Subtotal</th></tr></thead>' +
+                '<th class="num">Cant.</th><th class="num">Subtotal</th><th></th></tr></thead>' +
                 '<tbody>' + filas + '</tbody>' +
                 '<tfoot><tr><td colspan="4" class="num"><strong>Total</strong></td>' +
-                '<td class="num"><strong>' + money(v.total) + '</strong></td></tr></tfoot>' +
+                '<td class="num"><strong>' + money(v.total) + '</strong></td><td></td></tr></tfoot>' +
             '</table>' +
             bloqueDevolucion +
             credito +
             auditoria +
             '<div class="detalle-acciones">' + botonEditar + '</div>';
+    }
+
+    // ---------- Precio del catalogo ----------
+    // Cambia el precio del producto para las ventas futuras. Las ventas ya
+    // hechas conservan el precio con el que se cobraron (por eso el detalle
+    // guarda una copia), asi que esta venta no cambia de total.
+    let ventaDelPrecio = null;
+
+    async function abrirPrecio(codigo, ventaId) {
+        ventaDelPrecio = ventaId;
+        contenido.innerHTML = '<p class="venta-vacia">Cargando precio actual...</p>';
+
+        try {
+            const respuesta = await fetch(
+                '../../app/controllers/PrecioController.php?accion=consultar&codigo=' + encodeURIComponent(codigo)
+            );
+            const datos = await respuesta.json();
+
+            if (!datos.ok) {
+                contenido.innerHTML = '<p class="aviso aviso-error">' +
+                    esc(datos.error || 'No se pudo cargar el producto') + '</p>';
+                return;
+            }
+
+            pintarFormularioPrecio(datos.producto);
+
+        } catch (e) {
+            contenido.innerHTML = '<p class="aviso aviso-error">Error de conexión.</p>';
+        }
+    }
+
+    function pintarFormularioPrecio(p) {
+        const valor = (n) => (n === null ? '' : Number(n).toFixed(2));
+        const actual = (n) => (n === null ? 'sin precio' : money(n));
+
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Editar precio</h2>' +
+            '<div class="detalle-cabecera">' +
+                '<p><strong>' + esc(p.nombre) + '</strong></p>' +
+                '<p class="detalle-sub">' + p.codigo_interno + ' · ' + esc(p.codigo_proveedor || '') +
+                    (p.marca ? ' · ' + esc(p.marca) : '') + '</p>' +
+            '</div>' +
+            '<p class="aviso aviso-info">Esto cambia el precio del producto en el catálogo, ' +
+                'para las <strong>ventas futuras</strong>. Las ventas ya registradas conservan ' +
+                'el precio con el que se cobraron.</p>' +
+            '<div class="form-group">' +
+                '<label for="precio-menudeo">Precio menudeo <span class="detalle-sub">' +
+                    '(actual: ' + actual(p.precio_menudeo) + ')</span></label>' +
+                '<input type="number" id="precio-menudeo" class="form-control" ' +
+                       'min="0" step="0.01" value="' + valor(p.precio_menudeo) + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label for="precio-mayoreo">Precio mayoreo <span class="detalle-sub">' +
+                    '(actual: ' + actual(p.precio_mayoreo) + ')</span></label>' +
+                '<input type="number" id="precio-mayoreo" class="form-control" ' +
+                       'min="0" step="0.01" value="' + valor(p.precio_mayoreo) + '">' +
+            '</div>' +
+            '<p class="detalle-sub">Deja un campo vacío para no tocar ese precio. ' +
+                'Puedes cambiar solo uno o los dos.</p>' +
+            '<div id="precio-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-cancelar-precio">Cancelar</button>' +
+                '<button type="button" class="btn-save" id="btn-guardar-precio" ' +
+                    'data-codigo="' + p.codigo_interno + '">Guardar precio</button>' +
+            '</div>';
+    }
+
+    async function guardarPrecio(codigo) {
+        const avisoPrecio = document.getElementById('precio-aviso');
+        const boton = document.getElementById('btn-guardar-precio');
+
+        boton.disabled = true;
+        boton.textContent = 'Guardando...';
+
+        try {
+            const respuesta = await fetch('../../app/controllers/PrecioController.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    codigo:         codigo,
+                    precio_menudeo: document.getElementById('precio-menudeo').value,
+                    precio_mayoreo: document.getElementById('precio-mayoreo').value,
+                }),
+            });
+            const datos = await respuesta.json();
+
+            if (!datos.ok) {
+                avisoPrecio.textContent = datos.error || 'No se pudo guardar.';
+                avisoPrecio.className = 'aviso aviso-error';
+                avisoPrecio.hidden = false;
+                return;
+            }
+
+            if (datos.cambios === 0) {
+                mostrarAviso(datos.mensaje, 'ok');
+            } else {
+                const linea = (etiqueta, d) => {
+                    if (d.tendencia === 'igual') return '';
+                    const antes = d.antes === null ? 'sin precio' : money(d.antes);
+                    return ' ' + etiqueta + ': ' + antes + ' → ' + money(d.despues) + '.';
+                };
+                mostrarAviso(
+                    'Precio de ' + datos.nombre + ' actualizado.' +
+                    linea('Menudeo', datos.menudeo) + linea('Mayoreo', datos.mayoreo),
+                    'ok'
+                );
+            }
+
+            verDetalle(ventaDelPrecio);
+
+        } catch (e) {
+            avisoPrecio.textContent = 'Error de conexión.';
+            avisoPrecio.className = 'aviso aviso-error';
+            avisoPrecio.hidden = false;
+        } finally {
+            boton.disabled = false;
+            boton.textContent = 'Guardar precio';
+        }
     }
 
     // ---------- Edicion ----------
@@ -467,6 +589,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     contenido.addEventListener('click', async (e) => {
+        const botonPrecio = e.target.closest('.btn-precio');
+        if (botonPrecio) {
+            abrirPrecio(botonPrecio.dataset.codigo, botonPrecio.dataset.venta);
+            return;
+        }
+
+        if (e.target.id === 'btn-cancelar-precio') {
+            verDetalle(ventaDelPrecio);
+            return;
+        }
+
+        if (e.target.id === 'btn-guardar-precio') {
+            guardarPrecio(e.target.dataset.codigo);
+            return;
+        }
+
         if (e.target.id === 'btn-editar-venta') {
             const respuesta = await fetch(
                 '../../app/controllers/HistorialController.php?accion=detalle&id=' + e.target.dataset.id
