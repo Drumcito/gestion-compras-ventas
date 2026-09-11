@@ -87,9 +87,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (p.precio_menudeo !== null) precios.push('Menudeo ' + money(Number(p.precio_menudeo)));
             if (p.precio_mayoreo !== null) precios.push('Mayoreo ' + money(Number(p.precio_mayoreo)));
 
+            // casa-BNS01, casa-BNS02... le da a cada casa su color en el CSS.
+            const claseCasa = 'casa-' + String(p.codigo_casa || '').replace(/[^A-Za-z0-9_-]/g, '');
+
             fila.innerHTML =
                 '<span class="res-nombre">' + p.nombre +
-                    '<span class="res-casa">' + p.nombre_casa + '</span></span>' +
+                    '<span class="res-casa ' + claseCasa + '">' + p.nombre_casa + '</span></span>' +
                 '<span class="res-meta">' + p.codigo_interno + ' · ' + (p.codigo_proveedor || '') +
                 (p.marca ? ' · ' + p.marca : '') + '</span>' +
                 '<span class="res-precio">' + (precios.join(' | ') || 'Sin precio') + '</span>';
@@ -108,6 +111,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         resultados.hidden = false;
+        // Cambiar el contenido no mueve el scroll de la caja: sin esto, una
+        // busqueda nueva se veia desde donde se quedo la anterior. Va despues
+        // de mostrarla porque en una caja oculta el scroll no se aplica.
+        resultados.scrollTop = 0;
     }
 
     // ---------- Items de la venta ----------
@@ -173,24 +180,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? '<option value="menudeo" disabled>Menudeo (no disponible)</option>'
                 : '<option value="menudeo"' + (item.tipo_precio === 'menudeo' ? ' selected' : '') + '>Menudeo</option>';
 
+            // Todo va suelto dentro de la fila para que el CSS lo acomode en dos
+            // renglones: arriba nombre / precio / cantidad / subtotal y abajo
+            // casa / precio unitario, alineados entre sí.
             fila.innerHTML =
-                '<div class="item-datos">' +
-                    '<p class="item-nombre">' + item.nombre + '</p>' +
-                    '<p class="item-meta">' + item.casa_nombre + ' · ' + item.codigo_interno + '</p>' +
-                '</div>' +
-                '<div class="item-precio">' +
-                    '<select class="form-control select-precio" data-i="' + indice + '">' +
-                        opcionMenudeo + opcionMayoreo +
-                    '</select>' +
-                    '<span class="item-unitario">' + money(precio) + ' c/u</span>' +
-                '</div>' +
-                '<div class="item-cantidad">' +
-                    '<input type="number" class="input-qty input-cantidad" data-i="' + indice + '" ' +
-                           'value="' + item.cantidad + '" min="1" step="1">' +
-                    '<button type="button" class="btn-remove btn-quitar" data-i="' + indice + '" title="Quitar">' +
-                        '<i class="ph ph-minus"></i></button>' +
-                '</div>' +
-                '<div class="item-subtotal">' + money(subtotal) + '</div>';
+                '<p class="item-nombre">' + item.nombre + '</p>' +
+                '<p class="item-meta">' + item.casa_nombre + ' · ' + item.codigo_interno + '</p>' +
+                '<select class="form-control select-precio" data-i="' + indice + '" aria-label="Tipo de precio">' +
+                    opcionMenudeo + opcionMayoreo +
+                '</select>' +
+                '<span class="item-unitario">' + money(precio) + ' c/u</span>' +
+                '<input type="number" class="input-qty input-cantidad" data-i="' + indice + '" ' +
+                       'value="' + item.cantidad + '" min="1" step="1" aria-label="Cantidad">' +
+                '<div class="item-subtotal">' + money(subtotal) + '</div>' +
+                '<button type="button" class="btn-quitar" data-i="' + indice + '" ' +
+                        'title="Quitar pieza" aria-label="Quitar pieza">' +
+                    '<i class="ph ph-x"></i></button>';
 
             listaItems.appendChild(fila);
         });

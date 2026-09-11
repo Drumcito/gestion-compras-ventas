@@ -268,22 +268,46 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+/* Paleta del panel: el fondo naranja del contenido y el gris carbón del menú.
+   Los dos naranjas normalmente van juntos como degradado (claro -> oscuro).
+   La opción activa del menú usa el naranja oscuro liso, igual que el fondo,
+   para verse como una "pestaña" que sale del contenido. */
+:root {
+    --ga-naranja-claro: #ffbb5b;
+    --ga-naranja-oscuro: #c97500;
+    --ga-carbon: #34373c;
+    --ga-carbon-claro: #464a51;
+    --ga-carbon-borde: #575b63;
+
+    /* Un color por casa, el mismo en las etiquetas de búsqueda y en las
+       gráficas del dashboard. Se revisaron para que se distingan entre sí
+       también con daltonismo; si se agrega una casa, validar el color nuevo
+       contra estos cuatro. */
+    --casa-BNS01: #1976d2; /* Diplomex: azul */
+    --casa-BNS02: #7b1fa2; /* Marcus: morado */
+    --casa-BNS03: #08660b; /* La Jaladera: verde */
+    --casa-BNS04: #c2185b; /* Ferra Cholulita: rosa */
+}
+
 body.dashboard-body {
     display: flex;
     min-height: 100vh;
-    background-color: #e5e5e5;
+    background-color: var(--ga-naranja-oscuro);
 }
 
 /* --- SIDEBAR (PC y Tablets) --- */
 /* sticky + align-self:flex-start lo dejan fijo mientras el contenido baja, sin
    sacarlo del flujo: asi no hay que compensar con margenes en .main-content.
-   Si el menu llegara a ser mas alto que la pantalla, se desplaza por dentro. */
+   Si el menu llegara a ser mas alto que la pantalla, se desplaza por dentro.
+   Sin padding a la derecha: la pestaña activa llega al borde y se une con el
+   fondo naranja del contenido. */
 .sidebar {
     width: 240px;
-    background-color: #d9531e;
-    padding-top: 2rem;
+    background-color: var(--ga-carbon);
+    padding: 1.5rem 0 1.5rem 1rem;
     display: flex;
     flex-direction: column;
+    gap: 1.75rem;
     color: #ffffff;
     flex-shrink: 0;
     position: sticky;
@@ -293,59 +317,120 @@ body.dashboard-body {
     overflow-y: auto;
 }
 
+/* Tarjeta gris independiente: no se une con el naranja del contenido. */
 .user-profile {
     text-align: center;
-    padding: 0 1rem 2rem 1rem;
+    padding: 1.5rem 1rem 1.25rem;
+    margin-right: 0.9rem;
+    background-color: var(--ga-carbon-claro);
+    border: 1px solid var(--ga-carbon-borde);
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.user-profile i.profile-icon {
-    font-size: 3.5rem;
-    margin-bottom: 0.5rem;
-    display: inline-block;
+.user-profile .brand-logo {
+    width: 84px;
+    margin-bottom: 0.75rem;
 }
 
 .user-profile h3 {
-    font-size: 1.2rem;
-    font-weight: 600;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
 }
 
 .user-profile p {
     font-size: 0.85rem;
-    opacity: 0.85;
+    opacity: 0.9;
 }
 
 .sidebar-menu {
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding-left: 1rem;
+    gap: 0.6rem;
 }
 
 .sidebar-menu li a {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    color: #ffffff;
+    color: #f1f1f1;
     text-decoration: none;
-    padding: 0.8rem 1.2rem;
+    padding: 0.75rem 1.1rem;
+    margin-right: 0.9rem;
+    background-color: var(--ga-carbon-claro);
+    border: 1px solid var(--ga-carbon-borde);
+    border-radius: 14px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
     font-size: 1rem;
     font-weight: 500;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.sidebar-menu li a i {
+    font-size: 1.2rem;
+}
+
+.sidebar-menu li:not(.active) a:hover {
+    background-color: #52565e;
+}
+
+.sidebar-menu li a:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: -4px;
 }
 
 .sidebar-menu li.active a {
-    background-color: #e5e5e5;
-    color: #000000;
-    border-top-left-radius: 25px;
-    border-bottom-left-radius: 25px;
+    position: relative;
+    margin-right: 0;
+    background-color: var(--ga-naranja-oscuro);
+    border-color: transparent;
+    border-radius: 14px 0 0 14px;
+    box-shadow: none;
+    color: #ffffff;
     font-weight: 600;
 }
 
-.sidebar-menu li a:hover:not(.active) {
-    background-color: rgba(255, 255, 255, 0.15);
-    border-top-left-radius: 20px;
-    border-bottom-left-radius: 20px;
+/* Esquinas invertidas: dos cuadritos transparentes pegados al borde derecho,
+   arriba y abajo de la pestaña. Su sombra naranja rellena solo la parte fuera
+   de la curva, así el gris del menú se ve redondeado al tocar el naranja. */
+.sidebar-menu li.active a::before,
+.sidebar-menu li.active a::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    pointer-events: none;
+}
+
+.sidebar-menu li.active a::before {
+    top: -20px;
+    border-bottom-right-radius: 20px;
+    box-shadow: 6px 6px 0 6px var(--ga-naranja-oscuro);
+}
+
+.sidebar-menu li.active a::after {
+    bottom: -20px;
+    border-top-right-radius: 20px;
+    box-shadow: 6px -6px 0 6px var(--ga-naranja-oscuro);
+}
+
+.sidebar-menu li.menu-salir {
+    margin-top: 1.5rem;
+}
+
+.sidebar-menu li.menu-salir a:hover {
+    background-color: #8e2b25;
+    border-color: #b3372f;
+}
+
+/* Cabecera con el usuario: solo existe en celular / tablet vertical. */
+.mobile-header {
+    display: none;
 }
 
 /* --- CONTENIDO PRINCIPAL --- */
@@ -361,7 +446,7 @@ body.dashboard-body {
     font-size: 2.2rem;
     font-weight: 700;
     margin-bottom: 1.5rem;
-    color: #000000;
+    color: var(--ga-carbon);
 }
 
 /* --- TARJETA DE FORMULARIO --- */
@@ -397,6 +482,21 @@ body.dashboard-body {
     outline: none;
 }
 
+/* Flecha propia para los desplegables: la del navegador queda pegada al
+   borde y no se puede mover. Con appearance:none se quita y se dibuja otra
+   como fondo, a la distancia del borde que se quiera. */
+select.form-control {
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 2.75rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23444444' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 6 8 10.5 12.5 6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 14px;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
 .search-container {
     position: relative;
     display: flex;
@@ -405,14 +505,22 @@ body.dashboard-body {
 }
 
 .search-container input {
-    padding-right: 2.5rem;
+    padding-right: 2.75rem;
 }
 
 .search-container i.search-icon {
     position: absolute;
-    right: 4.5rem;
+    right: 1rem;
     font-size: 1.2rem;
     color: #555555;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+/* Al escribir (el campo tiene el foco y se abre el teclado) el icono se
+   quita para dejarle todo el ancho al texto. */
+.search-container:focus-within i.search-icon {
+    opacity: 0;
 }
 
 .btn-add {
@@ -510,14 +618,72 @@ body.dashboard-body {
    horizontal = diseño de escritorio (menú lateral).
    ========================================== */
 @media (max-width: 768px), (max-width: 1024px) and (orientation: portrait) {
+    /* La hoja del login centra el body y le pone padding en móvil; aquí se
+       anula para que la cabecera quede arriba aunque la página sea corta. */
     body.dashboard-body {
         flex-direction: column;
-        padding-bottom: 70px; /* Margen para que el menú inferior no tape contenido */
+        justify-content: flex-start;
+        align-items: stretch;
+        padding: 0 0 92px; /* Margen para que el menú inferior no tape contenido */
     }
 
     /* Ocultar Sidebar lateral en celular */
     .sidebar {
         display: none;
+    }
+
+    /* CABECERA CON EL USUARIO (en lugar del recuadro del sidebar) */
+    .mobile-header {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.8rem;
+        align-self: center;
+        width: calc(100% - 2rem);
+        max-width: 650px;
+        margin-top: 1rem;
+        padding: 0.65rem 0.7rem 0.65rem 1.25rem;
+        background: #e0e0e0;
+        border: 1px solid #cccccc;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .mobile-header-info {
+        min-width: 0;
+        text-align: right;
+    }
+
+    .mobile-header-info h3 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #222222;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .mobile-header-info p {
+        font-size: 0.8rem;
+        color: #555555;
+    }
+
+    .mobile-header-logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 54px;
+        height: 54px;
+        background: linear-gradient(135deg, var(--ga-naranja-claro), var(--ga-naranja-oscuro));
+        border-radius: 14px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .mobile-header-logo img {
+        width: 72%;
+        height: auto;
     }
 
     .main-content {
@@ -551,9 +717,11 @@ body.dashboard-body {
         bottom: 0;
         left: 0;
         width: 100%;
-        height: 60px;
-        background-color: #d9531e;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        height: 64px;
+        padding: 0 0.5rem;
+        background-color: var(--ga-carbon);
+        border-radius: 20px 20px 0 0;
+        box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.25);
         z-index: 1000;
     }
 
@@ -561,7 +729,7 @@ body.dashboard-body {
        cada enlace pedia el ancho completo (6 x 100% = 600%) y el menu
        terminaba desbordando la pantalla. min-width:0 permite que encojan. */
     .bottom-nav a {
-        color: rgba(255, 255, 255, 0.7);
+        color: #c3c5c9;
         text-decoration: none;
         font-size: 1.6rem;
         display: flex;
@@ -573,9 +741,30 @@ body.dashboard-body {
         transition: color 0.2s ease;
     }
 
+    .bottom-nav a:hover {
+        color: #ffffff;
+    }
+
+    .bottom-nav a.bottom-nav-salir {
+        color: #ff9e9e;
+    }
+
+    /* La opción activa es un cuadro naranja que sobresale de la barra. */
     .bottom-nav a.active {
         color: #ffffff;
-        font-size: 1.9rem;
+    }
+
+    .bottom-nav a.active i {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 54px;
+        height: 54px;
+        font-size: 1.8rem;
+        background: linear-gradient(135deg, var(--ga-naranja-claro), var(--ga-naranja-oscuro));
+        border-radius: 16px;
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+        transform: translateY(-14px);
     }
 
     /* Las tablas del detalle son mas anchas que un celular: se desplazan
@@ -599,8 +788,11 @@ body.dashboard-body {
         font-size: 1.35rem;
     }
 
-    .bottom-nav a.active {
-        font-size: 1.6rem;
+    .bottom-nav a.active i {
+        width: 46px;
+        height: 46px;
+        font-size: 1.55rem;
+        border-radius: 14px;
     }
 }
 /* ===== VENTA: buscador de productos y renglones del ticket ===== */
@@ -681,11 +873,19 @@ body.dashboard-body {
     margin: 0;
 }
 
+/* Dos renglones alineados: arriba nombre / tipo de precio / cantidad /
+   subtotal (el desplegable y la cantidad a la misma altura) y abajo la casa
+   junto al precio unitario. */
 .venta-item {
+    position: relative;
     display: grid;
-    grid-template-columns: 2fr 1.3fr 1.1fr 0.8fr;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) auto minmax(0, 0.9fr);
+    grid-template-areas:
+        "nombre precio   cantidad subtotal"
+        "meta   unitario .        .";
     align-items: center;
-    gap: 1rem;
+    column-gap: 1rem;
+    row-gap: 0.3rem;
     background: #f7f7f7;
     border: 1px solid #cccccc;
     border-radius: 12px;
@@ -694,45 +894,82 @@ body.dashboard-body {
 }
 
 .item-nombre {
+    grid-area: nombre;
     font-weight: 600;
     margin: 0;
     color: #222222;
 }
 
 .item-meta {
+    grid-area: meta;
+    align-self: start;
     font-size: 0.8rem;
     color: #666666;
-    margin: 0.15rem 0 0;
+    margin: 0;
 }
 
-.select-precio {
-    padding: 0.4rem 0.5rem;
+.venta-item select.select-precio {
+    grid-area: precio;
+    height: 38px;
+    padding: 0 2rem 0 0.6rem;
     font-size: 0.85rem;
     border-radius: 8px;
+    background-position: right 0.6rem center;
+    background-size: 12px;
 }
 
 .item-unitario {
-    display: block;
+    grid-area: unitario;
+    align-self: start;
     font-size: 0.8rem;
     color: #555555;
-    margin-top: 0.3rem;
-}
-
-.item-cantidad {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
 .input-cantidad {
+    grid-area: cantidad;
     width: 60px;
 }
 
 .item-subtotal {
+    grid-area: subtotal;
     text-align: right;
     font-weight: 700;
     font-size: 1.05rem;
     color: #08660b;
+}
+
+/* Quitar la pieza: una X roja montada en la esquina de la tarjeta, fuera
+   de los datos para no confundirla con los controles de cantidad. */
+.btn-quitar {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background-color: #e53935;
+    color: #ffffff;
+    font-size: 0.9rem;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-quitar:hover {
+    background-color: #c62828;
+}
+
+.btn-quitar:active {
+    transform: scale(0.92);
+}
+
+.btn-quitar:focus-visible {
+    outline: 2px solid #08660b;
+    outline-offset: 2px;
 }
 
 .aviso {
@@ -754,18 +991,37 @@ body.dashboard-body {
     border: 1px solid #e53935;
 }
 
+/* Celular: nombre y casa arriba a todo lo ancho; debajo el desplegable junto
+   a la cantidad y, en la línea siguiente, el precio unitario junto al
+   subtotal. */
 @media (max-width: 640px) {
     .venta-item {
-        grid-template-columns: 1fr 1fr;
-        row-gap: 0.75rem;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "nombre   nombre"
+            "meta     meta"
+            "precio   cantidad"
+            "unitario subtotal";
+        row-gap: 0.35rem;
     }
 
-    .item-datos {
-        grid-column: 1 / -1;
+    .item-nombre {
+        padding-right: 0.75rem; /* que no quede debajo de la X */
     }
 
-    .item-subtotal {
-        text-align: left;
+    .venta-item select.select-precio,
+    .input-cantidad {
+        margin-top: 0.5rem;
+    }
+
+    .input-cantidad {
+        justify-self: end;
+    }
+
+    .btn-quitar {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
     }
 }
 
@@ -786,6 +1042,13 @@ body.dashboard-body {
     margin-left: 0.5rem;
     vertical-align: middle;
 }
+
+/* Un color por casa para distinguirlas de un vistazo en la búsqueda. Todos
+   dejan el texto blanco legible; una casa nueva sin color se queda en verde. */
+.res-casa.casa-BNS01 { background: var(--casa-BNS01); }
+.res-casa.casa-BNS02 { background: var(--casa-BNS02); }
+.res-casa.casa-BNS03 { background: var(--casa-BNS03); }
+.res-casa.casa-BNS04 { background: var(--casa-BNS04); }
 
 .filtros {
     border-bottom: 1px solid #cccccc;
@@ -815,7 +1078,10 @@ body.dashboard-body {
     background: #eaeaea;
 }
 
-.chip-activo {
+/* :hover también, si no el gris del hover le gana y el chip activo se ve
+   blanco sobre gris mientras el mouse sigue encima. */
+.chip-activo,
+.chip-activo:hover {
     background: #08660b;
     border-color: #08660b;
     color: #ffffff;
@@ -1209,6 +1475,422 @@ body.dashboard-body {
     font-weight: 400;
 }
 
+/* ===== DASHBOARD (estadísticas) ===== */
+
+/* Las gráficas van sobre tarjetas casi blancas; los colores de las series y
+   los textos de las gráficas se leen de aquí desde estadisticas.js. */
+.main-dashboard {
+    --dash-superficie: #fcfcfb;
+    --dash-texto: #0b0b0b;
+    --dash-texto-2: #52514e;
+    --dash-tenue: #898781;
+    --dash-reticula: #e1e0d9;
+    --dash-eje: #c3c2b7;
+    --dash-ventas: #c97500;
+    --dash-sube: #d84315;
+    --dash-baja: #0097a7;
+    --dash-mejor: #006300;
+    --dash-peor: #b71c1c;
+}
+
+.main-dashboard > * {
+    width: 100%;
+    max-width: 1280px;
+}
+
+.main-dashboard > .page-title {
+    width: auto;
+}
+
+.card-form.dash-filtros {
+    max-width: 1280px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.dash-filtros .filtros-rapidos {
+    margin-bottom: 0.9rem;
+}
+
+.dash-periodo {
+    margin: 0.9rem 0 0;
+    font-size: 0.85rem;
+    color: #444444;
+}
+
+.dash-aviso {
+    margin-bottom: 1.25rem;
+}
+
+/* Al volver a consultar se deja lo anterior atenuado en lugar de vaciarlo:
+   así la página no brinca mientras llegan los datos nuevos. */
+.dash-contenido {
+    transition: opacity 0.15s ease;
+}
+
+.dash-contenido.cargando {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+/* ----- Indicadores ----- */
+
+/* Seis indicadores: 3 x 2 normalmente y en una sola fila si la pantalla es
+   muy ancha (así nunca queda uno solo colgando abajo). */
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+@media (min-width: 1700px) {
+    .kpis {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+}
+
+.kpi {
+    background: var(--dash-superficie);
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+    padding: 1rem 1.25rem;
+    min-width: 0;
+}
+
+.kpi-etiqueta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--dash-texto-2);
+}
+
+.kpi-etiqueta i {
+    font-size: 1.05rem;
+}
+
+.kpi-valor {
+    margin: 0.35rem 0 0.2rem;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--dash-texto);
+    overflow-wrap: anywhere;
+}
+
+.kpi-detalle {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--dash-texto-2);
+}
+
+.kpi-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    font-weight: 600;
+}
+
+.kpi-delta.mejor { color: var(--dash-mejor); }
+.kpi-delta.peor  { color: var(--dash-peor); }
+.kpi-delta.igual { color: var(--dash-texto-2); }
+
+.kpi-sube { color: var(--dash-sube); font-weight: 600; }
+.kpi-baja { color: var(--dash-baja); font-weight: 600; }
+
+/* ----- Tarjetas de gráficas ----- */
+
+.dash-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.dash-card {
+    background: var(--dash-superficie);
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+    padding: 1.25rem 1.25rem 1rem;
+    min-width: 0;
+}
+
+.dash-card-ancha {
+    grid-column: 1 / -1;
+}
+
+.dash-card-cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+}
+
+.dash-card-titulo {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--dash-texto);
+}
+
+.dash-card-sub {
+    margin: 0.15rem 0 0;
+    font-size: 0.8rem;
+    color: var(--dash-texto-2);
+}
+
+.dash-card-acciones {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.chip-mini {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.7rem;
+    font-size: 0.8rem;
+}
+
+.chip-mini[aria-pressed="true"] {
+    background: var(--ga-carbon);
+    border-color: var(--ga-carbon);
+    color: #ffffff;
+}
+
+/* Selector Piezas / Importe */
+.segmentado {
+    display: inline-flex;
+    border: 1px solid #aaaaaa;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #f7f7f7;
+}
+
+.segmento {
+    border: none;
+    background: transparent;
+    padding: 0.25rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.8rem;
+    color: #333333;
+    cursor: pointer;
+}
+
+.segmento + .segmento {
+    border-left: 1px solid #aaaaaa;
+}
+
+.segmento-activo {
+    background: var(--ga-carbon);
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.dash-leyenda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--dash-texto-2);
+}
+
+.dash-leyenda:empty {
+    display: none;
+}
+
+.leyenda-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.leyenda-muestra {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* La altura incluye los ejes: Chart.js dibuja todo dentro del canvas. */
+.dash-grafica {
+    position: relative;
+    height: 300px;
+}
+
+#grafica-productos {
+    height: 420px;
+}
+
+.dash-grafica[hidden],
+.dash-tabla[hidden] {
+    display: none;
+}
+
+.dash-vacio {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 1rem;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--dash-texto-2);
+    background: var(--dash-superficie);
+}
+
+.dash-vacio[hidden] {
+    display: none;
+}
+
+/* ----- Tablas ----- */
+
+.dash-tabla,
+.tabla-scroll {
+    overflow-x: auto;
+}
+
+.tabla-dash {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    color: var(--dash-texto);
+}
+
+.tabla-dash th,
+.tabla-dash td {
+    padding: 0.55rem 0.5rem;
+    border-bottom: 1px solid var(--dash-reticula);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.tabla-dash th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--dash-texto-2);
+    white-space: nowrap;
+}
+
+.tabla-dash .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.tabla-dash .col-ancha {
+    min-width: 12rem;
+}
+
+.tabla-dash tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.tabla-dash .detalle-sub {
+    color: var(--dash-texto-2);
+}
+
+.tabla-dash .res-casa {
+    margin-left: 0;
+}
+
+.tabla-dash .kpi-sube,
+.tabla-dash .kpi-baja {
+    white-space: nowrap;
+}
+
+/* Barrita de proporción dentro de una celda (clientes, vendedores). */
+.barra-celda {
+    min-width: 90px;
+    width: 30%;
+}
+
+.barra-pista {
+    height: 6px;
+    border-radius: 3px;
+    background: #efeee9;
+    overflow: hidden;
+}
+
+.barra-relleno {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--dash-ventas);
+}
+
+.tabla-vacia {
+    margin: 0;
+    padding: 1.5rem 0;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--dash-texto-2);
+}
+
+@media (max-width: 1100px) {
+    .dash-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 768px), (max-width: 1024px) and (orientation: portrait) {
+    .card-form.dash-filtros {
+        padding: 1rem;
+    }
+
+    .kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .kpi {
+        padding: 0.85rem 1rem;
+    }
+
+    .kpi-valor {
+        font-size: 1.35rem;
+    }
+
+    .dash-card {
+        padding: 1rem 0.85rem 0.85rem;
+    }
+
+    .dash-grafica {
+        height: 260px;
+    }
+
+    #grafica-productos {
+        height: 440px;
+    }
+}
+
+/* En el celular la barrita de proporción sobra (el importe ya está en la
+   fila) y los nombres pueden ocupar menos ancho. */
+@media (max-width: 640px) {
+    .tabla-dash .col-extra {
+        display: none;
+    }
+
+    .tabla-dash .col-ancha {
+        min-width: 9rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .kpis {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 /* ==========================================================================
    TABLET EN VERTICAL (769px - 1024px)
    Conserva el diseño apilado del celular, pero con los componentes bastante
@@ -1217,11 +1899,30 @@ body.dashboard-body {
    ========================================================================== */
 @media (min-width: 769px) and (max-width: 1024px) and (orientation: portrait) {
     body.dashboard-body {
-        padding-bottom: 104px;   /* el menú inferior es más alto aquí */
+        padding-bottom: 135px;   /* el menú inferior es más alto aquí */
     }
 
     .main-content {
         padding: 2.5rem 1.5rem;
+    }
+
+    /* --- Cabecera con el usuario --- */
+    .mobile-header {
+        width: calc(100% - 3rem);
+        max-width: 780px;
+        margin-top: 1.5rem;
+        padding: 1rem 1rem 1rem 1.75rem;
+        gap: 1.1rem;
+        border-radius: 24px;
+    }
+
+    .mobile-header-info h3 { font-size: 1.6rem; }
+    .mobile-header-info p  { font-size: 1.15rem; }
+
+    .mobile-header-logo {
+        width: 80px;
+        height: 80px;
+        border-radius: 20px;
     }
 
     .page-title {
@@ -1256,6 +1957,19 @@ body.dashboard-body {
         border-radius: 16px;
     }
 
+    /* La regla de arriba trae padding completo y le ganaba al espacio
+       reservado para la flecha y para el icono de búsqueda. */
+    select.form-control,
+    .form-group select.form-control {
+        padding-right: 3.75rem;
+        background-position: right 1.35rem center;
+        background-size: 20px;
+    }
+
+    .search-container input.form-control {
+        padding-right: 3.75rem;
+    }
+
     .search-container i.search-icon {
         font-size: 1.8rem;
         right: 1.35rem;
@@ -1280,9 +1994,10 @@ body.dashboard-body {
     /* Con la letra más grande el nombre del producto se partía en tres
        renglones, así que esa columna se lleva más ancho. */
     .venta-item {
-        grid-template-columns: 2.4fr 1.4fr 1.05fr 0.85fr;
+        grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.4fr) auto minmax(0, 0.85fr);
         padding: 1.4rem 1.25rem;
-        gap: 1rem;
+        column-gap: 1rem;
+        row-gap: 0.4rem;
         border-radius: 16px;
     }
 
@@ -1290,7 +2005,15 @@ body.dashboard-body {
     .item-meta       { font-size: 1.1rem; }
     .item-unitario   { font-size: 1.1rem; }
     .item-subtotal   { font-size: 1.5rem; }
-    .select-precio   { font-size: 1.05rem; padding: 0.6rem 0.5rem; }
+
+    .venta-item select.select-precio {
+        height: 56px;
+        padding: 0 2.6rem 0 0.8rem;
+        font-size: 1.05rem;
+        border-radius: 12px;
+        background-position: right 0.8rem center;
+        background-size: 16px;
+    }
 
     .input-qty {
         width: 78px;
@@ -1302,6 +2025,15 @@ body.dashboard-body {
         width: 48px;
         height: 48px;
         font-size: 1.7rem;
+    }
+
+    .btn-quitar {
+        top: -14px;
+        right: -14px;
+        width: 42px;
+        height: 42px;
+        font-size: 1.35rem;
+        border-width: 3px;
     }
 
     /* --- Pie del formulario --- */
@@ -1377,8 +2109,49 @@ body.dashboard-body {
     /* --- Menú inferior --- */
     .bottom-nav {
         height: 94px;
+        border-radius: 28px 28px 0 0;
     }
 
-    .bottom-nav a          { font-size: 2.7rem; }
-    .bottom-nav a.active   { font-size: 3.1rem; }
+    .bottom-nav a { font-size: 2.7rem; }
+
+    .bottom-nav a.active i {
+        width: 82px;
+        height: 82px;
+        font-size: 2.9rem;
+        border-radius: 22px;
+        transform: translateY(-22px);
+    }
+
+    /* --- Dashboard --- */
+    .card-form.dash-filtros {
+        padding: 1.75rem 1.5rem;
+        border-radius: 24px;
+    }
+
+    .dash-periodo      { font-size: 1.15rem; }
+    .kpi               { padding: 1.25rem 1.4rem; border-radius: 20px; }
+    .kpi-etiqueta      { font-size: 1.15rem; }
+    .kpi-etiqueta i    { font-size: 1.4rem; }
+    .kpi-valor         { font-size: 2rem; }
+    .kpi-detalle       { font-size: 1.05rem; }
+
+    .dash-card         { padding: 1.5rem 1.25rem 1.25rem; border-radius: 20px; }
+    .dash-card-titulo  { font-size: 1.5rem; }
+    .dash-card-sub     { font-size: 1.1rem; }
+    .dash-leyenda      { font-size: 1.1rem; }
+    .leyenda-muestra   { width: 14px; height: 14px; }
+    .dash-grafica      { height: 360px; }
+    #grafica-productos { height: 520px; }
+    .dash-vacio        { font-size: 1.2rem; }
+    .tabla-dash        { font-size: 1.15rem; }
+    .tabla-dash th     { font-size: 1rem; }
+    .tabla-dash th,
+    .tabla-dash td     { padding: 0.8rem 0.6rem; }
+    .tabla-vacia       { font-size: 1.2rem; }
+
+    .chip-mini,
+    .segmento {
+        font-size: 1.05rem;
+        padding: 0.45rem 1rem;
+    }
 }

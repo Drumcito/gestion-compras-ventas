@@ -66,7 +66,7 @@ $casas = Database::getConnection()
                     <div class="search-container">
                         <input type="text" id="piezas" class="form-control"
                                placeholder="Buscar por nombre o código..." autocomplete="off">
-                        <i class="ph ph-magnifying-glass search-icon"></i>
+                        <i class="ph ph-magnifying-glass search-icon" aria-hidden="true"></i>
                     </div>
                     <div id="resultados" class="search-results" hidden></div>
                 </div>
