@@ -1,6 +1,5 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/gabenet/public_html/GABE/
-    - /bin/mkdir -p $DEPLOYPATH
-    - /bin/cp -R * $DEPLOYPATH
+    - export DEPLOYPATH=/home/gabenet/public_html/
+    - /bin/rsync -av --delete --exclude='.git*' --exclude='.cpanel.yml' ./ $DEPLOYPATH
