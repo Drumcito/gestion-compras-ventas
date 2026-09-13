@@ -296,9 +296,10 @@ body.dashboard-body {
 }
 
 /* --- SIDEBAR (PC y Tablets) --- */
-/* sticky + align-self:flex-start lo dejan fijo mientras el contenido baja, sin
-   sacarlo del flujo: asi no hay que compensar con margenes en .main-content.
-   Si el menu llegara a ser mas alto que la pantalla, se desplaza por dentro.
+/* position:fixed y no sticky: el body tiene overflow-x:hidden, lo que lo
+   convierte en contenedor de scroll y hace que sticky no se comporte igual en
+   todos los navegadores. Con fixed el menu no se mueve nunca; como sale del
+   flujo, .main-content compensa con un margen del mismo ancho.
    Sin padding a la derecha: la pestaña activa llega al borde y se une con el
    fondo naranja del contenido. */
 .sidebar {
@@ -310,11 +311,12 @@ body.dashboard-body {
     gap: 1.75rem;
     color: #ffffff;
     flex-shrink: 0;
-    position: sticky;
+    position: fixed;
     top: 0;
-    align-self: flex-start;
+    left: 0;
     height: 100vh;
     overflow-y: auto;
+    z-index: 900;
 }
 
 /* Tarjeta gris independiente: no se une con el naranja del contenido. */
@@ -440,6 +442,7 @@ body.dashboard-body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    margin-left: 240px;   /* hueco que deja el menu fijo */
 }
 
 .page-title {
@@ -686,8 +689,10 @@ select.form-control {
         height: auto;
     }
 
+    /* Aqui el menu lateral esta oculto, asi que no hay hueco que compensar. */
     .main-content {
         padding: 1rem;
+        margin-left: 0;
     }
 
     .page-title {
@@ -2174,4 +2179,214 @@ select.form-control {
         font-size: 1.05rem;
         padding: 0.45rem 1rem;
     }
+}
+
+/* ===== INVENTARIO ===== */
+
+.casas-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.casa-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.casa-conteo {
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 20px;
+    padding: 0.05rem 0.5rem;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.chip-activo .casa-conteo {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.inventario-buscador {
+    flex: 1;
+    min-width: 240px;
+}
+
+.producto-fila .venta-fila-derecha {
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.precios-producto {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+}
+
+.precio-etiqueta {
+    font-size: 0.85rem;
+    color: #555555;
+    white-space: nowrap;
+}
+
+.precio-etiqueta strong {
+    color: #08660b;
+    font-size: 1rem;
+}
+
+.btn-editar-precio {
+    font-size: 0.78rem;
+    padding: 0.25rem 0.7rem;
+    white-space: nowrap;
+}
+
+.paginacion {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    color: #444444;
+}
+
+.paginacion .chip:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+    .producto-fila .venta-fila-derecha {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .precios-producto {
+        align-items: flex-start;
+        flex-direction: row;
+        gap: 0.75rem;
+    }
+}
+
+/* ----- Descarga del historial ----- */
+
+.btn-exportar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* ==========================================================================
+   LEGIBILIDAD DE LISTAS Y TABLAS
+   Título dentro de un recuadro con color de marca, y filas alternando blanco
+   con un gris muy claro: en listas largas ayuda a no perder el renglón.
+   ========================================================================== */
+
+.page-title {
+    background: var(--ga-carbon);
+    color: #ffffff;
+    padding: 0.85rem 2rem;
+    border-radius: 14px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+    border-bottom: 4px solid var(--ga-naranja-claro);
+}
+
+/* ----- Filas alternadas: historial e inventario ----- */
+
+.lista-ventas {
+    gap: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #cfcfcf;
+    background: #ffffff;
+}
+
+.lista-ventas .venta-fila {
+    border: none;
+    border-bottom: 1px solid #e6e6e6;
+    border-radius: 0;
+    background: #ffffff;
+}
+
+.lista-ventas .venta-fila:nth-child(even) {
+    background: #f4f6f4;
+}
+
+.lista-ventas .venta-fila:last-child {
+    border-bottom: none;
+}
+
+.lista-ventas .venta-fila:hover {
+    background: #e8f2e8;
+}
+
+/* El mensaje de "sin resultados" no debe verse como una fila más. */
+.lista-ventas .venta-vacia {
+    background: #ffffff;
+    margin: 0;
+}
+
+/* ----- Tablas del detalle ----- */
+
+.tabla-detalle thead th {
+    background: var(--ga-carbon);
+    color: #ffffff;
+    font-weight: 600;
+    border-bottom: none;
+}
+
+.tabla-detalle thead th:first-child {
+    border-top-left-radius: 10px;
+}
+
+.tabla-detalle thead th:last-child {
+    border-top-right-radius: 10px;
+}
+
+.tabla-detalle tbody tr:nth-child(even) {
+    background: #f4f6f4;
+}
+
+.tabla-detalle tbody tr:hover {
+    background: #e8f2e8;
+}
+
+/* ----- Resultados del buscador de piezas ----- */
+
+.search-result-item:nth-child(even) {
+    background: #f4f6f4;
+}
+
+.search-result-item:hover,
+.search-result-item:nth-child(even):hover {
+    background: #e8f2e8;
+}
+
+/* ----- Piezas del ticket de venta ----- */
+
+.venta-items .venta-item:nth-child(even) {
+    background: #f0f2f0;
+}
+
+/* ----- Aviso con acción (venta guardada + imprimir nota) ----- */
+
+.aviso-con-accion {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.btn-imprimir-nota,
+.btn-imprimir {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+}
+
+.btn-imprimir-nota {
+    background: #ffffff;
 }

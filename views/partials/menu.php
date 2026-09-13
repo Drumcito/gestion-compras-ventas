@@ -20,7 +20,7 @@ $opciones = [
     ['clave' => 'dashboard',  'texto' => 'Dashboard',  'icono' => 'ph-chart-line-up',          'url' => '../estadisticas/index.php'],
     ['clave' => 'historial',  'texto' => 'Historial',  'icono' => 'ph-clock-counter-clockwise','url' => '../historial/index.php'],
     ['clave' => 'usuarios',   'texto' => 'Usuarios',   'icono' => 'ph-user-circle',            'url' => '../users/index.php', 'soloAdmin' => true],
-    ['clave' => 'inventario', 'texto' => 'Inventario', 'icono' => 'ph-shopping-cart',          'url' => '#'],
+    ['clave' => 'inventario', 'texto' => 'Inventario', 'icono' => 'ph-package',               'url' => '../inventario/index.php'],
 ];
 
 $visibles = array_filter($opciones, function ($o) use ($esAdministrador) {

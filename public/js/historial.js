@@ -5,8 +5,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputDesde   = document.getElementById('desde');
     const inputHasta   = document.getElementById('hasta');
     const btnFiltrar   = document.getElementById('btn-filtrar');
+    const btnExportar  = document.getElementById('btn-exportar');
     const filtroUsuario = document.getElementById('filtro-usuario');
-    const chips        = document.querySelectorAll('.chip');
+    // Solo los chips de rango: hay otros elementos con la clase .chip (como el
+    // boton de descargar) que no deben comportarse como filtro de fechas.
+    const chips        = document.querySelectorAll('.chip[data-rango]');
     const resumen      = document.getElementById('resumen-periodo');
     const aviso        = document.getElementById('aviso-historial');
     const modal        = document.getElementById('modal-detalle');
@@ -275,7 +278,87 @@ document.addEventListener('DOMContentLoaded', () => {
             bloqueDevolucion +
             credito +
             auditoria +
-            '<div class="detalle-acciones">' + botonEditar + '</div>';
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip btn-imprimir" data-id="' + v.id + '">' +
+                    '<i class="ph ph-printer"></i> Imprimir nota</button>' +
+                botonEditar +
+            '</div>';
+    }
+
+    // ---------- Nota imprimible ----------
+    // Direccion, C.P. y telefono no viven en la base: se capturan aqui, solo
+    // para lo que se va a imprimir. El folio y la fecha salen de la venta.
+    let ventaDeLaNota = null;
+
+    function abrirImpresion(v) {
+        ventaDeLaNota = v.id;
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Imprimir nota — Venta #' + v.id + '</h2>' +
+            '<p class="aviso aviso-info">Estos datos son solo para la nota impresa. ' +
+                'Todos son opcionales: lo que dejes vacío sale como renglón en blanco ' +
+                'para llenarlo a mano.</p>' +
+            '<div class="form-group">' +
+                '<label for="nota-cliente">Cliente:</label>' +
+                '<input type="text" id="nota-cliente" class="form-control" maxlength="150" ' +
+                       'value="' + esc(v.cliente || '') + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label for="nota-direccion">Dirección:</label>' +
+                '<input type="text" id="nota-direccion" class="form-control" maxlength="150">' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label for="nota-cp">C.P.:</label>' +
+                '<input type="text" id="nota-cp" class="form-control" maxlength="5" inputmode="numeric">' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label for="nota-telefono">Teléfono:</label>' +
+                '<input type="tel" id="nota-telefono" class="form-control" maxlength="10" ' +
+                       'inputmode="numeric" placeholder="10 dígitos">' +
+                '<span class="detalle-sub" id="nota-tel-aviso"></span>' +
+            '</div>' +
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-cancelar-nota">Cancelar</button>' +
+                '<button type="button" class="btn-save" id="btn-generar-nota" ' +
+                    'data-id="' + v.id + '">Imprimir</button>' +
+            '</div>';
+
+        // Solo digitos en C.P. y telefono. El recorte va DESPUES de limpiar:
+        // maxlength cuenta tambien las letras, asi que al teclear una por error
+        // se perdian digitos validos (o se colaba uno de mas).
+        ['nota-cp', 'nota-telefono'].forEach((id) => {
+            document.getElementById(id).addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '').slice(0, e.target.maxLength);
+                if (id === 'nota-telefono') {
+                    const faltan = 10 - e.target.value.length;
+                    document.getElementById('nota-tel-aviso').textContent =
+                        e.target.value.length === 0 || faltan === 0
+                            ? '' : 'Faltan ' + faltan + ' dígito' + (faltan === 1 ? '' : 's');
+                }
+            });
+        });
+
+        document.getElementById('nota-cliente').focus();
+    }
+
+    function generarNota(ventaId) {
+        const telefono = document.getElementById('nota-telefono').value;
+
+        if (telefono !== '' && telefono.length !== 10) {
+            document.getElementById('nota-tel-aviso').textContent =
+                'El teléfono debe tener 10 dígitos o quedar vacío.';
+            return;
+        }
+
+        const parametros = new URLSearchParams({
+            id:        ventaId,
+            cliente:   document.getElementById('nota-cliente').value.trim(),
+            direccion: document.getElementById('nota-direccion').value.trim(),
+            cp:        document.getElementById('nota-cp').value,
+            telefono:  telefono,
+        });
+
+        window.open('../ventas/nota.php?' + parametros.toString(), '_blank');
+        modal.hidden = true;
     }
 
     // ---------- Precio del catalogo ----------
@@ -570,6 +653,24 @@ document.addEventListener('DOMContentLoaded', () => {
         cargar(desde, hasta);
     });
 
+    // La descarga es una navegacion normal: el navegador la resuelve como
+    // archivo adjunto y se lleva la cookie de sesion. Usa exactamente los
+    // mismos filtros que la pantalla tiene puestos.
+    btnExportar.addEventListener('click', () => {
+        const desde = inputDesde.value;
+        const hasta = inputHasta.value || desde;
+
+        if (!desde) {
+            mostrarAviso('Elige un rango de fechas antes de descargar.', 'error');
+            return;
+        }
+
+        window.location = '../../app/controllers/ExportarHistorialController.php'
+            + '?desde=' + desde
+            + '&hasta=' + hasta
+            + '&usuario=' + (filtroUsuario.value || 0);
+    });
+
     filtroUsuario.addEventListener('change', () => {
         cargar(inputDesde.value, inputHasta.value || inputDesde.value);
     });
@@ -602,6 +703,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (e.target.id === 'btn-guardar-precio') {
             guardarPrecio(e.target.dataset.codigo);
+            return;
+        }
+
+        const botonImprimir = e.target.closest('.btn-imprimir');
+        if (botonImprimir) {
+            const respuesta = await fetch(
+                '../../app/controllers/HistorialController.php?accion=detalle&id=' + botonImprimir.dataset.id
+            );
+            const datos = await respuesta.json();
+            if (datos.ok) abrirImpresion(datos.venta);
+            return;
+        }
+
+        if (e.target.id === 'btn-cancelar-nota') {
+            verDetalle(ventaDeLaNota);
+            return;
+        }
+
+        if (e.target.id === 'btn-generar-nota') {
+            generarNota(e.target.dataset.id);
             return;
         }
 

@@ -38,6 +38,29 @@ document.addEventListener('DOMContentLoaded', () => {
         aviso.hidden = true;
     }
 
+    // Aviso de venta guardada con acceso directo a la nota imprimible.
+    function mostrarAvisoConNota(ventaId, total, cliente) {
+        clearTimeout(temporizadorAviso);
+
+        aviso.className = 'aviso aviso-ok aviso-con-accion';
+        aviso.hidden = false;
+        aviso.innerHTML = '';
+
+        const texto = document.createElement('span');
+        texto.textContent = 'Venta #' + ventaId + ' guardada por $' + total + '.';
+        aviso.appendChild(texto);
+
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.className = 'chip btn-imprimir-nota';
+        boton.innerHTML = '<i class="ph ph-printer"></i> Imprimir nota';
+        boton.addEventListener('click', () => {
+            const parametros = new URLSearchParams({ id: ventaId, cliente: cliente || '' });
+            window.open('../ventas/nota.php?' + parametros.toString(), '_blank');
+        });
+        aviso.appendChild(boton);
+    }
+
     // ---------- Busqueda de productos ----------
     let temporizador = null;
 
@@ -292,7 +315,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const datos = await respuesta.json();
 
             if (datos.ok) {
-                mostrarAviso('Venta #' + datos.venta_id + ' guardada por $' + datos.total, 'ok', 5);
+                // El aviso lleva el boton de imprimir: es el momento en que se
+                // entrega la nota al cliente. Sin limite de tiempo para que no
+                // desaparezca antes de alcanzar a imprimirla.
+                mostrarAvisoConNota(datos.venta_id, datos.total, cuerpo.cliente);
                 items = [];
                 form.reset();
                 camposCredito.hidden = true;
