@@ -217,6 +217,61 @@ body {
 }
 
 /* ==========================================================================
+   LOGIN EN PANTALLA ANCHA Y VERTICAL (600px - 1024px)
+   Cubre la tablet en vertical y tambien al celular que abre la pagina con
+   "Sitio de escritorio" activado: ahi el lienzo mide ~980px y la tarjeta de
+   400px se veia diminuta, perdida en medio de la pantalla.
+   Las proporciones del circulo se conservan (55% visible sobre la tarjeta).
+   ========================================================================== */
+@media (min-width: 600px) and (max-width: 1024px) and (orientation: portrait) {
+    .login-wrapper {
+        max-width: 560px;
+    }
+
+    .login-card {
+        /* La regla base la limita a 400px: hay que subir el tope aqui tambien,
+           no basta con ensanchar el contenedor. */
+        max-width: 560px;
+        padding: 3rem 2.75rem;
+        padding-top: 4.75rem;
+        border-radius: 22px;
+    }
+
+    .login-header {
+        margin-bottom: 2.25rem;
+    }
+
+    .login-header h2 { font-size: 2.2rem; }
+    .login-header p  { font-size: 1.05rem; }
+
+    .form-group        { margin-bottom: 1.6rem; }
+    .form-group label  { font-size: 1.05rem; }
+
+    .form-group input {
+        padding: 1rem 1.15rem;
+        font-size: 1.15rem;
+        border-radius: 12px;
+    }
+
+    .btn-submit {
+        padding: 1.05rem;
+        font-size: 1.2rem;
+        border-radius: 12px;
+    }
+
+    .circle-container {
+        width: 140px;
+        height: 140px;
+        margin-bottom: -63px;
+    }
+
+    .brand-logo {
+        width: 77px;
+        height: 77px;
+    }
+}
+
+/* ==========================================================================
    LOGIN EN TABLET HORIZONTAL (769px - 1280px, apaisado)
    En estas pantallas el semicirculo de 120vh no alcanza a salirse por arriba
    y por abajo, asi que su curva queda visible dentro del encuadre y la marca
