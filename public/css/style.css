@@ -10,7 +10,12 @@
 
 body {
     display: flex;
+    /* En celular, 100vh mide la pantalla CON la barra de direcciones oculta,
+       asi que la pagina queda mas alta que lo visible: se alcanza a desplazar
+       y el contenido centrado cae por debajo del pliegue. 100svh mide el area
+       realmente visible. El 100vh queda de respaldo para navegadores viejos. */
     min-height: 100vh;
+    min-height: 100svh;
     background-color: #2A2312;
     overflow-x: hidden;
     position: relative;
@@ -292,6 +297,7 @@ body {
 body.dashboard-body {
     display: flex;
     min-height: 100vh;
+    min-height: 100svh;
     background-color: var(--ga-naranja-oscuro);
 }
 
