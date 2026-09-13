@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal        = document.getElementById('modal-detalle');
     const contenido    = document.getElementById('contenido-detalle');
     const btnCerrar    = document.getElementById('btn-cerrar-detalle');
+    const barraSeleccion = document.getElementById('barra-seleccion');
 
     const money = (n) => '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -118,6 +119,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function pintarVentas(datos) {
         lista.innerHTML = '';
+        // Cambiar de filtro descarta lo que estuviera seleccionado.
+        barraSeleccion.hidden = true;
         llenarVendedores(datos.vendedores || [], datos.usuario);
 
         const rango = datos.desde === datos.hasta
@@ -155,6 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     : '<span class="etiqueta etiqueta-pagado">Contado</span>');
 
             fila.innerHTML =
+                '<label class="venta-elegir" title="Seleccionar para imprimir">' +
+                    '<input type="checkbox" class="chk-venta" value="' + v.id + '"></label>' +
                 '<div class="venta-fila-datos">' +
                     '<p class="venta-fila-cliente">' + (v.cliente ? esc(v.cliente) : 'Sin cliente') +
                         (v.puede_editar ? '<i class="ph ph-pencil-simple icono-editable" title="Puedes editar esta venta"></i>' : '') +
@@ -204,10 +209,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<td class="num">' + money(i.precio_aplicado) + '</td>' +
                 '<td class="num">' + i.cantidad + '</td>' +
                 '<td class="num">' + money(i.subtotal) + '</td>' +
-                '<td><button type="button" class="chip btn-precio" ' +
-                    'data-codigo="' + i.codigo_interno_producto + '" ' +
-                    'data-venta="' + v.id + '" ' +
-                    'title="Cambiar el precio de este producto en el catálogo">Editar precio</button></td>' +
+                // Cambiar precios es solo del administrador.
+                (window.ES_ADMIN
+                    ? '<td><button type="button" class="chip btn-precio" ' +
+                        'data-codigo="' + i.codigo_interno_producto + '" ' +
+                        'data-venta="' + v.id + '" ' +
+                        'title="Cambiar el precio de este producto en el catálogo">Editar precio</button></td>'
+                    : '<td></td>') +
             '</tr>'
         ).join('');
 
@@ -676,9 +684,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     lista.addEventListener('click', (e) => {
+        // La casilla y su etiqueta seleccionan; no deben abrir el detalle.
+        if (e.target.closest('.venta-elegir')) return;
+
         const fila = e.target.closest('.venta-fila');
         if (fila) verDetalle(fila.dataset.id);
     });
+
+    lista.addEventListener('change', (e) => {
+        if (e.target.classList.contains('chk-venta')) actualizarSeleccion();
+    });
+
+    // ---------- Impresion de varias notas ----------
+    function seleccionadas() {
+        return [...lista.querySelectorAll('.chk-venta:checked')].map((c) => c.value);
+    }
+
+    function actualizarSeleccion() {
+        const n = seleccionadas().length;
+        barraSeleccion.hidden = n === 0;
+
+        if (n > 0) {
+            const hojas = Math.ceil(n / 2);
+            document.getElementById('cuenta-seleccion').textContent =
+                n + ' venta' + (n === 1 ? '' : 's') + ' · ' +
+                hojas + ' hoja' + (hojas === 1 ? '' : 's');
+        }
+    }
 
     lista.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -771,6 +803,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const campo = document.getElementById('edit-campo-venc');
             if (campo) campo.hidden = e.target.value !== 'credito';
         }
+    });
+
+    document.getElementById('btn-limpiar-seleccion').addEventListener('click', () => {
+        lista.querySelectorAll('.chk-venta:checked').forEach((c) => { c.checked = false; });
+        actualizarSeleccion();
+    });
+
+    document.getElementById('btn-imprimir-seleccion').addEventListener('click', () => {
+        const ids = seleccionadas();
+        if (ids.length === 0) return;
+
+        // Con varias ventas no se piden dirección ni teléfono: cada nota sale
+        // con el cliente que ya tenga guardado y los demás renglones en blanco.
+        window.open('../ventas/nota.php?ids=' + ids.join(','), '_blank');
     });
 
     btnCerrar.addEventListener('click', () => { modal.hidden = true; });

@@ -8,6 +8,15 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Cambiar un precio afecta a todas las ventas futuras de ese producto, asi que
+// queda reservado al administrador. La barrera vive aqui y no solo en el boton:
+// ocultarlo en pantalla no impide que alguien llame al controlador directo.
+if (($_SESSION['user_role'] ?? '') !== 'admin') {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Solo un administrador puede cambiar precios']);
+    exit;
+}
+
 require_once __DIR__ . '/../../config/conexionBD.php';
 
 $usuarioId = (int) $_SESSION['user_id'];

@@ -125,10 +125,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // <div> y no <button>: dentro de un boton, Firefox y Safari no
             // respetan el layout de los hijos.
             const fila = document.createElement('div');
-            fila.className = 'venta-fila producto-fila';
-            fila.setAttribute('role', 'button');
-            fila.tabIndex = 0;
+            fila.className = 'venta-fila producto-fila' + (window.ES_ADMIN ? '' : ' fila-no-editable');
             fila.dataset.codigo = p.codigo_interno;
+
+            // Sin permiso para editar precios, la fila es solo informativa.
+            if (window.ES_ADMIN) {
+                fila.setAttribute('role', 'button');
+                fila.tabIndex = 0;
+            }
 
             const precios =
                 '<span class="precio-etiqueta">Menudeo <strong>' + money(p.precio_menudeo) + '</strong></span>' +
@@ -144,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 '</div>' +
                 '<div class="venta-fila-derecha">' +
                     '<div class="precios-producto">' + precios + '</div>' +
-                    '<span class="chip btn-editar-precio">Editar precio</span>' +
+                    (window.ES_ADMIN ? '<span class="chip btn-editar-precio">Editar precio</span>' : '') +
                 '</div>';
 
             listaProductos.appendChild(fila);
@@ -298,11 +302,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     listaProductos.addEventListener('click', (e) => {
+        if (!window.ES_ADMIN) return;
         const fila = e.target.closest('.producto-fila');
         if (fila) abrirPrecio(fila.dataset.codigo);
     });
 
     listaProductos.addEventListener('keydown', (e) => {
+        if (!window.ES_ADMIN) return;
         if (e.key !== 'Enter' && e.key !== ' ') return;
         const fila = e.target.closest('.producto-fila');
         if (fila) { e.preventDefault(); abrirPrecio(fila.dataset.codigo); }

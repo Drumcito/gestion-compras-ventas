@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $nombreUsuario = $_SESSION['user_name'] ?? 'Usuario';
 $rolUsuario = ucfirst($_SESSION['user_role'] ?? 'Rol');
+$esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -64,6 +65,7 @@ $rolUsuario = ucfirst($_SESSION['user_role'] ?? 'Rol');
         </div>
     </div>
 
+    <script>window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;</script>
     <script src="<?= recurso('js/inventario.js') ?>"></script>
 </body>
 </html>

@@ -69,6 +69,17 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
             <!-- Listado de ventas -->
             <div id="lista-ventas" class="lista-ventas"></div>
+
+            <!-- Aparece al marcar ventas: imprime sus notas, 2 por hoja -->
+            <div id="barra-seleccion" class="barra-seleccion" hidden>
+                <span id="cuenta-seleccion"></span>
+                <div class="barra-seleccion-acciones">
+                    <button type="button" class="chip" id="btn-limpiar-seleccion">Quitar selección</button>
+                    <button type="button" class="btn-save" id="btn-imprimir-seleccion">
+                        <i class="ph ph-printer"></i> Imprimir notas
+                    </button>
+                </div>
+            </div>
         </div>
     </main>
 
