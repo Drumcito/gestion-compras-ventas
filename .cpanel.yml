@@ -4,8 +4,12 @@ deployment:
     # El sitio corre desde public_html/GABE/, no desde la raiz de public_html.
     - export DEPLOYPATH=/home/gabenet/public_html/GABE/
     - /bin/mkdir -p $DEPLOYPATH
-    # --delete borra del servidor lo que ya no este en el repositorio, por eso
-    # se excluyen las credenciales: viven solo en el hosting (estan en
-    # .gitignore) y sin este exclude el primer despliegue las borraria y
-    # tumbaria produccion.
-    - /usr/bin/rsync -av --delete --exclude 'credenciales.local.php' --exclude 'credenciales.prod.php' * $DEPLOYPATH
+    # Se usa cp y no rsync: con "/usr/bin/rsync -av --delete" el despliegue
+    # terminaba sin copiar un solo archivo (13/09), mientras que con este
+    # mismo cp si funciono. Al parecer rsync no esta disponible en esa ruta.
+    #
+    # Contrapartida: cp no borra. Un archivo que se elimine del repositorio
+    # se queda huerfano en el servidor y hay que quitarlo a mano. A cambio,
+    # config/credenciales.prod.php (que solo existe en el hosting) nunca
+    # corre peligro.
+    - /bin/cp -R * $DEPLOYPATH
