@@ -113,9 +113,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         '<option value="1"' + (Number(u.activo) ? ' selected' : '') + '>Activo</option>' +
                         '<option value="0"' + (Number(u.activo) ? '' : ' selected') + '>Inactivo (no puede entrar)</option>' +
                     '</select></div>') +
-            '<div class="form-group"><label for="u-password">' +
-                (esNuevo ? 'Contraseña:' : 'Nueva contraseña (dejar vacío para no cambiarla):') + '</label>' +
-                '<input type="password" id="u-password" class="form-control" autocomplete="new-password"></div>' +
+            (esNuevo
+                ? '<div class="aviso aviso-info">Se le asignará la contraseña <b>GABE3234</b>. ' +
+                      'Al iniciar sesión por primera vez se le pedirá cambiarla.</div>'
+                : '<div class="form-group">' +
+                      '<label class="check-linea" for="u-reiniciar">' +
+                          '<input type="checkbox" id="u-reiniciar"> Reiniciar contraseña</label>' +
+                      '<span class="detalle-sub">Vuelve a GABE3234 y se le pedirá cambiarla al iniciar sesión.</span>' +
+                  '</div>') +
             '<div id="u-aviso" class="aviso" hidden></div>' +
             '<div class="detalle-acciones">' +
                 '<button type="button" class="chip" id="btn-cancelar-usuario">Cancelar</button>' +
@@ -138,12 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
             numero_empleado: document.getElementById('u-numero').value.trim(),
             numero_telefono: document.getElementById('u-telefono').value.trim(),
             rol:             document.getElementById('u-rol').value,
-            password:        document.getElementById('u-password').value,
         };
 
         if (!esNuevo) {
             cuerpo.id = Number(id);
             cuerpo.activo = document.getElementById('u-activo').value === '1';
+            cuerpo.reiniciar_password = document.getElementById('u-reiniciar').checked;
         }
 
         boton.disabled = true;
@@ -159,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (datos.ok) {
                 modal.hidden = true;
-                mostrarAviso(datos.mensaje, 'ok');
+                mostrarAviso(datos.mensaje, 'ok', 8);
                 cargar();
             } else {
                 avisoForm.textContent = datos.error || 'No se pudo guardar.';

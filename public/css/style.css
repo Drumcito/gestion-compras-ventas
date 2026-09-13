@@ -1475,6 +1475,26 @@ select.form-control {
     font-weight: 400;
 }
 
+/* Casilla con su texto en la misma línea (p. ej. "Reiniciar contraseña").
+   Se anula el estilo de ".form-group input", pensado para campos de texto; el
+   tamaño va en em para que crezca junto con la etiqueta en tablet. */
+.form-group .check-linea {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+.form-group .check-linea input {
+    width: 1.2em;
+    height: 1.2em;
+    padding: 0;
+    margin: 0;
+    accent-color: #ff5500;
+    cursor: pointer;
+}
+
 /* ===== DASHBOARD (estadísticas) ===== */
 
 /* Las gráficas van sobre tarjetas casi blancas; los colores de las series y

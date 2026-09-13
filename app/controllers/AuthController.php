@@ -15,12 +15,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo = Database::getConnection();
 
         // activo = 1: un usuario dado de baja no debe poder entrar.
-        $stmt = $pdo->prepare('SELECT id, numero_empleado, nombre, apellido, rol, password FROM usuarios WHERE numero_empleado = :num_empleado AND activo = 1 LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, numero_empleado, nombre, apellido, rol, password, debe_cambiar_password FROM usuarios WHERE numero_empleado = :num_empleado AND activo = 1 LIMIT 1');
         $stmt->execute(['num_empleado' => $numEmpleado]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
             session_regenerate_id(true);
+
+            // Usuario nuevo o con contraseña reiniciada: todavía no entra al
+            // sistema, solo queda autorizado para elegir su contraseña.
+            if ((int) $user['debe_cambiar_password'] === 1) {
+                $_SESSION = [];
+                $_SESSION['cambio_password_id'] = $user['id'];
+
+                header('Location: ../../views/auth/cambiar_password.php');
+                exit;
+            }
 
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['num_empleado'] = $user['numero_empleado'];

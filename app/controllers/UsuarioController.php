@@ -18,6 +18,10 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
 
 require_once __DIR__ . '/../../config/conexionBD.php';
 
+// Contraseña que recibe todo usuario nuevo o reiniciado. Al entrar con ella el
+// login lo manda a elegir una propia (ver debe_cambiar_password).
+const PASSWORD_INICIAL = 'GABE3234';
+
 $usuarioActual = (int) $_SESSION['user_id'];
 $accion = $_GET['accion'] ?? 'listar';
 
@@ -58,16 +62,12 @@ try {
         $numero    = trim($datos['numero_empleado'] ?? '');
         $telefono  = trim($datos['numero_telefono'] ?? '');
         $rol       = $datos['rol'] ?? 'vendedor';
-        $password  = (string) ($datos['password'] ?? '');
 
         if ($nombre === '' || $numero === '') {
             throw new RuntimeException('El nombre y el número de empleado son obligatorios');
         }
         if (!in_array($rol, ['admin', 'vendedor'], true)) {
             throw new RuntimeException('Rol no valido');
-        }
-        if (mb_strlen($password) < 6) {
-            throw new RuntimeException('La contraseña debe tener al menos 6 caracteres');
         }
 
         $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE numero_empleado = :num');
@@ -77,8 +77,8 @@ try {
         }
 
         $stmt = $pdo->prepare(
-            'INSERT INTO usuarios (nombre, apellido, numero_empleado, numero_telefono, rol, password)
-             VALUES (:nombre, :apellido, :numero, :telefono, :rol, :password)'
+            'INSERT INTO usuarios (nombre, apellido, numero_empleado, numero_telefono, rol, password, debe_cambiar_password)
+             VALUES (:nombre, :apellido, :numero, :telefono, :rol, :password, 1)'
         );
         $stmt->execute([
             'nombre'   => $nombre,
@@ -86,10 +86,14 @@ try {
             'numero'   => $numero,
             'telefono' => $telefono !== '' ? $telefono : null,
             'rol'      => $rol,
-            'password' => password_hash($password, PASSWORD_BCRYPT),
+            'password' => password_hash(PASSWORD_INICIAL, PASSWORD_BCRYPT),
         ]);
 
-        echo json_encode(['ok' => true, 'mensaje' => "Usuario {$numero} creado"]);
+        echo json_encode([
+            'ok'      => true,
+            'mensaje' => "Usuario {$numero} creado con la contraseña " . PASSWORD_INICIAL .
+                         ' (se le pedirá cambiarla al iniciar sesión)',
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -102,7 +106,7 @@ try {
         $telefono = trim($datos['numero_telefono'] ?? '');
         $rol      = $datos['rol'] ?? 'vendedor';
         $activo   = !empty($datos['activo']);
-        $password = (string) ($datos['password'] ?? '');
+        $reiniciarPassword = !empty($datos['reiniciar_password']);
 
         $stmt = $pdo->prepare('SELECT * FROM usuarios WHERE id = :id');
         $stmt->execute(['id' => $id]);
@@ -153,20 +157,23 @@ try {
             'id'       => $id,
         ];
 
-        // La contraseña solo se toca si el admin escribió una nueva.
-        if ($password !== '') {
-            if (mb_strlen($password) < 6) {
-                throw new RuntimeException('La contraseña debe tener al menos 6 caracteres');
-            }
-            $sql .= ', password = :password';
-            $parametros['password'] = password_hash($password, PASSWORD_BCRYPT);
+        // La contraseña solo se toca si el admin marcó "Reiniciar contraseña":
+        // vuelve a la inicial y se le pide cambiarla en su siguiente inicio de sesión.
+        if ($reiniciarPassword) {
+            $sql .= ', password = :password, debe_cambiar_password = 1';
+            $parametros['password'] = password_hash(PASSWORD_INICIAL, PASSWORD_BCRYPT);
         }
 
         $sql .= ' WHERE id = :id';
 
         $pdo->prepare($sql)->execute($parametros);
 
-        echo json_encode(['ok' => true, 'mensaje' => 'Usuario actualizado']);
+        $mensaje = $reiniciarPassword
+            ? 'Usuario actualizado. Su contraseña volvió a ser ' . PASSWORD_INICIAL .
+              ' (se le pedirá cambiarla al iniciar sesión)'
+            : 'Usuario actualizado';
+
+        echo json_encode(['ok' => true, 'mensaje' => $mensaje], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
