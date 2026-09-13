@@ -2516,3 +2516,46 @@ select.form-control {
     padding: 0.55rem 1.4rem;
     font-size: 1rem;
 }
+
+/* ==========================================================================
+   MENÚ LATERAL EN PANTALLAS BAJAS (laptops)
+   El menú mide 617px de alto. En un monitor cabe de sobra, pero una laptop
+   con escalado de Windows al 150% deja un área útil de ~616px: se desbordaba
+   por un pelo y aparecía un scroll propio dentro del menú.
+   Aquí se compacta para que quepa completo y siga viéndose fijo.
+   ========================================================================== */
+@media (min-width: 769px) and (max-height: 760px) {
+    .sidebar {
+        padding: 1rem 0 1rem 0.85rem;
+        gap: 1rem;
+    }
+
+    .sidebar .user-profile {
+        padding: 1rem 0.85rem 0.85rem;
+        border-radius: 16px;
+    }
+
+    .sidebar .brand-logo {
+        width: 58px;
+        height: 58px;
+        margin-bottom: 0.5rem;
+    }
+
+    .user-profile h3 { font-size: 1rem; }
+    .user-profile p  { font-size: 0.78rem; }
+
+    .sidebar-menu {
+        gap: 0.4rem;
+    }
+
+    .sidebar-menu li a {
+        padding: 0.55rem 1rem;
+        font-size: 0.95rem;
+        border-radius: 12px;
+    }
+
+    /* El separador antes de "Cerrar Sesión" se reduce a la mitad. */
+    .sidebar-menu .menu-salir {
+        margin-top: 1rem;
+    }
+}
