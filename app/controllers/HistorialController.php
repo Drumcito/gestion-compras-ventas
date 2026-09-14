@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../../config/conexionBD.php';
+require_once __DIR__ . '/../helpers/casas.php';
 
 $usuarioId = (int) $_SESSION['user_id'];
 $esAdmin   = ($_SESSION['user_role'] ?? '') === 'admin';
@@ -49,6 +50,11 @@ try {
         );
         $stmt->execute(['id' => $ventaId]);
         $venta['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($venta['items'] as &$item) {
+            $item['casa'] = etiquetaCasa($item['codigo_casa']);
+        }
+        unset($item);
 
         // El estado (cobrado / saldo / devolucion) aplica igual a contado y credito.
         $stmt = $pdo->prepare(
@@ -109,6 +115,79 @@ try {
     // Filtro opcional por vendedor: 0 o vacio = todos.
     $filtroUsuario = isset($_GET['usuario']) ? (int) $_GET['usuario'] : 0;
     $condicionUsuario = $filtroUsuario > 0 ? ' AND v.usuario_id = :usuario' : '';
+
+    // ---------- Resumen de productos vendidos en el periodo ----------
+    // Junta todas las ventas del filtro y suma por producto, para responder
+    // "que se vendio y cuanto" sin abrir venta por venta.
+    if ($accion === 'productos') {
+        $stmt = $pdo->prepare(
+            'SELECT c.nombre AS casa, c.codigo_casa,
+                    d.codigo_interno_producto,
+                    MAX(d.nombre_producto) AS nombre_producto,
+                    SUM(d.cantidad)  AS piezas,
+                    SUM(d.subtotal)  AS importe,
+                    COUNT(DISTINCT d.venta_id) AS ventas
+               FROM detalle_venta d
+               JOIN ventas v  ON v.id = d.venta_id
+               JOIN casas c   ON c.id = d.casa_id
+              WHERE DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicionUsuario . '
+              GROUP BY c.nombre, c.codigo_casa, d.codigo_interno_producto
+              ORDER BY piezas DESC, importe DESC'
+        );
+
+        $parametros = ['desde' => $desde, 'hasta' => $hasta];
+        if ($filtroUsuario > 0) {
+            $parametros['usuario'] = $filtroUsuario;
+        }
+
+        $stmt->execute($parametros);
+        $productos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($productos as &$p) {
+            $p['casa'] = etiquetaCasa($p['codigo_casa']);
+        }
+        unset($p);
+
+        $totalPiezas  = 0;
+        $totalImporte = 0.0;
+        $porCasa      = [];
+
+        foreach ($productos as $p) {
+            $totalPiezas  += (int) $p['piezas'];
+            $totalImporte += (float) $p['importe'];
+
+            $clave = $p['codigo_casa'];
+            if (!isset($porCasa[$clave])) {
+                $porCasa[$clave] = [
+                    'codigo_casa' => $clave,
+                    'casa'        => $p['casa'],
+                    'productos'   => 0,
+                    'piezas'      => 0,
+                    'importe'     => 0.0,
+                ];
+            }
+            $porCasa[$clave]['productos']++;
+            $porCasa[$clave]['piezas']  += (int) $p['piezas'];
+            $porCasa[$clave]['importe'] += (float) $p['importe'];
+        }
+
+        // Las casas se ordenan por lo que mas se vendio.
+        usort($porCasa, fn($a, $b) => $b['piezas'] <=> $a['piezas']);
+
+        echo json_encode([
+            'ok'        => true,
+            'desde'     => $desde,
+            'hasta'     => $hasta,
+            'productos' => $productos,
+            'resumen'   => [
+                'distintos' => count($productos),
+                'piezas'    => $totalPiezas,
+                'importe'   => number_format($totalImporte, 2, '.', ''),
+                'por_casa'  => array_values($porCasa),
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 
     $stmt = $pdo->prepare(
         'SELECT v.id, v.cliente, v.fecha, v.total, v.monto_cobrado, v.tipo_pago,

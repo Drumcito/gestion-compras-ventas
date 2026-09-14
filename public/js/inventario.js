@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
             listaCasas.innerHTML = datos.casas.map((c, i) =>
                 '<button type="button" class="chip casa-tab' + (i === 0 ? ' chip-activo' : '') + '" ' +
                     'data-casa="' + c.codigo_casa + '">' +
-                    esc(c.nombre) +
+                    esc(c.etiqueta) +
                     '<span class="casa-conteo">' + Number(c.productos).toLocaleString('es-MX') + '</span>' +
                 '</button>'
             ).join('');

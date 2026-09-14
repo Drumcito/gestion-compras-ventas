@@ -57,6 +57,10 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
                         </select>
                     </div>
                     <button type="button" class="btn-save btn-filtrar" id="btn-filtrar">Filtrar</button>
+                    <button type="button" class="chip btn-exportar" id="btn-productos"
+                            title="Resumen de lo vendido en el periodo filtrado">
+                        <i class="ph ph-package"></i> Ver productos
+                    </button>
                     <button type="button" class="chip btn-exportar" id="btn-exportar"
                             title="Descargar las ventas del filtro actual">
                         <i class="ph ph-download-simple"></i> Descargar Excel

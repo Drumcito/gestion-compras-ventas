@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../../config/conexionBD.php';
+require_once __DIR__ . '/../helpers/casas.php';
 require_once __DIR__ . '/../helpers/ExcelSimple.php';
 
 $desde = $_GET['desde'] ?? date('Y-m-d');
@@ -57,7 +58,7 @@ try {
         'SELECT v.id AS venta_id, v.fecha, v.cliente, v.tipo_pago,
                 CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
                 u.numero_empleado,
-                c.nombre AS casa, d.codigo_interno_producto, d.nombre_producto,
+                c.codigo_casa, d.codigo_interno_producto, d.nombre_producto,
                 d.tipo_precio, d.precio_aplicado, d.cantidad, d.subtotal
            FROM detalle_venta d
            JOIN ventas v  ON v.id = d.venta_id
@@ -129,7 +130,7 @@ foreach ($detalle as $d) {
         $d['cliente'] ?? 'Sin cliente',
         trim($d['vendedor']),
         $d['numero_empleado'],
-        $d['casa'],
+        etiquetaCasa($d['codigo_casa']),
         $d['codigo_interno_producto'],
         $d['nombre_producto'],
         ucfirst($d['tipo_precio']),

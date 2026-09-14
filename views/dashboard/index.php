@@ -8,13 +8,17 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../../config/conexionBD.php';
+require_once __DIR__ . '/../../app/helpers/casas.php';
 
 $nombreUsuario = $_SESSION['user_name'] ?? 'Usuario';
 $rolUsuario = ucfirst($_SESSION['user_role'] ?? 'Rol');
 
 $casas = Database::getConnection()
-    ->query('SELECT codigo_casa, nombre FROM casas WHERE activo = 1 ORDER BY codigo_casa')
+    ->query('SELECT codigo_casa, nombre FROM casas WHERE activo = 1')
     ->fetchAll(PDO::FETCH_ASSOC);
+
+// El orden y la etiqueta visible salen del mapa de app/helpers/casas.php.
+$casas = ordenarCasas($casas);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -54,7 +58,7 @@ $casas = Database::getConnection()
                         <option value="TODAS">Todas las casas (buscar en todo el catálogo)</option>
                         <?php foreach ($casas as $casa): ?>
                             <option value="<?= htmlspecialchars($casa['codigo_casa'], ENT_QUOTES, 'UTF-8') ?>">
-                                <?= htmlspecialchars($casa['nombre'], ENT_QUOTES, 'UTF-8') ?>
+                                <?= htmlspecialchars($casa['etiqueta'], ENT_QUOTES, 'UTF-8') ?>
                             </option>
                         <?php endforeach; ?>
                     </select>

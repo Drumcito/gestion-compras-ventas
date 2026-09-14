@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../../config/conexionBD.php';
+require_once __DIR__ . '/../helpers/casas.php';
 
 $tablasCasa = [
     'BNS01' => 'productos_casa1',
@@ -148,8 +149,16 @@ $aNumero = function (array $filas, array $campos): array {
 try {
     $pdo = Database::getConnection();
 
-    $casas = $pdo->query('SELECT id, codigo_casa, nombre FROM casas WHERE activo = 1 ORDER BY codigo_casa')
-        ->fetchAll(PDO::FETCH_ASSOC);
+    $casas = ordenarCasas(
+        $pdo->query('SELECT id, codigo_casa, nombre FROM casas WHERE activo = 1')
+            ->fetchAll(PDO::FETCH_ASSOC)
+    );
+
+    // En las graficas y tablas la casa se identifica por su etiqueta corta.
+    foreach ($casas as &$casaVisible) {
+        $casaVisible['nombre'] = $casaVisible['etiqueta'];
+    }
+    unset($casaVisible);
 
     // Filtro opcional por casa: aplica a todo lo que sale del detalle de venta
     // (importe, piezas, productos) y a los cambios de precio.
@@ -454,6 +463,18 @@ try {
     );
     $stmt->execute($parametros($inicio, $fin));
     $vendedores = $aNumero($stmt->fetchAll(PDO::FETCH_ASSOC), ['ventas', 'importe', 'piezas']);
+
+    // Un solo punto donde la casa pasa a su etiqueta corta, para no repetirlo
+    // en cada consulta.
+    foreach ([&$topPiezas, &$topImporte, &$porCasa, &$topPrecios] as &$lista) {
+        foreach ($lista as &$fila) {
+            if (isset($fila['codigo_casa'])) {
+                $fila['casa'] = etiquetaCasa($fila['codigo_casa']);
+            }
+        }
+        unset($fila);
+    }
+    unset($lista);
 
     echo json_encode([
         'ok'         => true,

@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../../config/conexionBD.php';
+require_once __DIR__ . '/../helpers/casas.php';
 
 $tablasCasa = [
     'BNS01' => 'productos_casa1',
@@ -24,8 +25,10 @@ try {
 
     // ---------- Casas con su conteo de productos ----------
     if (($_GET['accion'] ?? '') === 'casas') {
-        $casas = $pdo->query('SELECT id, codigo_casa, nombre FROM casas WHERE activo = 1 ORDER BY codigo_casa')
-                     ->fetchAll(PDO::FETCH_ASSOC);
+        $casas = ordenarCasas(
+            $pdo->query('SELECT id, codigo_casa, nombre FROM casas WHERE activo = 1')
+                ->fetchAll(PDO::FETCH_ASSOC)
+        );
 
         foreach ($casas as &$casa) {
             $tabla = $tablasCasa[$casa['codigo_casa']] ?? null;

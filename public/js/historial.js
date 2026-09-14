@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputHasta   = document.getElementById('hasta');
     const btnFiltrar   = document.getElementById('btn-filtrar');
     const btnExportar  = document.getElementById('btn-exportar');
+    const btnProductos = document.getElementById('btn-productos');
     const filtroUsuario = document.getElementById('filtro-usuario');
     // Solo los chips de rango: hay otros elementos con la clase .chip (como el
     // boton de descargar) que no deben comportarse como filtro de fechas.
@@ -174,6 +175,115 @@ document.addEventListener('DOMContentLoaded', () => {
 
             lista.appendChild(fila);
         });
+    }
+
+    // ---------- Resumen de productos del periodo ----------
+    async function verProductos() {
+        const desde = inputDesde.value;
+        const hasta = inputHasta.value || desde;
+
+        if (!desde) {
+            mostrarAviso('Elige un rango de fechas primero.', 'error');
+            return;
+        }
+
+        contenido.innerHTML = '<p class="venta-vacia">Cargando...</p>';
+        modal.hidden = false;
+
+        try {
+            const url = '../../app/controllers/HistorialController.php'
+                + '?accion=productos&desde=' + desde + '&hasta=' + hasta
+                + '&usuario=' + (filtroUsuario.value || 0);
+
+            const respuesta = await fetch(url);
+
+            if (respuesta.status === 401) {
+                contenido.innerHTML = '<p class="aviso aviso-error">Tu sesión expiró.</p>';
+                return;
+            }
+
+            const datos = await respuesta.json();
+
+            if (!datos.ok) {
+                contenido.innerHTML = '<p class="aviso aviso-error">' +
+                    esc(datos.error || 'No se pudo cargar el resumen') + '</p>';
+                return;
+            }
+
+            pintarProductos(datos);
+
+        } catch (e) {
+            contenido.innerHTML = '<p class="aviso aviso-error">Error de conexión.</p>';
+        }
+    }
+
+    function pintarProductos(datos) {
+        const r = datos.resumen;
+
+        const rango = datos.desde === datos.hasta
+            ? fechaLegible(datos.desde)
+            : fechaLegible(datos.desde) + ' al ' + fechaLegible(datos.hasta);
+
+        const encabezado =
+            '<h2 class="detalle-titulo">Productos vendidos</h2>' +
+            '<p class="detalle-sub">' + rango +
+                (filtroUsuario.value > 0
+                    ? ' · ' + esc(filtroUsuario.options[filtroUsuario.selectedIndex].text)
+                    : ' · todos los vendedores') + '</p>';
+
+        if (r.distintos === 0) {
+            contenido.innerHTML = encabezado +
+                '<p class="venta-vacia">No se vendió ningún producto en este periodo.</p>';
+            return;
+        }
+
+        // Tarjetas de totales, arriba: la respuesta rápida a "cuánto se movió".
+        const totales =
+            '<div class="prod-totales">' +
+                '<div class="prod-dato"><span>' + r.piezas.toLocaleString('es-MX') + '</span>piezas vendidas</div>' +
+                '<div class="prod-dato"><span>' + r.distintos.toLocaleString('es-MX') + '</span>productos distintos</div>' +
+                '<div class="prod-dato prod-dato-importe"><span>' + money(r.importe) + '</span>importe total</div>' +
+            '</div>';
+
+        // Los productos vienen ordenados de más a menos vendido; al agruparlos
+        // por casa cada bloque conserva ese orden.
+        const porCasa = {};
+        datos.productos.forEach((p) => {
+            (porCasa[p.codigo_casa] = porCasa[p.codigo_casa] || []).push(p);
+        });
+
+        // Se recorre resumen.por_casa para respetar el orden de casas (la que
+        // más vendió primero) y tener sus totales a la mano.
+        const bloques = r.por_casa.map((c) => {
+            const filas = (porCasa[c.codigo_casa] || []).map((p) =>
+                '<tr>' +
+                    '<td>' + esc(p.nombre_producto) +
+                        '<span class="detalle-sub">' + p.codigo_interno_producto +
+                        ' · en ' + p.ventas + ' venta' + (p.ventas === '1' ? '' : 's') + '</span></td>' +
+                    '<td class="num"><strong>' + Number(p.piezas).toLocaleString('es-MX') + '</strong></td>' +
+                    '<td class="num">' + money(p.importe) + '</td>' +
+                '</tr>'
+            ).join('');
+
+            return '<div class="prod-bloque">' +
+                '<div class="prod-bloque-titulo">' +
+                    '<span class="res-casa casa-' + esc(c.codigo_casa) + '">' + esc(c.casa) + '</span>' +
+                    '<span class="prod-casa-cifras">' +
+                        '<strong>' + Number(c.piezas).toLocaleString('es-MX') + '</strong> piezas · ' +
+                        c.productos + ' producto' + (c.productos === 1 ? '' : 's') + ' · ' +
+                        money(c.importe) +
+                    '</span>' +
+                '</div>' +
+                '<table class="tabla-detalle">' +
+                    '<thead><tr><th>Producto</th>' +
+                    '<th class="num">Piezas</th><th class="num">Importe</th></tr></thead>' +
+                    '<tbody>' + filas + '</tbody>' +
+                '</table>' +
+            '</div>';
+        }).join('');
+
+        contenido.innerHTML = encabezado + totales + bloques +
+            '<p class="detalle-sub">Casas y productos ordenados de más vendido a menos.</p>';
     }
 
     // ---------- Detalle ----------
@@ -818,6 +928,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // con el cliente que ya tenga guardado y los demás renglones en blanco.
         window.open('../ventas/nota.php?ids=' + ids.join(','), '_blank');
     });
+
+    btnProductos.addEventListener('click', verProductos);
 
     btnCerrar.addEventListener('click', () => { modal.hidden = true; });
 

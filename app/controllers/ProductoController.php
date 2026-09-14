@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../../config/conexionBD.php';
+require_once __DIR__ . '/../helpers/casas.php';
 
 $casa    = $_GET['casa'] ?? '';
 $termino = trim($_GET['q'] ?? '');
@@ -51,7 +52,15 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($parametros);
 
-    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
+    $productos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // La etiqueta que se ve en la pastilla de color de cada resultado.
+    foreach ($productos as &$producto) {
+        $producto['nombre_casa'] = etiquetaCasa($producto['codigo_casa']);
+    }
+    unset($producto);
+
+    echo json_encode($productos, JSON_UNESCAPED_UNICODE);
 
 } catch (PDOException $e) {
     error_log($e->getMessage());
