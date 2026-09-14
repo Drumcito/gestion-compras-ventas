@@ -1,0 +1,10 @@
+# El deploy copia todo el repo a public_html, asi que esta carpeta quedaria
+# accesible desde el navegador. Las migraciones no traen contraseñas, pero
+# tampoco tienen por que verse desde fuera: aqui no hay nada que servir.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

@@ -1,6 +1,11 @@
 # La base de datos vive en el hosting, no en el repo: esquema, datos y
-# respaldos se quedan fuera.
-database/
+# respaldos se quedan fuera. Las migraciones si van al repo: son los cambios de
+# estructura que hay que correr tambien en produccion, y si no se versionan pasa
+# lo que paso con usuarios.debe_cambiar_password (codigo desplegado sin su
+# columna, login roto). Son de texto y pesan unos KB.
+database/*
+!database/migraciones/
+!database/.htaccess
 *.sql.zip
 *.dump
 

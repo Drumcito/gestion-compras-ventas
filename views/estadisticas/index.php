@@ -122,7 +122,8 @@ $toggleMetrica = function (string $grupo): string {
                 <?php tarjetaGrafica('ventas', 'Ventas en el tiempo', 'Importe vendido'); ?>
                 <?php tarjetaGrafica('casas', 'Ventas por casa', 'Piezas vendidas de cada casa', $toggleMetrica('casas')); ?>
                 <?php tarjetaGrafica('productos', 'Productos más vendidos', 'Top 10', $toggleMetrica('productos')); ?>
-                <?php tarjetaGrafica('precios', 'Cambios de precio', 'Cada precio (menudeo y mayoreo) cuenta por separado'); ?>
+                <?php tarjetaGrafica('precios', 'Cambios de precio',
+                    'Cada precio (menudeo y mayoreo) cuenta por separado. Abre la tabla para ver qué producto subió o bajó'); ?>
             </div>
 
             <!-- Tablas de detalle -->
@@ -132,6 +133,16 @@ $toggleMetrica = function (string $grupo): string {
                         <div>
                             <h2 class="dash-card-titulo">Productos con más cambios de precio</h2>
                             <p class="dash-card-sub">Cuántas veces subió o bajó cada uno en el periodo</p>
+                        </div>
+                        <div class="dash-card-acciones">
+                            <span class="dash-card-sub">Mostrar</span>
+                            <div class="segmentado" role="group" aria-label="Cuántos productos mostrar"
+                                 data-grupo="cambios">
+                                <button type="button" class="segmento" data-cuantos="1" aria-pressed="false">1</button>
+                                <button type="button" class="segmento" data-cuantos="3" aria-pressed="false">3</button>
+                                <button type="button" class="segmento segmento-activo" data-cuantos="5"
+                                        aria-pressed="true">5</button>
+                            </div>
                         </div>
                     </header>
                     <div id="tabla-cambios-precio"></div>

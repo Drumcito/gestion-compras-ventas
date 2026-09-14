@@ -11,12 +11,9 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/../../config/conexionBD.php';
 require_once __DIR__ . '/../helpers/casas.php';
 
-$tablasCasa = [
-    'BNS01' => 'productos_casa1',
-    'BNS02' => 'productos_casa2',
-    'BNS03' => 'productos_casa3',
-    'BNS04' => 'productos_casa4',
-];
+// El mapa casa -> tabla sale de la base (ver app/helpers/casas.php), asi que una
+// casa creada desde esta misma pantalla queda disponible sin tocar codigo.
+$tablasCasa = tablasCasa();
 
 const POR_PAGINA = 50;
 

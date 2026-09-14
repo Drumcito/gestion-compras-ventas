@@ -15,8 +15,10 @@ $casa    = $_GET['casa'] ?? '';
 $termino = trim($_GET['q'] ?? '');
 
 // 'TODAS' busca en el catalogo completo cuando el vendedor no sabe de que casa
-// es la pieza; el resultado dice a que casa pertenece cada una.
-$codigosValidos = ['TODAS', 'BNS01', 'BNS02', 'BNS03', 'BNS04'];
+// es la pieza; el resultado dice a que casa pertenece cada una. El resto de los
+// codigos son los de las casas registradas, para que una casa nueva se pueda
+// buscar sin tocar esta lista.
+$codigosValidos = array_merge(['TODAS'], array_keys(tablasCasa()));
 
 if (!in_array($casa, $codigosValidos, true)) {
     http_response_code(400);
@@ -33,7 +35,7 @@ try {
     $pdo  = Database::getConnection();
     $like = '%' . $termino . '%';
 
-    // vista_catalogo une las 4 tablas de productos y ya trae el nombre de la casa.
+    // vista_catalogo une el catalogo de todas las casas y ya trae el nombre de la casa.
     $sql = 'SELECT codigo_casa, nombre_casa, codigo_interno, codigo_proveedor,
                    nombre, marca, precio_mayoreo, precio_menudeo
               FROM vista_catalogo

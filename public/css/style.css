@@ -1922,6 +1922,13 @@ select.form-control {
     color: var(--dash-texto-2);
 }
 
+/* Aclaración al pie de una tabla recortada ("se listan los N más recientes"). */
+.tabla-nota {
+    margin: 0.6rem 0 0;
+    font-size: 0.78rem;
+    color: var(--dash-texto-2);
+}
+
 @media (max-width: 1100px) {
     .dash-grid {
         grid-template-columns: minmax(0, 1fr);
@@ -2643,4 +2650,118 @@ select.form-control {
     .prod-dato {
         min-width: 100%;
     }
+}
+
+/* ===== INVENTARIO · ALTA DE CASAS Y PRODUCTOS ===== */
+
+/* Las pestañas de casa y el botón de casa nueva comparten renglón. */
+.casas-linea {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.casas-linea .casas-tabs {
+    margin-bottom: 0;
+}
+
+/* Botones de "crear": el borde punteado los distingue de un filtro. */
+.chip-nuevo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-style: dashed;
+    font-weight: 600;
+    color: var(--ga-carbon, #34373c);
+}
+
+.chip-nuevo:hover {
+    border-style: solid;
+    background: #eef3ee;
+}
+
+/* El alta lleva tabla de vista previa: necesita más ancho que editar un precio. */
+.modal-caja-ancha {
+    max-width: 860px;
+}
+
+.alta-ejemplo-titulo {
+    margin: 0 0 0.4rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #333333;
+}
+
+/* La tabla de ejemplo es de referencia: mas chica que una tabla de datos. */
+.tabla-ejemplo {
+    margin: 0;
+    font-size: 0.8rem;
+}
+
+.tabla-ejemplo th,
+.tabla-ejemplo td {
+    padding: 0.4rem 0.6rem;
+    white-space: nowrap;
+}
+
+.tabla-ejemplo th {
+    line-height: 1.25;
+}
+
+.tabla-ejemplo th .detalle-sub {
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: #777777;
+}
+
+.tabla-ejemplo tbody td {
+    color: #555555;
+}
+
+.alta-ejemplo-pie {
+    margin: 0.5rem 0 1.25rem;
+}
+
+/* Dos campos por renglón, uno solo cuando no cabe. */
+.alta-dos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0 1rem;
+}
+
+#alta-pegado {
+    font-family: inherit;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    resize: vertical;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.alta-errores {
+    background: #fdf3f2;
+    border: 1px solid #e9b8b3;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.88rem;
+    color: #7b2d24;
+}
+
+.alta-errores p {
+    margin: 0 0 0.4rem;
+}
+
+.alta-errores ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    line-height: 1.55;
+    max-height: 11rem;
+    overflow-y: auto;
+}
+
+#alta-resumen .tabla-detalle {
+    margin-top: 0.5rem;
 }

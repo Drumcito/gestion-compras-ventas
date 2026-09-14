@@ -31,7 +31,15 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
         <div class="card-form card-historial">
             <!-- Casas -->
             <div class="filtros">
-                <div id="lista-casas" class="casas-tabs"></div>
+                <div class="casas-linea">
+                    <div id="lista-casas" class="casas-tabs"></div>
+
+                    <?php if ($esAdmin): ?>
+                        <button type="button" class="chip chip-nuevo" id="btn-nueva-casa">
+                            <i class="ph ph-plus" aria-hidden="true"></i> Nueva casa
+                        </button>
+                    <?php endif; ?>
+                </div>
 
                 <div class="filtros-rango">
                     <div class="search-container inventario-buscador">
@@ -39,6 +47,12 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
                                placeholder="Buscar por nombre o código..." autocomplete="off">
                         <i class="ph ph-magnifying-glass search-icon"></i>
                     </div>
+
+                    <?php if ($esAdmin): ?>
+                        <button type="button" class="chip chip-nuevo" id="btn-agregar-productos">
+                            <i class="ph ph-package" aria-hidden="true"></i> Agregar productos
+                        </button>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -54,6 +68,16 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
             </div>
         </div>
     </main>
+
+    <!-- Casa nueva / alta de productos (solo admin) -->
+    <div id="modal-casa" class="modal" hidden>
+        <div class="modal-caja modal-caja-ancha">
+            <button type="button" class="modal-cerrar" id="btn-cerrar-casa" title="Cerrar">
+                <i class="ph ph-x"></i>
+            </button>
+            <div id="contenido-casa"></div>
+        </div>
+    </div>
 
     <!-- Edición de precio -->
     <div id="modal-inventario" class="modal" hidden>

@@ -11,12 +11,11 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/../../config/conexionBD.php';
 require_once __DIR__ . '/../helpers/casas.php';
 
-$tablasCasa = [
-    'BNS01' => 'productos_casa1',
-    'BNS02' => 'productos_casa2',
-    'BNS03' => 'productos_casa3',
-    'BNS04' => 'productos_casa4',
-];
+/** Cuantos cambios de precio se detallan (los mas recientes del periodo). */
+const MAX_DETALLE_PRECIOS = 200;
+
+/** Cuantos productos trae la tabla de "mas cambios de precio" (se ven 1, 3 o 5). */
+const TOP_CAMBIOS_PRECIO = 5;
 
 // ---------- Periodo ----------
 $desde = $_GET['desde'] ?? date('Y-m-d');
@@ -351,36 +350,48 @@ try {
             AND {$cambioReal}{$filtroCasaPrecio}
           GROUP BY hp.codigo_interno_producto, c.codigo_casa, c.nombre
           ORDER BY cambios DESC, ultimo_cambio DESC
-          LIMIT 10"
+          LIMIT " . TOP_CAMBIOS_PRECIO
     );
     $stmt->execute($parametros($inicio, $fin));
     $topPrecios = $aNumero($stmt->fetchAll(PDO::FETCH_ASSOC), ['subidas', 'bajadas', 'cambios']);
 
-    if ($topPrecios) {
-        $codigos = array_column($topPrecios, 'codigo');
-
-        // Nombre y precio vigente, de la tabla de su casa (el prefijo del
-        // codigo dice cual es; se valida contra la lista fija).
+    /**
+     * Nombre y precio vigente de una lista de codigos internos. Cada producto
+     * vive en la tabla de su casa y el prefijo del codigo dice cual es; la tabla
+     * se resuelve contra las casas registradas, nunca con texto del navegador.
+     */
+    $productosPorCodigo = function (array $codigos) use ($pdo): array {
         $porTabla = [];
-        foreach ($codigos as $codigo) {
-            $prefijo = strtoupper(substr($codigo, 0, 5));
-            if (isset($tablasCasa[$prefijo])) {
-                $porTabla[$tablasCasa[$prefijo]][] = $codigo;
+
+        foreach (array_unique($codigos) as $codigo) {
+            $tabla = tablaDeProducto($codigo);
+
+            if ($tabla !== null) {
+                $porTabla[$tabla][] = $codigo;
             }
         }
 
         $catalogo = [];
+
         foreach ($porTabla as $tabla => $lista) {
             $marcas = implode(',', array_fill(0, count($lista), '?'));
             $stmt = $pdo->prepare(
                 "SELECT codigo_interno, nombre, precio_menudeo, precio_mayoreo
                    FROM {$tabla} WHERE codigo_interno IN ({$marcas})"
             );
-            $stmt->execute($lista);
+            $stmt->execute(array_values($lista));
+
             foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $p) {
                 $catalogo[$p['codigo_interno']] = $p;
             }
         }
+
+        return $catalogo;
+    };
+
+    if ($topPrecios) {
+        $codigos  = array_column($topPrecios, 'codigo');
+        $catalogo = $productosPorCodigo($codigos);
 
         // Precio al empezar el periodo y al terminarlo, por tipo, para sacar
         // cuanto se movio en total (no solo cuantas veces).
@@ -429,6 +440,40 @@ try {
         unset($fila);
     }
 
+    // ---------- Que producto subio o bajo ----------
+    // La grafica dice cuantos cambios hubo; esto dice cuales fueron. Va con la
+    // misma clave de cubeta que la serie, para poder nombrarlos en la grafica.
+    $stmt = $pdo->prepare(
+        "SELECT {$exprPrecio} AS clave, hp.fecha_cambio,
+                hp.codigo_interno_producto AS codigo, c.codigo_casa,
+                hp.tipo_precio, hp.precio_anterior, hp.precio_nuevo
+           FROM historial_precios hp
+           JOIN casas c ON c.id = hp.casa_id
+          WHERE hp.fecha_cambio >= :inicio AND hp.fecha_cambio < :fin
+            AND {$cambioReal}{$filtroCasaPrecio}
+          ORDER BY hp.fecha_cambio DESC, hp.id DESC
+          LIMIT " . (MAX_DETALLE_PRECIOS + 1)
+    );
+    $stmt->execute($parametros($inicio, $fin));
+    $detallePrecios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Se pide uno de mas solo para saber si el periodo trae mas de los que caben.
+    $detalleCompleto = count($detallePrecios) <= MAX_DETALLE_PRECIOS;
+    $detallePrecios  = array_slice($detallePrecios, 0, MAX_DETALLE_PRECIOS);
+
+    if ($detallePrecios) {
+        $catalogoDetalle = $productosPorCodigo(array_column($detallePrecios, 'codigo'));
+
+        foreach ($detallePrecios as &$fila) {
+            // Si el producto ya no esta en el catalogo, al menos queda el codigo.
+            $fila['nombre']          = $catalogoDetalle[$fila['codigo']]['nombre'] ?? $fila['codigo'];
+            $fila['precio_anterior'] = (float) $fila['precio_anterior'];
+            $fila['precio_nuevo']    = (float) $fila['precio_nuevo'];
+            $fila['direccion']       = $fila['precio_nuevo'] > $fila['precio_anterior'] ? 'subio' : 'bajo';
+        }
+        unset($fila);
+    }
+
     // ---------- Mejores clientes ----------
     $stmt = $pdo->prepare(
         "SELECT TRIM(v.cliente) AS nombre_cliente,
@@ -466,7 +511,7 @@ try {
 
     // Un solo punto donde la casa pasa a su etiqueta corta, para no repetirlo
     // en cada consulta.
-    foreach ([&$topPiezas, &$topImporte, &$porCasa, &$topPrecios] as &$lista) {
+    foreach ([&$topPiezas, &$topImporte, &$porCasa, &$topPrecios, &$detallePrecios] as &$lista) {
         foreach ($lista as &$fila) {
             if (isset($fila['codigo_casa'])) {
                 $fila['casa'] = etiquetaCasa($fila['codigo_casa']);
@@ -512,6 +557,9 @@ try {
             'productos' => (int) $resumenPrecios['productos'],
             'serie'     => $seriePrecios,
             'top'       => $topPrecios,
+            'detalle'          => $detallePrecios,
+            'detalle_completo' => $detalleCompleto,
+            'detalle_maximo'   => MAX_DETALLE_PRECIOS,
         ],
         'clientes'   => $clientes,
         'vendedores' => $vendedores,

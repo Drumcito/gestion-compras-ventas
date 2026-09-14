@@ -18,30 +18,24 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
 }
 
 require_once __DIR__ . '/../../config/conexionBD.php';
+require_once __DIR__ . '/../helpers/casas.php';
 
 $usuarioId = (int) $_SESSION['user_id'];
 
-$tablasCasa = [
-    'BNS01' => 'productos_casa1',
-    'BNS02' => 'productos_casa2',
-    'BNS03' => 'productos_casa3',
-    'BNS04' => 'productos_casa4',
-];
-
 /**
  * El codigo interno ya dice de que casa es el producto (BNS03-01270), asi que
- * de ahi sale la tabla. Se valida contra la lista fija: nunca se arma el FROM
- * con texto que venga del navegador.
+ * de ahi sale la tabla. Se resuelve contra las casas registradas: nunca se arma
+ * el FROM con texto que venga del navegador.
  */
-function tablaDe(string $codigoInterno, array $tablasCasa): string
+function tablaDe(string $codigoInterno): string
 {
-    $prefijo = strtoupper(substr($codigoInterno, 0, 5));
+    $tabla = tablaDeProducto($codigoInterno);
 
-    if (!isset($tablasCasa[$prefijo])) {
+    if ($tabla === null) {
         throw new RuntimeException('Codigo de producto no valido');
     }
 
-    return $tablasCasa[$prefijo];
+    return $tabla;
 }
 
 function aPrecio($valor): ?float
@@ -68,7 +62,7 @@ try {
     // ---------- Consultar el precio vigente en el catalogo ----------
     if (($_GET['accion'] ?? '') === 'consultar') {
         $codigo = $_GET['codigo'] ?? '';
-        $tabla  = tablaDe($codigo, $tablasCasa);
+        $tabla  = tablaDe($codigo);
 
         $stmt = $pdo->prepare(
             "SELECT codigo_interno, codigo_proveedor, nombre, marca,
@@ -97,7 +91,7 @@ try {
 
     $datos  = json_decode(file_get_contents('php://input'), true);
     $codigo = $datos['codigo'] ?? '';
-    $tabla  = tablaDe($codigo, $tablasCasa);
+    $tabla  = tablaDe($codigo);
 
     // Un campo vacio significa "no tocar ese precio", no "ponerlo en cero".
     $nuevoMayoreo = aPrecio($datos['precio_mayoreo'] ?? null);

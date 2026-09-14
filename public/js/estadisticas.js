@@ -145,6 +145,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const graficas = {};
     const tablas = {};
     const metricas = { casas: 'piezas', productos: 'piezas' };
+
+    // Cuantos productos se listan en "mas cambios de precio" (selector 1/3/5).
+    let cuantosCambios = 5;
     let datos = null;
     let rangoActivo = 'hoy';
     let peticion = 0;
@@ -645,12 +648,41 @@ document.addEventListener('DOMContentLoaded', () => {
             { color: color.baja, texto: '↓ Bajó (' + entero(p.bajadas) + ')' },
         ]);
 
-        tablas.precios = () => tabla(
-            [{ texto: 'Periodo' }, { texto: '↑ Subió', num: true }, { texto: '↓ Bajó', num: true }],
-            serie.filter((s) => s.subidas + s.bajadas > 0).map((s) => [
-                esc(tituloCubeta(s.clave, datos.agrupacion)), entero(s.subidas), entero(s.bajadas),
-            ])
-        );
+        // Que producto cambio, agrupado con la misma cubeta que las barras.
+        const detalle = p.detalle || [];
+        const porClave = {};
+
+        detalle.forEach((d) => {
+            (porClave[d.clave] = porClave[d.clave] || []).push(d);
+        });
+
+        const flecha = (d) => d.direccion === 'subio'
+            ? '<span class="kpi-sube"><i class="ph ph-arrow-up"></i> Subió</span>'
+            : '<span class="kpi-baja"><i class="ph ph-arrow-down"></i> Bajó</span>';
+
+        // La tabla ya no repite el conteo de la gráfica: dice cuál producto fue.
+        tablas.precios = () => {
+            const filas = detalle.map((d) => [
+                fechaCorta(d.fecha_cambio.slice(0, 10)),
+                esc(d.nombre) + '<span class="detalle-sub">' + esc(d.codigo) + '</span>',
+                etiquetaCasa(d.codigo_casa, d.casa),
+                d.tipo_precio,
+                money(d.precio_anterior) + ' → ' + money(d.precio_nuevo),
+                flecha(d),
+            ]);
+
+            const cuerpo = tabla(
+                [{ texto: 'Fecha' }, { texto: 'Producto', ancha: true }, { texto: 'Casa' },
+                 { texto: 'Precio' }, { texto: 'Cambio', num: true }, { texto: '', num: true }],
+                filas
+            );
+
+            // Con muchos cambios solo caben los mas recientes; hay que decirlo.
+            return filas.length > 0 && !p.detalle_completo
+                ? cuerpo + '<p class="tabla-nota">Se listan los ' + entero(p.detalle_maximo) +
+                  ' cambios más recientes del periodo.</p>'
+                : cuerpo;
+        };
         refrescarTabla('precios');
 
         describir('precios', 'Gráfica de barras de cambios de precio: ' + p.subidas + ' subidas y ' + p.bajadas + ' bajadas');
@@ -688,6 +720,22 @@ document.addEventListener('DOMContentLoaded', () => {
                             title: (items) => tituloCubeta(serie[items[0].dataIndex].clave, datos.agrupacion),
                             label: (item) => ' ' + item.dataset.label + ': ' + entero(Math.abs(item.raw)) + ' ' +
                                 (Math.abs(item.raw) === 1 ? 'vez' : 'veces'),
+                            // Los nombres de los productos que cambiaron ese dia,
+                            // que es lo que de verdad se quiere saber al ver una barra.
+                            afterBody: (items) => {
+                                const lista = porClave[serie[items[0].dataIndex].clave] || [];
+                                if (lista.length === 0) return '';
+
+                                const nombres = lista.slice(0, 4).map((d) =>
+                                    (d.direccion === 'subio' ? '↑ ' : '↓ ') + recortar(d.nombre, 34) +
+                                    '  ' + money(d.precio_anterior) + ' → ' + money(d.precio_nuevo));
+
+                                if (lista.length > 4) {
+                                    nombres.push('y ' + (lista.length - 4) + ' más');
+                                }
+
+                                return [''].concat(nombres);
+                            },
                         },
                     },
                 },
@@ -697,7 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ---------- Tablas de detalle ----------
     function tablaCambiosPrecio() {
-        const top = datos.precios.top;
+        const top = datos.precios.top.slice(0, cuantosCambios);
         const precio = (n) => (n === null ? '—' : money(n));
 
         document.getElementById('tabla-cambios-precio').innerHTML = tabla(
@@ -799,6 +847,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 b.classList.toggle('segmento-activo', activo);
                 b.setAttribute('aria-pressed', activo ? 'true' : 'false');
             });
+
+            // Este grupo no cambia la metrica, solo cuantas filas se ven.
+            if (grupo.dataset.grupo === 'cambios') {
+                cuantosCambios = Number(boton.dataset.cuantos);
+                tablaCambiosPrecio();
+                return;
+            }
 
             metricas[grupo.dataset.grupo] = boton.dataset.metrica;
             if (grupo.dataset.grupo === 'casas') graficaCasas();
