@@ -355,43 +355,13 @@ try {
     $stmt->execute($parametros($inicio, $fin));
     $topPrecios = $aNumero($stmt->fetchAll(PDO::FETCH_ASSOC), ['subidas', 'bajadas', 'cambios']);
 
-    /**
-     * Nombre y precio vigente de una lista de codigos internos. Cada producto
-     * vive en la tabla de su casa y el prefijo del codigo dice cual es; la tabla
-     * se resuelve contra las casas registradas, nunca con texto del navegador.
-     */
-    $productosPorCodigo = function (array $codigos) use ($pdo): array {
-        $porTabla = [];
-
-        foreach (array_unique($codigos) as $codigo) {
-            $tabla = tablaDeProducto($codigo);
-
-            if ($tabla !== null) {
-                $porTabla[$tabla][] = $codigo;
-            }
-        }
-
-        $catalogo = [];
-
-        foreach ($porTabla as $tabla => $lista) {
-            $marcas = implode(',', array_fill(0, count($lista), '?'));
-            $stmt = $pdo->prepare(
-                "SELECT codigo_interno, nombre, precio_menudeo, precio_mayoreo
-                   FROM {$tabla} WHERE codigo_interno IN ({$marcas})"
-            );
-            $stmt->execute(array_values($lista));
-
-            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $p) {
-                $catalogo[$p['codigo_interno']] = $p;
-            }
-        }
-
-        return $catalogo;
-    };
+    // Nombre, codigo del proveedor y precio vigente salen de la tabla de cada
+    // casa (ver catalogoDeProductos en app/helpers/casas.php).
+    $columnasCatalogo = ['nombre', 'codigo_proveedor', 'precio_menudeo', 'precio_mayoreo'];
 
     if ($topPrecios) {
         $codigos  = array_column($topPrecios, 'codigo');
-        $catalogo = $productosPorCodigo($codigos);
+        $catalogo = catalogoDeProductos($pdo, $codigos, $columnasCatalogo);
 
         // Precio al empezar el periodo y al terminarlo, por tipo, para sacar
         // cuanto se movio en total (no solo cuantas veces).
@@ -418,7 +388,8 @@ try {
 
         foreach ($topPrecios as &$fila) {
             $p = $catalogo[$fila['codigo']] ?? null;
-            $fila['nombre']         = $p['nombre'] ?? $fila['codigo'];
+            $fila['nombre']           = $p['nombre'] ?? $fila['codigo'];
+            $fila['codigo_proveedor'] = $p['codigo_proveedor'] ?? null;
             $fila['precio_menudeo'] = $p && $p['precio_menudeo'] !== null ? (float) $p['precio_menudeo'] : null;
             $fila['precio_mayoreo'] = $p && $p['precio_mayoreo'] !== null ? (float) $p['precio_mayoreo'] : null;
 
@@ -462,11 +433,14 @@ try {
     $detallePrecios  = array_slice($detallePrecios, 0, MAX_DETALLE_PRECIOS);
 
     if ($detallePrecios) {
-        $catalogoDetalle = $productosPorCodigo(array_column($detallePrecios, 'codigo'));
+        $catalogoDetalle = catalogoDeProductos(
+            $pdo, array_column($detallePrecios, 'codigo'), ['nombre', 'codigo_proveedor']
+        );
 
         foreach ($detallePrecios as &$fila) {
             // Si el producto ya no esta en el catalogo, al menos queda el codigo.
-            $fila['nombre']          = $catalogoDetalle[$fila['codigo']]['nombre'] ?? $fila['codigo'];
+            $fila['nombre']           = $catalogoDetalle[$fila['codigo']]['nombre'] ?? $fila['codigo'];
+            $fila['codigo_proveedor'] = $catalogoDetalle[$fila['codigo']]['codigo_proveedor'] ?? null;
             $fila['precio_anterior'] = (float) $fila['precio_anterior'];
             $fila['precio_nuevo']    = (float) $fila['precio_nuevo'];
             $fila['direccion']       = $fila['precio_nuevo'] > $fila['precio_anterior'] ? 'subio' : 'bajo';
@@ -516,6 +490,22 @@ try {
             if (isset($fila['codigo_casa'])) {
                 $fila['casa'] = etiquetaCasa($fila['codigo_casa']);
             }
+        }
+        unset($fila);
+    }
+    unset($lista);
+
+    // Los productos mas vendidos salen del detalle de la venta, que solo guarda
+    // el codigo interno: en pantalla se muestra el del proveedor.
+    $catalogoTop = catalogoDeProductos(
+        $pdo,
+        array_merge(array_column($topPiezas, 'codigo'), array_column($topImporte, 'codigo')),
+        ['codigo_proveedor']
+    );
+
+    foreach ([&$topPiezas, &$topImporte] as &$lista) {
+        foreach ($lista as &$fila) {
+            $fila['codigo_proveedor'] = $catalogoTop[$fila['codigo']]['codigo_proveedor'] ?? null;
         }
         unset($fila);
     }

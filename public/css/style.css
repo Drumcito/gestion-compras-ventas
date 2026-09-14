@@ -2765,3 +2765,25 @@ select.form-control {
 #alta-resumen .tabla-detalle {
     margin-top: 0.5rem;
 }
+
+/* ===== CÓDIGO INTERNO DEL PRODUCTO ===== */
+
+/* El código interno (BNS04-00001) es lo que identifica una pieza sin lugar a
+   dudas: se busca por él y se dicta por teléfono. Va resaltado en todas partes
+   —resultados de búsqueda, inventario, detalle de venta e historial— para que
+   se encuentre de un vistazo entre el resto del texto gris. */
+.codigo-prod {
+    font-weight: 700;
+    color: var(--ga-carbon);
+    background: #eceeec;
+    border-radius: 4px;
+    padding: 0.05em 0.35em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Sobre la fila azul del resultado activo el gris claro desaparece. */
+.search-result-item:hover .codigo-prod,
+.search-result-item:focus .codigo-prod {
+    background: #ffffff;
+}

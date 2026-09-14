@@ -19,6 +19,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const money = (n) => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+    /**
+     * El codigo que ocupa el vendedor es el del proveedor: es el que viene
+     * impreso en el catalogo y en la caja. El interno (BNS02-02411) es de la
+     * base de datos y no se muestra; solo aparece si la pieza no trae codigo de
+     * proveedor, para que la fila no quede sin nada con que identificarla.
+     */
+    const codigoVisible = (p) => p.codigo_proveedor || p.codigo_interno;
+
+    // Los nombres salen del catalogo y se pintan con innerHTML: uno con < o &
+    // rompe la pantalla (y desde que se pueden dar de alta productos pegando
+    // desde Excel, el texto ya no viene solo de los archivos del proveedor).
+    function esc(texto) {
+        const div = document.createElement('div');
+        div.textContent = texto === null || texto === undefined ? '' : texto;
+        return div.innerHTML;
+    }
+
     let temporizadorAviso = null;
 
     // segundos = 0 deja el aviso fijo (errores que conviene que el vendedor lea).
@@ -114,10 +131,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const claseCasa = 'casa-' + String(p.codigo_casa || '').replace(/[^A-Za-z0-9_-]/g, '');
 
             fila.innerHTML =
-                '<span class="res-nombre">' + p.nombre +
-                    '<span class="res-casa ' + claseCasa + '">' + p.nombre_casa + '</span></span>' +
-                '<span class="res-meta">' + p.codigo_interno + ' · ' + (p.codigo_proveedor || '') +
-                (p.marca ? ' · ' + p.marca : '') + '</span>' +
+                '<span class="res-nombre">' + esc(p.nombre) +
+                    '<span class="res-casa ' + claseCasa + '">' + esc(p.nombre_casa) + '</span></span>' +
+                '<span class="res-meta">' +
+                    '<span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
+                    (p.marca ? ' · ' + esc(p.marca) : '') + '</span>' +
                 '<span class="res-precio">' + (precios.join(' | ') || 'Sin precio') + '</span>';
 
             fila.addEventListener('click', () => agregarItem(p));
@@ -157,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 casa:           producto.codigo_casa,
                 casa_nombre:    producto.nombre_casa,
                 codigo_interno: producto.codigo_interno,
+                codigo_visible: codigoVisible(producto),
                 nombre:         producto.nombre,
                 precio_mayoreo: producto.precio_mayoreo === null ? null : Number(producto.precio_mayoreo),
                 precio_menudeo: producto.precio_menudeo === null ? null : Number(producto.precio_menudeo),
@@ -207,8 +226,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // renglones: arriba nombre / precio / cantidad / subtotal y abajo
             // casa / precio unitario, alineados entre sí.
             fila.innerHTML =
-                '<p class="item-nombre">' + item.nombre + '</p>' +
-                '<p class="item-meta">' + item.casa_nombre + ' · ' + item.codigo_interno + '</p>' +
+                '<p class="item-nombre">' + esc(item.nombre) + '</p>' +
+                '<p class="item-meta">' + esc(item.casa_nombre) +
+                    ' · <span class="codigo-prod">' + esc(item.codigo_visible) + '</span></p>' +
                 '<select class="form-control select-precio" data-i="' + indice + '" aria-label="Tipo de precio">' +
                     opcionMenudeo + opcionMayoreo +
                 '</select>' +

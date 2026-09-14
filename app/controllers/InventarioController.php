@@ -57,14 +57,36 @@ try {
 
     // El catalogo de una casa llega a 12 mil productos: se pagina siempre.
     $filtro     = '';
+    $orden      = 'nombre';
     $parametros = [];
+    $paramOrden = [];
 
     if (mb_strlen($termino) >= 2) {
         $filtro = ' AND (nombre LIKE :q1 OR codigo_proveedor LIKE :q2 OR codigo_interno LIKE :q3)';
         $like = '%' . $termino . '%';
         $parametros = ['q1' => $like, 'q2' => $like, 'q3' => $like];
+
+        // Igual que en la busqueda de la venta: si lo escrito es un codigo, esos
+        // resultados van primero y manda el codigo de la casa. Cada marcador
+        // lleva nombre propio porque PDO sin emulacion no deja repetirlos.
+        $orden = 'CASE
+                      WHEN codigo_proveedor = :ex1     THEN 0
+                      WHEN codigo_interno   = :ex2     THEN 1
+                      WHEN codigo_proveedor LIKE :ini1 THEN 2
+                      WHEN codigo_interno   LIKE :ini2 THEN 3
+                      WHEN codigo_proveedor LIKE :med1 THEN 4
+                      WHEN codigo_interno   LIKE :med2 THEN 5
+                      ELSE 6
+                  END, nombre';
+
+        $paramOrden = [
+            'ex1' => $termino,        'ex2' => $termino,
+            'ini1' => $termino . '%', 'ini2' => $termino . '%',
+            'med1' => $like,          'med2' => $like,
+        ];
     }
 
+    // El conteo no lleva los marcadores del ORDER BY: PDO rechaza los que sobran.
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM {$tabla} WHERE activo = 1{$filtro}");
     $stmt->execute($parametros);
     $total = (int) $stmt->fetchColumn();
@@ -76,10 +98,10 @@ try {
                 precio_mayoreo, precio_menudeo
            FROM {$tabla}
           WHERE activo = 1{$filtro}
-          ORDER BY nombre
+          ORDER BY {$orden}
           LIMIT " . POR_PAGINA . " OFFSET " . (int) $desde
     );
-    $stmt->execute($parametros);
+    $stmt->execute($parametros + $paramOrden);
 
     echo json_encode([
         'ok'          => true,

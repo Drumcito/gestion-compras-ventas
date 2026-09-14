@@ -49,7 +49,30 @@ try {
         $parametros['casa'] = $casa;
     }
 
-    $sql .= ' ORDER BY nombre LIMIT 25';
+    // Quien busca un codigo ya sabe que pieza quiere: esos resultados van
+    // primero, y entre ellos manda el codigo de la casa (el que viene impreso en
+    // el catalogo del proveedor). Los que solo coinciden por nombre quedan al
+    // final, en orden alfabetico como siempre.
+    //
+    // Cada marcador va con nombre propio: PDO sin emulacion no deja repetir uno.
+    $sql .= ' ORDER BY
+                CASE
+                    WHEN codigo_proveedor = :ex1      THEN 0
+                    WHEN codigo_interno   = :ex2      THEN 1
+                    WHEN codigo_proveedor LIKE :ini1  THEN 2
+                    WHEN codigo_interno   LIKE :ini2  THEN 3
+                    WHEN codigo_proveedor LIKE :med1  THEN 4
+                    WHEN codigo_interno   LIKE :med2  THEN 5
+                    ELSE 6
+                END,
+                nombre
+              LIMIT 25';
+
+    $parametros += [
+        'ex1' => $termino,        'ex2' => $termino,
+        'ini1' => $termino . '%', 'ini2' => $termino . '%',
+        'med1' => $like,          'med2' => $like,
+    ];
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($parametros);

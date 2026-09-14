@@ -10,6 +10,7 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/../../config/conexionBD.php';
 require_once __DIR__ . '/../helpers/casas.php';
+require_once __DIR__ . '/../helpers/resumen_productos.php';
 
 $usuarioId = (int) $_SESSION['user_id'];
 $esAdmin   = ($_SESSION['user_role'] ?? '') === 'admin';
@@ -51,8 +52,17 @@ try {
         $stmt->execute(['id' => $ventaId]);
         $venta['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // El detalle guarda el codigo interno, pero en pantalla se ocupa el del
+        // proveedor: se busca en la tabla de cada casa.
+        $catalogo = catalogoDeProductos(
+            $pdo, array_column($venta['items'], 'codigo_interno_producto'), ['codigo_proveedor']
+        );
+
         foreach ($venta['items'] as &$item) {
             $item['casa'] = etiquetaCasa($item['codigo_casa']);
+
+            // Si el producto ya no esta en el catalogo, queda el codigo interno.
+            $item['codigo_proveedor'] = $catalogo[$item['codigo_interno_producto']]['codigo_proveedor'] ?? null;
         }
         unset($item);
 
@@ -117,74 +127,17 @@ try {
     $condicionUsuario = $filtroUsuario > 0 ? ' AND v.usuario_id = :usuario' : '';
 
     // ---------- Resumen de productos vendidos en el periodo ----------
-    // Junta todas las ventas del filtro y suma por producto, para responder
-    // "que se vendio y cuanto" sin abrir venta por venta.
+    // La consulta vive en app/helpers/resumen_productos.php porque la comparten
+    // esta pantalla y la hoja imprimible del mismo resumen.
     if ($accion === 'productos') {
-        $stmt = $pdo->prepare(
-            'SELECT c.nombre AS casa, c.codigo_casa,
-                    d.codigo_interno_producto,
-                    MAX(d.nombre_producto) AS nombre_producto,
-                    SUM(d.cantidad)  AS piezas,
-                    SUM(d.subtotal)  AS importe,
-                    COUNT(DISTINCT d.venta_id) AS ventas
-               FROM detalle_venta d
-               JOIN ventas v  ON v.id = d.venta_id
-               JOIN casas c   ON c.id = d.casa_id
-              WHERE DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicionUsuario . '
-              GROUP BY c.nombre, c.codigo_casa, d.codigo_interno_producto
-              ORDER BY piezas DESC, importe DESC'
-        );
-
-        $parametros = ['desde' => $desde, 'hasta' => $hasta];
-        if ($filtroUsuario > 0) {
-            $parametros['usuario'] = $filtroUsuario;
-        }
-
-        $stmt->execute($parametros);
-        $productos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        foreach ($productos as &$p) {
-            $p['casa'] = etiquetaCasa($p['codigo_casa']);
-        }
-        unset($p);
-
-        $totalPiezas  = 0;
-        $totalImporte = 0.0;
-        $porCasa      = [];
-
-        foreach ($productos as $p) {
-            $totalPiezas  += (int) $p['piezas'];
-            $totalImporte += (float) $p['importe'];
-
-            $clave = $p['codigo_casa'];
-            if (!isset($porCasa[$clave])) {
-                $porCasa[$clave] = [
-                    'codigo_casa' => $clave,
-                    'casa'        => $p['casa'],
-                    'productos'   => 0,
-                    'piezas'      => 0,
-                    'importe'     => 0.0,
-                ];
-            }
-            $porCasa[$clave]['productos']++;
-            $porCasa[$clave]['piezas']  += (int) $p['piezas'];
-            $porCasa[$clave]['importe'] += (float) $p['importe'];
-        }
-
-        // Las casas se ordenan por lo que mas se vendio.
-        usort($porCasa, fn($a, $b) => $b['piezas'] <=> $a['piezas']);
+        $datos = resumenProductosVendidos($pdo, $desde, $hasta, $filtroUsuario);
 
         echo json_encode([
             'ok'        => true,
             'desde'     => $desde,
             'hasta'     => $hasta,
-            'productos' => $productos,
-            'resumen'   => [
-                'distintos' => count($productos),
-                'piezas'    => $totalPiezas,
-                'importe'   => number_format($totalImporte, 2, '.', ''),
-                'por_casa'  => array_values($porCasa),
-            ],
+            'productos' => $datos['productos'],
+            'resumen'   => $datos['resumen'],
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }

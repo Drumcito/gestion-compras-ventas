@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         (u.es_usuario_actual ? '<span class="detalle-sub">(tú)</span>' : '') + '</p>' +
                     '<p class="venta-fila-meta">' + esc(u.numero_empleado) +
                         (u.numero_telefono ? ' · ' + esc(u.numero_telefono) : '') +
-                        ' · ' + u.ventas + ' venta' + (u.ventas === '1' ? '' : 's') + '</p>' +
+                        ' · ' + u.ventas + ' venta' + (Number(u.ventas) === 1 ? '' : 's') + '</p>' +
                 '</div>' +
                 '<div class="venta-fila-derecha">' +
                     '<div class="usuario-etiquetas">' + etiquetaRol + etiquetaEstado + '</div>' +

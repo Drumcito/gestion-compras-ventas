@@ -26,6 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
         ? '—'
         : '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+    /**
+     * El codigo que se muestra es el del proveedor; el interno (BNS0X-#####) es
+     * de la base y no se ocupa en el mostrador. Solo sale si la pieza no trae
+     * codigo de proveedor.
+     */
+    const codigoVisible = (p) => p.codigo_proveedor || p.codigo_interno;
+
     function esc(texto) {
         const div = document.createElement('div');
         div.textContent = texto === null || texto === undefined ? '' : texto;
@@ -173,8 +180,8 @@ document.addEventListener('DOMContentLoaded', () => {
             fila.innerHTML =
                 '<div class="venta-fila-datos">' +
                     '<p class="venta-fila-cliente">' + esc(p.nombre) + '</p>' +
-                    '<p class="venta-fila-meta">' + p.codigo_interno +
-                        ' · ' + esc(p.codigo_proveedor || 's/código') +
+                    '<p class="venta-fila-meta">' +
+                        '<span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
                         (p.marca ? ' · ' + esc(p.marca) : '') +
                         (p.categoria ? ' · ' + esc(p.categoria) : '') + '</p>' +
                 '</div>' +
@@ -222,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '<h2 class="detalle-titulo">Editar precio</h2>' +
             '<div class="detalle-cabecera">' +
                 '<p><strong>' + esc(p.nombre) + '</strong></p>' +
-                '<p class="detalle-sub">' + p.codigo_interno + ' · ' + esc(p.codigo_proveedor || '') +
+                '<p class="detalle-sub"><span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
                     (p.marca ? ' · ' + esc(p.marca) : '') + '</p>' +
             '</div>' +
             '<p class="aviso aviso-info">El precio nuevo aplica a partir de este momento. ' +

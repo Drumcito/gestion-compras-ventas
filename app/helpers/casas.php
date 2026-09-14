@@ -171,6 +171,53 @@ function tablaDeProducto(string $codigoInterno): ?string
 }
 
 /**
+ * Datos de catalogo para una lista de codigos internos.
+ *
+ * El detalle de una venta guarda el codigo interno (BNS03-02737) pero no el del
+ * proveedor ni el nombre vigente, asi que cuando hace falta alguno hay que ir a
+ * la tabla de cada casa. El prefijo del codigo dice a cual.
+ *
+ * @param  array $columnas Columnas del catalogo que se necesitan.
+ * @return array<string, array> Indexado por codigo_interno.
+ */
+function catalogoDeProductos(PDO $pdo, array $codigos, array $columnas = ['nombre']): array
+{
+    // Las columnas salen del codigo, no del navegador, pero van dentro del
+    // SELECT: se validan igual.
+    foreach ($columnas as $columna) {
+        if (!preg_match('/^[a-z_]{1,40}$/', $columna)) {
+            throw new InvalidArgumentException('Columna de catalogo no valida: ' . $columna);
+        }
+    }
+
+    $porTabla = [];
+
+    foreach (array_unique($codigos) as $codigo) {
+        $tabla = tablaDeProducto((string) $codigo);
+
+        if ($tabla !== null) {
+            $porTabla[$tabla][] = $codigo;
+        }
+    }
+
+    $seleccion = implode(', ', array_unique(array_merge(['codigo_interno'], $columnas)));
+    $catalogo  = [];
+
+    foreach ($porTabla as $tabla => $lista) {
+        $marcas = implode(',', array_fill(0, count($lista), '?'));
+
+        $stmt = $pdo->prepare("SELECT {$seleccion} FROM {$tabla} WHERE codigo_interno IN ({$marcas})");
+        $stmt->execute(array_values($lista));
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+            $catalogo[$fila['codigo_interno']] = $fila;
+        }
+    }
+
+    return $catalogo;
+}
+
+/**
  * Reescribe vista_catalogo, que une el catalogo de todas las casas y es la que
  * usa el buscador de Ventas. Hay que llamarla cada vez que nace una casa: si no,
  * sus productos no aparecen en la busqueda.

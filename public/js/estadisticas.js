@@ -48,6 +48,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return div.innerHTML;
     }
 
+    /**
+     * El codigo que se muestra es el del proveedor, no el interno de la base
+     * (BNS03-02737): ese no lo ocupa nadie en el mostrador.
+     */
+    const codigoVisible = (p) => p.codigo_proveedor || p.codigo;
+
     function recortar(texto, maximo) {
         return texto.length > maximo ? texto.slice(0, maximo - 1).trimEnd() + '…' : texto;
     }
@@ -568,7 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
              { texto: 'Importe', num: true }, { texto: 'Ventas', num: true }],
             lista.map((p, i) => [
                 i + 1,
-                esc(p.nombre) + '<span class="detalle-sub">' + esc(p.codigo) + '</span>',
+                esc(p.nombre) + '<span class="detalle-sub">' + esc(codigoVisible(p)) + '</span>',
                 etiquetaCasa(p.codigo_casa, p.casa), entero(p.piezas), money(p.importe), entero(p.ventas),
             ])
         );
@@ -614,7 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             label: (item) => {
                                 const p = lista[item.dataIndex];
                                 return [
-                                    ' ' + p.casa + ' · ' + p.codigo,
+                                    ' ' + p.casa + ' · ' + codigoVisible(p),
                                     ' ' + entero(p.piezas) + ' piezas · ' + money(p.importe),
                                     ' en ' + entero(p.ventas) + ' venta' + (p.ventas === 1 ? '' : 's'),
                                 ];
@@ -664,7 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tablas.precios = () => {
             const filas = detalle.map((d) => [
                 fechaCorta(d.fecha_cambio.slice(0, 10)),
-                esc(d.nombre) + '<span class="detalle-sub">' + esc(d.codigo) + '</span>',
+                esc(d.nombre) + '<span class="detalle-sub">' + esc(codigoVisible(d)) + '</span>',
                 etiquetaCasa(d.codigo_casa, d.casa),
                 d.tipo_precio,
                 money(d.precio_anterior) + ' → ' + money(d.precio_nuevo),
@@ -761,7 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         '<span class="detalle-sub">' + v.tipo + ': ' + money(v.inicial) + ' → ' + money(v.final) + '</span>';
                 }
                 return [
-                    esc(t.nombre) + '<span class="detalle-sub">' + esc(t.codigo) + '</span>',
+                    esc(t.nombre) + '<span class="detalle-sub">' + esc(codigoVisible(t)) + '</span>',
                     etiquetaCasa(t.codigo_casa, t.casa),
                     '<span class="kpi-sube">' + entero(t.subidas) + '</span>',
                     '<span class="kpi-baja">' + entero(t.bajadas) + '</span>',

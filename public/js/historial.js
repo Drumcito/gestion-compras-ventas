@@ -33,6 +33,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Escapa lo que viene de la base (nombre de cliente, producto) antes de
     // meterlo al HTML.
+    /**
+     * El codigo que se muestra es el del proveedor: es el que viene impreso en
+     * el catalogo y el que ocupa la gente. El interno (BNS03-02737) es de la
+     * base de datos; solo sale cuando la pieza no trae codigo de proveedor.
+     */
+    const codigoVisible = (p) =>
+        p.codigo_proveedor || p.codigo_interno_producto || p.codigo_interno;
+
     function esc(texto) {
         const div = document.createElement('div');
         div.textContent = texto === null || texto === undefined ? '' : texto;
@@ -167,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     '</p>' +
                     '<p class="venta-fila-meta">#' + v.id + ' · ' + fechaLegible(v.fecha) +
                         ' · ' + esc(v.vendedor) + ' (' + esc(v.numero_empleado) + ')' +
-                        ' · ' + v.piezas + ' pieza' + (v.piezas === '1' ? '' : 's') + '</p>' +
+                        ' · ' + v.piezas + ' pieza' + (Number(v.piezas) === 1 ? '' : 's') + '</p>' +
                 '</div>' +
                 '<div class="venta-fila-derecha">' + etiquetaPago +
                     '<span class="venta-fila-total">' + money(v.total) + '</span>' +
@@ -258,8 +266,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const filas = (porCasa[c.codigo_casa] || []).map((p) =>
                 '<tr>' +
                     '<td>' + esc(p.nombre_producto) +
-                        '<span class="detalle-sub">' + p.codigo_interno_producto +
-                        ' · en ' + p.ventas + ' venta' + (p.ventas === '1' ? '' : 's') + '</span></td>' +
+                        '<span class="detalle-sub">' +
+                        '<span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
+                        ' · en ' + p.ventas + ' venta' + (Number(p.ventas) === 1 ? '' : 's') + '</span></td>' +
                     '<td class="num"><strong>' + Number(p.piezas).toLocaleString('es-MX') + '</strong></td>' +
                     '<td class="num">' + money(p.importe) + '</td>' +
                 '</tr>'
@@ -282,8 +291,33 @@ document.addEventListener('DOMContentLoaded', () => {
             '</div>';
         }).join('');
 
-        contenido.innerHTML = encabezado + totales + bloques +
+        // Misma información, en hoja carta vertical: el navegador la guarda como
+        // PDF desde su propio diálogo de impresión.
+        const acciones =
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-productos-pdf">' +
+                    '<i class="ph ph-file-pdf" aria-hidden="true"></i> Guardar en PDF' +
+                '</button>' +
+            '</div>';
+
+        contenido.innerHTML = encabezado + acciones + totales + bloques +
             '<p class="detalle-sub">Casas y productos ordenados de más vendido a menos.</p>';
+    }
+
+    function abrirResumenPdf() {
+        const desde = inputDesde.value;
+        const hasta = inputHasta.value || desde;
+
+        if (!desde) {
+            mostrarAviso('Elige un rango de fechas antes de generar el PDF.', 'error');
+            return;
+        }
+
+        window.open(
+            'productos.php?desde=' + desde + '&hasta=' + hasta +
+            '&usuario=' + (filtroUsuario.value || 0),
+            '_blank'
+        );
     }
 
     // ---------- Detalle ----------
@@ -314,7 +348,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const filas = v.items.map((i) =>
             '<tr>' +
                 '<td>' + esc(i.nombre_producto) +
-                    '<span class="detalle-sub">' + esc(i.casa) + ' · ' + i.codigo_interno_producto + '</span></td>' +
+                    '<span class="detalle-sub">' + esc(i.casa) +
+                    ' · <span class="codigo-prod">' + esc(codigoVisible(i)) + '</span></span></td>' +
                 '<td>' + i.tipo_precio + '</td>' +
                 '<td class="num">' + money(i.precio_aplicado) + '</td>' +
                 '<td class="num">' + i.cantidad + '</td>' +
@@ -516,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '<h2 class="detalle-titulo">Editar precio</h2>' +
             '<div class="detalle-cabecera">' +
                 '<p><strong>' + esc(p.nombre) + '</strong></p>' +
-                '<p class="detalle-sub">' + p.codigo_interno + ' · ' + esc(p.codigo_proveedor || '') +
+                '<p class="detalle-sub"><span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
                     (p.marca ? ' · ' + esc(p.marca) : '') + '</p>' +
             '</div>' +
             '<p class="aviso aviso-info">Esto cambia el precio del producto en el catálogo, ' +
@@ -610,6 +645,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 casa_nombre:    i.casa,
                 casa_codigo:    i.codigo_casa,
                 codigo_interno: i.codigo_interno_producto,
+                // El interno es la llave con la que se guarda; el del proveedor
+                // es el que se ve en pantalla.
+                codigo_proveedor: i.codigo_proveedor,
                 nombre:         i.nombre_producto,
                 tipo_precio:    i.tipo_precio,
                 precio:         Number(i.precio_aplicado),
@@ -627,7 +665,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const filas = v.items.map((i, indice) =>
             '<tr>' +
                 '<td>' + esc(i.nombre) +
-                    '<span class="detalle-sub">' + esc(i.casa_nombre) + ' · ' + i.codigo_interno + '</span></td>' +
+                    '<span class="detalle-sub">' + esc(i.casa_nombre) +
+                    ' · <span class="codigo-prod">' + esc(codigoVisible(i)) + '</span></span></td>' +
                 '<td class="num">' + money(i.precio) + '</td>' +
                 '<td class="num">' +
                     '<input type="number" class="input-qty edit-cantidad" data-i="' + indice + '" ' +
@@ -832,6 +871,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     contenido.addEventListener('click', async (e) => {
+        // closest: el click puede caer en el icono de adentro del boton.
+        if (e.target.closest('#btn-productos-pdf')) {
+            abrirResumenPdf();
+            return;
+        }
+
         const botonPrecio = e.target.closest('.btn-precio');
         if (botonPrecio) {
             abrirPrecio(botonPrecio.dataset.codigo, botonPrecio.dataset.venta);
