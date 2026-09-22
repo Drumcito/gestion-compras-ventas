@@ -38,10 +38,10 @@ try {
 
     // ---------- Hoja 1: una fila por venta ----------
     $stmt = $pdo->prepare(
-        'SELECT v.id, v.fecha, v.cliente, v.total, v.monto_cobrado, v.tipo_pago,
+        'SELECT v.id, v.fecha, v.cliente, v.total, v.monto_cobrado, v.credito_aplicado, v.tipo_pago,
                 v.estado_pago, v.fecha_vencimiento,
-                GREATEST(v.total - v.monto_cobrado, 0) AS saldo_pendiente,
-                GREATEST(v.monto_cobrado - v.total, 0) AS devolucion,
+                GREATEST(v.total - v.monto_cobrado - v.credito_aplicado, 0) AS saldo_pendiente,
+                GREATEST(v.monto_cobrado + v.credito_aplicado - v.total, 0) AS devolucion,
                 CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
                 u.numero_empleado,
                 (SELECT COUNT(*) FROM detalle_venta d WHERE d.venta_id = v.id) AS piezas

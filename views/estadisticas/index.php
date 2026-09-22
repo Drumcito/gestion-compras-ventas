@@ -123,7 +123,7 @@ $toggleMetrica = function (string $grupo): string {
                 <?php tarjetaGrafica('casas', 'Ventas por casa', 'Piezas vendidas de cada casa', $toggleMetrica('casas')); ?>
                 <?php tarjetaGrafica('productos', 'Productos más vendidos', 'Top 10', $toggleMetrica('productos')); ?>
                 <?php tarjetaGrafica('precios', 'Cambios de precio',
-                    'Cada precio (menudeo y mayoreo) cuenta por separado. Abre la tabla para ver qué producto subió o bajó'); ?>
+                    'Cambios del precio bruto. Abre la tabla para ver qué producto subió o bajó'); ?>
             </div>
 
             <!-- Tablas de detalle -->

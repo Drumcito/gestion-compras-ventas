@@ -24,8 +24,8 @@ try {
         $ventaId = (int) ($_GET['id'] ?? 0);
 
         $stmt = $pdo->prepare(
-            'SELECT v.id, v.cliente, v.fecha, v.total, v.tipo_pago, v.estado_pago,
-                    v.fecha_vencimiento, v.usuario_id,
+            'SELECT v.id, v.cliente, v.cliente_id, v.fecha, v.total, v.tipo_pago, v.estado_pago,
+                    v.credito_aplicado, v.fecha_vencimiento, v.usuario_id,
                     CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
                     u.numero_empleado
                FROM ventas v
@@ -68,7 +68,7 @@ try {
 
         // El estado (cobrado / saldo / devolucion) aplica igual a contado y credito.
         $stmt = $pdo->prepare(
-            'SELECT total_abonado, saldo_pendiente, devolucion
+            'SELECT total_abonado, credito_aplicado, saldo_pendiente, devolucion
                FROM vista_estado_ventas WHERE venta_id = :id'
         );
         $stmt->execute(['id' => $ventaId]);
@@ -143,9 +143,9 @@ try {
     }
 
     $stmt = $pdo->prepare(
-        'SELECT v.id, v.cliente, v.fecha, v.total, v.monto_cobrado, v.tipo_pago,
+        'SELECT v.id, v.cliente, v.fecha, v.total, v.monto_cobrado, v.credito_aplicado, v.tipo_pago,
                 v.estado_pago, v.usuario_id,
-                GREATEST(v.monto_cobrado - v.total, 0) AS devolucion,
+                GREATEST(v.monto_cobrado + v.credito_aplicado - v.total, 0) AS devolucion,
                 CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
                 u.numero_empleado,
                 (SELECT COUNT(*) FROM detalle_venta d WHERE d.venta_id = v.id) AS piezas

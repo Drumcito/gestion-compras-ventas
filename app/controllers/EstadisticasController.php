@@ -357,7 +357,7 @@ try {
 
     // Nombre, codigo del proveedor y precio vigente salen de la tabla de cada
     // casa (ver catalogoDeProductos en app/helpers/casas.php).
-    $columnasCatalogo = ['nombre', 'codigo_proveedor', 'precio_menudeo', 'precio_mayoreo'];
+    $columnasCatalogo = ['nombre', 'codigo_proveedor', 'precio_mayoreo'];
 
     if ($topPrecios) {
         $codigos  = array_column($topPrecios, 'codigo');
@@ -390,22 +390,18 @@ try {
             $p = $catalogo[$fila['codigo']] ?? null;
             $fila['nombre']           = $p['nombre'] ?? $fila['codigo'];
             $fila['codigo_proveedor'] = $p['codigo_proveedor'] ?? null;
-            $fila['precio_menudeo'] = $p && $p['precio_menudeo'] !== null ? (float) $p['precio_menudeo'] : null;
             $fila['precio_mayoreo'] = $p && $p['precio_mayoreo'] !== null ? (float) $p['precio_mayoreo'] : null;
 
-            // Se reporta el menudeo; si ese no cambio en el periodo, el mayoreo.
+            // Solo existe el precio bruto (mayoreo); se reporta cuanto se movio.
             $fila['variacion'] = null;
-            foreach (['menudeo', 'mayoreo'] as $tipo) {
-                $e = $extremos[$fila['codigo'] . '|' . $tipo] ?? null;
-                if ($e && $e['inicial'] > 0) {
-                    $fila['variacion'] = [
-                        'tipo'    => $tipo,
-                        'inicial' => $e['inicial'],
-                        'final'   => $e['final'],
-                        'porcentaje' => round(($e['final'] - $e['inicial']) / $e['inicial'] * 100, 1),
-                    ];
-                    break;
-                }
+            $e = $extremos[$fila['codigo'] . '|mayoreo'] ?? null;
+            if ($e && $e['inicial'] > 0) {
+                $fila['variacion'] = [
+                    'tipo'    => 'mayoreo',
+                    'inicial' => $e['inicial'],
+                    'final'   => $e['final'],
+                    'porcentaje' => round(($e['final'] - $e['inicial']) / $e['inicial'] * 100, 1),
+                ];
             }
         }
         unset($fila);

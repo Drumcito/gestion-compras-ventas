@@ -100,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ---------- Productos ----------
     async function cargarProductos() {
+        pintarCasaInfo();
         listaProductos.innerHTML = '<p class="venta-vacia">Cargando...</p>';
         paginacion.hidden = true;
 
@@ -174,8 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const precios =
-                '<span class="precio-etiqueta">Menudeo <strong>' + money(p.precio_menudeo) + '</strong></span>' +
-                '<span class="precio-etiqueta">Mayoreo <strong>' + money(p.precio_mayoreo) + '</strong></span>';
+                '<span class="precio-etiqueta">Bruto <strong>' + money(p.precio_mayoreo) + '</strong></span>';
 
             fila.innerHTML =
                 '<div class="venta-fila-datos">' +
@@ -235,18 +235,12 @@ document.addEventListener('DOMContentLoaded', () => {
             '<p class="aviso aviso-info">El precio nuevo aplica a partir de este momento. ' +
                 'Las ventas ya registradas conservan el precio con el que se cobraron.</p>' +
             '<div class="form-group">' +
-                '<label for="inv-menudeo">Precio menudeo <span class="detalle-sub">' +
-                    '(actual: ' + money(p.precio_menudeo) + ')</span></label>' +
-                '<input type="number" id="inv-menudeo" class="form-control" min="0" step="0.01" ' +
-                       'value="' + valor(p.precio_menudeo) + '">' +
-            '</div>' +
-            '<div class="form-group">' +
-                '<label for="inv-mayoreo">Precio mayoreo <span class="detalle-sub">' +
+                '<label for="inv-mayoreo">Precio bruto <span class="detalle-sub">' +
                     '(actual: ' + money(p.precio_mayoreo) + ')</span></label>' +
                 '<input type="number" id="inv-mayoreo" class="form-control" min="0" step="0.01" ' +
                        'value="' + valor(p.precio_mayoreo) + '">' +
             '</div>' +
-            '<p class="detalle-sub">Deja un campo vacío para no tocar ese precio.</p>' +
+            '<p class="detalle-sub">El precio de venta (neto) se calcula solo, sumándole el porcentaje de la casa.</p>' +
             '<div id="inv-aviso" class="aviso" hidden></div>' +
             '<div class="detalle-acciones">' +
                 '<button type="button" class="chip" id="btn-cancelar-inv">Cancelar</button>' +
@@ -268,7 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     codigo:         codigo,
-                    precio_menudeo: document.getElementById('inv-menudeo').value,
                     precio_mayoreo: document.getElementById('inv-mayoreo').value,
                 }),
             })).json();
@@ -285,14 +278,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (datos.cambios === 0) {
                 mostrarAviso(datos.mensaje, 'ok');
             } else {
-                const linea = (etiqueta, d) => {
-                    if (d.tendencia === 'igual') return '';
-                    const antes = d.antes === null ? 'sin precio' : money(d.antes);
-                    return ' ' + etiqueta + ': ' + antes + ' → ' + money(d.despues) + '.';
-                };
+                const d = datos.mayoreo;
+                const antes = d.antes === null ? 'sin precio' : money(d.antes);
                 mostrarAviso(
-                    'Precio de ' + datos.nombre + ' actualizado.' +
-                    linea('Menudeo', datos.menudeo) + linea('Mayoreo', datos.mayoreo),
+                    'Precio de ' + datos.nombre + ' actualizado. Bruto: ' +
+                    antes + ' → ' + money(d.despues) + '.',
                     'ok'
                 );
             }
@@ -316,7 +306,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const contenidoCasa = document.getElementById('contenido-casa');
     const btnCerrarCasa = document.getElementById('btn-cerrar-casa');
     const btnNuevaCasa  = document.getElementById('btn-nueva-casa');
+    const btnEditarCasa = document.getElementById('btn-editar-casa');
     const btnAltaProd   = document.getElementById('btn-agregar-productos');
+    const casaNetoInfo  = document.getElementById('casa-neto-info');
 
     // Orden de las columnas al pegar; el 'false' marca las que son opcionales.
     const COLUMNAS = [
@@ -324,16 +316,15 @@ document.addEventListener('DOMContentLoaded', () => {
         ['Nombre',              true],
         ['Marca',               false],
         ['Categoría',           false],
-        ['Precio menudeo',      true],
-        ['Precio mayoreo',      false],
+        ['Precio bruto',        true],
     ];
 
     // Ejemplo de cómo deben verse las celdas en Excel. El tercer renglón deja ver
     // que las columnas opcionales pueden quedar vacías sin romper el orden.
     const EJEMPLO = [
-        ['FP-200', 'PINZA DE PRESIÓN 10"',  'TRUPER', 'HERRAMIENTA', '245.00',   '1980.00'],
-        ['FP-201', 'CINTA MÉTRICA 5 M',     'TRUPER', 'MEDICIÓN',    '$89.50',   ''],
-        ['',       'MARTILLO DE UÑA 16 OZ', '',       '',            '150',      ''],
+        ['FP-200', 'PINZA DE PRESIÓN 10"',  'TRUPER', 'HERRAMIENTA', '245.00'],
+        ['FP-201', 'CINTA MÉTRICA 5 M',     'TRUPER', 'MEDICIÓN',    '$89.50'],
+        ['',       'MARTILLO DE UÑA 16 OZ', '',       '',            '150'],
     ];
 
     // Mismo tope que MAX_FILAS en CasaController: más que esto no cabe en un POST.
@@ -439,21 +430,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const menudeo = aPrecioJS(celdas[4]);
+            const bruto = aPrecioJS(celdas[4]);
 
-            if (menudeo.error) {
-                anotarError('el precio de menudeo ' + menudeo.error);
+            if (bruto.error) {
+                anotarError('el precio bruto ' + bruto.error);
                 return;
             }
-            if (menudeo.valor === null) {
-                anotarError('falta el precio de menudeo');
-                return;
-            }
-
-            const mayoreo = aPrecioJS(celdas[5]);
-
-            if (mayoreo.error) {
-                anotarError('el precio de mayoreo ' + mayoreo.error);
+            if (bruto.valor === null) {
+                anotarError('falta el precio bruto');
                 return;
             }
 
@@ -463,8 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nombre:           nombre,
                 marca:            (celdas[2] || '').trim(),
                 categoria:        (celdas[3] || '').trim(),
-                precio_menudeo:   menudeo.valor,
-                precio_mayoreo:   mayoreo.valor,
+                precio_mayoreo:   bruto.valor,
             });
         });
 
@@ -526,13 +509,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (validas.length > 0) {
             html += '<div class="tabla-scroll"><table class="tabla-detalle"><thead><tr>' +
                 '<th>Código</th><th>Producto</th><th>Marca</th>' +
-                '<th class="num">Menudeo</th><th class="num">Mayoreo</th>' +
+                '<th class="num">Bruto</th>' +
                 '</tr></thead><tbody>' +
                 validas.slice(0, 8).map((f) =>
                     '<tr><td>' + esc(f.codigo_proveedor || '—') + '</td>' +
                     '<td>' + esc(f.nombre) + '</td>' +
                     '<td>' + esc(f.marca || '—') + '</td>' +
-                    '<td class="num">' + money(f.precio_menudeo) + '</td>' +
                     '<td class="num">' + money(f.precio_mayoreo) + '</td></tr>'
                 ).join('') +
                 '</tbody></table></div>' +
@@ -638,6 +620,12 @@ document.addEventListener('DOMContentLoaded', () => {
             '</div>' +
             '<p class="detalle-sub">La etiqueta es lo que se ve en Ventas, Inventario, Estadísticas ' +
                 'y el Excel del historial. El orden decide en qué lugar aparece la casa en las listas.</p>' +
+            '<div class="form-group">' +
+                '<label for="casa-porcentaje">Porcentaje para el neto (%)</label>' +
+                '<input type="number" id="casa-porcentaje" class="form-control" min="0" max="999.99" step="0.01" ' +
+                       'value="' + Number(datos.porcentaje_sugerido) + '">' +
+                '<span class="detalle-sub">El precio de venta se calcula sumándole este porcentaje al bruto.</span>' +
+            '</div>' +
             '<div id="casa-aviso" class="aviso" hidden></div>' +
             '<div class="detalle-acciones">' +
                 '<button type="button" class="chip" id="btn-cancelar-casa">Cancelar</button>' +
@@ -658,9 +646,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({
-                    nombre:   document.getElementById('casa-nombre').value,
-                    etiqueta: document.getElementById('casa-etiqueta').value,
-                    orden:    document.getElementById('casa-orden').value,
+                    nombre:          document.getElementById('casa-nombre').value,
+                    etiqueta:        document.getElementById('casa-etiqueta').value,
+                    orden:           document.getElementById('casa-orden').value,
+                    porcentaje_neto: document.getElementById('casa-porcentaje').value,
                 }),
             })).json();
 
@@ -686,6 +675,97 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             boton.disabled = false;
             boton.textContent = 'Crear casa';
+        }
+    }
+
+    // ---------- Editar casa (nombre y porcentaje del neto) ----------
+    function casaObj() {
+        return casas.find((c) => c.codigo_casa === casaActual) || null;
+    }
+
+    /** Línea que recuerda con qué porcentaje se calcula el neto de la casa activa. */
+    function pintarCasaInfo() {
+        if (!casaNetoInfo) return;
+
+        const casa = casaObj();
+        if (!casa || casa.porcentaje_neto === undefined) {
+            casaNetoInfo.hidden = true;
+            return;
+        }
+
+        const pct = Number(casa.porcentaje_neto).toLocaleString('es-MX', { maximumFractionDigits: 2 });
+        casaNetoInfo.hidden = false;
+        casaNetoInfo.innerHTML =
+            '<i class="ph ph-tag" aria-hidden="true"></i> Precio de venta = bruto + <strong>' + pct + '%</strong>';
+    }
+
+    function abrirEditarCasa() {
+        const casa = casaObj();
+        if (!casa) {
+            mostrarAviso('Primero elige una casa.', 'error');
+            return;
+        }
+
+        modalCasa.hidden = false;
+        contenidoCasa.innerHTML =
+            '<h2 class="detalle-titulo">Editar casa ' + esc(casa.etiqueta) + '</h2>' +
+            '<div class="form-group">' +
+                '<label for="casa-ed-nombre">Nombre del proveedor</label>' +
+                '<input type="text" id="casa-ed-nombre" class="form-control" maxlength="100" value="' + esc(casa.nombre) + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label for="casa-ed-porcentaje">Porcentaje para el neto (%)</label>' +
+                '<input type="number" id="casa-ed-porcentaje" class="form-control" min="0" max="999.99" step="0.01" ' +
+                       'value="' + Number(casa.porcentaje_neto) + '">' +
+                '<span class="detalle-sub">Al cambiarlo, todos los precios de venta de esta casa se recalculan solos.</span>' +
+            '</div>' +
+            '<div id="casa-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-cancelar-casa">Cancelar</button>' +
+                '<button type="button" class="btn-save" id="btn-guardar-edicion-casa" ' +
+                    'data-casa="' + casa.codigo_casa + '">Guardar</button>' +
+            '</div>';
+
+        document.getElementById('casa-ed-nombre').focus();
+    }
+
+    async function guardarEdicionCasa(codigo) {
+        const boton = document.getElementById('btn-guardar-edicion-casa');
+
+        boton.disabled = true;
+        boton.textContent = 'Guardando...';
+
+        try {
+            const datos = await (await fetch(RUTA_CASA + '?accion=editar', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    codigo_casa:     codigo,
+                    nombre:          document.getElementById('casa-ed-nombre').value,
+                    porcentaje_neto: document.getElementById('casa-ed-porcentaje').value,
+                }),
+            })).json();
+
+            if (!datos.ok) {
+                avisoModal(datos.error || 'No se pudo guardar la casa.', 'error');
+                return;
+            }
+
+            modalCasa.hidden = true;
+            mostrarAviso(
+                'Casa actualizada.' + (datos.avisos && datos.avisos.length ? ' ' + datos.avisos.join(' ') : ''),
+                datos.avisos && datos.avisos.length ? 'info' : 'ok',
+                datos.avisos && datos.avisos.length ? 0 : 6
+            );
+
+            // Recargar refresca el % de la info y los precios que se ven.
+            await cargarCasas(codigo);
+
+        } catch (e) {
+            avisoModal('Error de conexión.', 'error');
+        } finally {
+            boton.disabled = false;
+            boton.textContent = 'Guardar';
         }
     }
 
@@ -795,15 +875,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<input type="text" id="p-categoria" class="form-control" maxlength="60">' +
                 '</div>' +
             '</div>' +
-            '<div class="alta-dos">' +
-                '<div class="form-group">' +
-                    '<label for="p-menudeo">Precio menudeo</label>' +
-                    '<input type="number" id="p-menudeo" class="form-control" min="0" step="0.01">' +
-                '</div>' +
-                '<div class="form-group">' +
-                    '<label for="p-mayoreo">Precio mayoreo <span class="detalle-sub">(opcional)</span></label>' +
-                    '<input type="number" id="p-mayoreo" class="form-control" min="0" step="0.01">' +
-                '</div>' +
+            '<div class="form-group">' +
+                '<label for="p-mayoreo">Precio bruto</label>' +
+                '<input type="number" id="p-mayoreo" class="form-control" min="0" step="0.01">' +
             '</div>' +
             '<p id="alta-contador" class="detalle-sub"></p>' +
             '<div class="detalle-acciones">' +
@@ -823,7 +897,6 @@ document.addEventListener('DOMContentLoaded', () => {
             nombre:           document.getElementById('p-nombre').value,
             marca:            document.getElementById('p-marca').value,
             categoria:        document.getElementById('p-categoria').value,
-            precio_menudeo:   document.getElementById('p-menudeo').value,
             precio_mayoreo:   document.getElementById('p-mayoreo').value,
         };
 
@@ -835,7 +908,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Se limpia lo que cambia de producto a producto; marca y categoría se
         // quedan porque normalmente se capturan varios seguidos de la misma.
-        ['p-nombre', 'p-codigo', 'p-menudeo', 'p-mayoreo'].forEach((id) => {
+        ['p-nombre', 'p-codigo', 'p-mayoreo'].forEach((id) => {
             document.getElementById(id).value = '';
         });
 
@@ -847,8 +920,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('p-nombre').focus();
     }
 
-    if (btnNuevaCasa) btnNuevaCasa.addEventListener('click', abrirNuevaCasa);
-    if (btnAltaProd)  btnAltaProd.addEventListener('click', abrirAltaProductos);
+    if (btnNuevaCasa)  btnNuevaCasa.addEventListener('click', abrirNuevaCasa);
+    if (btnEditarCasa) btnEditarCasa.addEventListener('click', abrirEditarCasa);
+    if (btnAltaProd)   btnAltaProd.addEventListener('click', abrirAltaProductos);
 
     if (btnCerrarCasa) {
         btnCerrarCasa.addEventListener('click', cerrarModalCasa);
@@ -876,6 +950,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.id === 'btn-guardar-casa')   guardarCasa();
             if (e.target.id === 'btn-guardar-pegado') guardarPegado();
             if (e.target.id === 'btn-guardar-uno')    guardarUno();
+
+            const btnEd = e.target.closest('#btn-guardar-edicion-casa');
+            if (btnEd) guardarEdicionCasa(btnEd.dataset.casa);
         });
     }
 

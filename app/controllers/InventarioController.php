@@ -28,6 +28,9 @@ try {
         );
 
         foreach ($casas as &$casa) {
+            // El porcentaje que se le suma al bruto para el neto (editable por casa).
+            $casa['porcentaje_neto'] = porcentajeCasa($casa['codigo_casa']);
+
             $tabla = $tablasCasa[$casa['codigo_casa']] ?? null;
             if ($tabla === null) {
                 $casa['productos'] = 0;
@@ -95,7 +98,7 @@ try {
     // sin emulacion no acepta marcadores en esa posicion.
     $stmt = $pdo->prepare(
         "SELECT codigo_interno, codigo_proveedor, nombre, marca, categoria,
-                precio_mayoreo, precio_menudeo
+                precio_mayoreo
            FROM {$tabla}
           WHERE activo = 1{$filtro}
           ORDER BY {$orden}

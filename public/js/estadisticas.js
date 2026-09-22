@@ -772,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<span class="kpi-sube">' + entero(t.subidas) + '</span>',
                     '<span class="kpi-baja">' + entero(t.bajadas) + '</span>',
                     variacion,
-                    precio(t.precio_menudeo) + '<span class="detalle-sub">mayoreo ' + precio(t.precio_mayoreo) + '</span>',
+                    precio(t.precio_mayoreo) + '<span class="detalle-sub">bruto</span>',
                     fechaCorta(t.ultimo_cambio.slice(0, 10)),
                 ];
             })

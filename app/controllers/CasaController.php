@@ -101,19 +101,13 @@ function revisarProducto(array $fila): array
     }
 
     try {
-        $menudeo = aPrecio($fila['precio_menudeo'] ?? null);
-    } catch (RuntimeException $e) {
-        throw new RuntimeException('el precio de menudeo ' . $e->getMessage());
-    }
-
-    if ($menudeo === null) {
-        throw new RuntimeException('falta el precio de menudeo');
-    }
-
-    try {
         $mayoreo = aPrecio($fila['precio_mayoreo'] ?? null);
     } catch (RuntimeException $e) {
-        throw new RuntimeException('el precio de mayoreo ' . $e->getMessage());
+        throw new RuntimeException('el precio bruto ' . $e->getMessage());
+    }
+
+    if ($mayoreo === null) {
+        throw new RuntimeException('falta el precio bruto');
     }
 
     return [
@@ -121,7 +115,6 @@ function revisarProducto(array $fila): array
         'nombre'           => $nombre,
         'marca'            => texto($fila['marca'] ?? '', 60) ?: null,
         'categoria'        => texto($fila['categoria'] ?? '', 60) ?: null,
-        'precio_menudeo'   => $menudeo,
         'precio_mayoreo'   => $mayoreo,
     ];
 }
@@ -138,7 +131,6 @@ function ddlTablaProductos(string $tabla, int $numero): string
       `categoria` VARCHAR(60) DEFAULT NULL,
       `codigo_sat` VARCHAR(20) DEFAULT NULL,
       `precio_mayoreo` DECIMAL(10,2) DEFAULT NULL,
-      `precio_menudeo` DECIMAL(10,2) DEFAULT NULL,
       `piezas_inner` INT DEFAULT NULL,
       `piezas_master` INT DEFAULT NULL,
       `fecha_precio_proveedor` DATE DEFAULT NULL,
@@ -166,10 +158,6 @@ function ddlTriggerPrecios(string $tabla, int $numero, string $codigoCasa): stri
             INSERT INTO historial_precios (casa_id, codigo_interno_producto, tipo_precio, precio_anterior, precio_nuevo, usuario_id)
             VALUES ((SELECT id FROM casas WHERE codigo_casa = '{$codigoCasa}'), NEW.codigo_interno, 'mayoreo', OLD.precio_mayoreo, NEW.precio_mayoreo, @usuario_actual);
         END IF;
-        IF NOT (OLD.precio_menudeo <=> NEW.precio_menudeo) THEN
-            INSERT INTO historial_precios (casa_id, codigo_interno_producto, tipo_precio, precio_anterior, precio_nuevo, usuario_id)
-            VALUES ((SELECT id FROM casas WHERE codigo_casa = '{$codigoCasa}'), NEW.codigo_interno, 'menudeo', OLD.precio_menudeo, NEW.precio_menudeo, @usuario_actual);
-        END IF;
     END";
 }
 
@@ -185,6 +173,22 @@ function siguienteNumero(array $valores, string $patron): int
     }
 
     return $maximo + 1;
+}
+
+/** Porcentaje de neto de una casa: numero de 0 a 999.99, con 2 decimales. */
+function aPorcentaje($valor): float
+{
+    if ($valor === null || $valor === '' || !is_numeric($valor)) {
+        throw new RuntimeException('El porcentaje debe ser un numero');
+    }
+
+    $numero = round((float) $valor, 2);
+
+    if ($numero < 0 || $numero > 999.99) {
+        throw new RuntimeException('El porcentaje debe estar entre 0 y 999.99');
+    }
+
+    return $numero;
 }
 
 // ------------------------------------------------------------------ acciones
@@ -206,11 +210,65 @@ try {
         }
 
         echo json_encode([
-            'ok'               => true,
-            'codigo_casa'      => 'BNS' . str_pad((string) $siguiente, 2, '0', STR_PAD_LEFT),
-            'orden_sugerido'   => $orden,
-            'etiqueta_sugerida' => 'C' . (count($casas) + 1) . '-',
-            'max_filas'        => MAX_FILAS,
+            'ok'                 => true,
+            'codigo_casa'        => 'BNS' . str_pad((string) $siguiente, 2, '0', STR_PAD_LEFT),
+            'orden_sugerido'     => $orden,
+            'etiqueta_sugerida'  => 'C' . (count($casas) + 1) . '-',
+            'porcentaje_sugerido' => CASAS_PORCENTAJE_DEFECTO,
+            'max_filas'          => MAX_FILAS,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ---------- Modificar una casa (nombre y porcentaje de neto) ----------
+    // El porcentaje no se guarda en ningun precio: cambiarlo aqui recalcula solos
+    // todos los netos de la casa, porque el neto siempre se saca del bruto.
+    if ($accion === 'editar') {
+        $codigo     = (string) ($datos['codigo_casa'] ?? '');
+        $nombre     = texto($datos['nombre'] ?? '', 100);
+        $porcentaje = aPorcentaje($datos['porcentaje_neto'] ?? null);
+
+        $casas = casasRegistradas();
+
+        if (!isset($casas[$codigo])) {
+            throw new RuntimeException('Casa no encontrada');
+        }
+        if (mb_strlen($nombre) < 2) {
+            throw new RuntimeException('Escribe el nombre de la casa (al menos 2 letras)');
+        }
+
+        foreach ($casas as $otra) {
+            if ($otra['codigo_casa'] !== $codigo && mb_strtolower($otra['nombre']) === mb_strtolower($nombre)) {
+                throw new RuntimeException('Ya hay otra casa llamada ' . $otra['nombre']);
+            }
+        }
+
+        $pdo->prepare(
+            'UPDATE casas SET nombre = :nombre, porcentaje_neto = :porcentaje WHERE codigo_casa = :codigo'
+        )->execute([
+            'nombre'     => $nombre,
+            'porcentaje' => $porcentaje,
+            'codigo'     => $codigo,
+        ]);
+
+        casasRegistradas(true);
+
+        $avisos = [];
+
+        // El nombre de la casa va como literal dentro de vista_catalogo, asi que
+        // si cambio hay que reescribirla para que el buscador lo muestre.
+        try {
+            refrescarVistaCatalogo($pdo);
+        } catch (PDOException $e) {
+            error_log('vista_catalogo (editar casa): ' . $e->getMessage());
+            $avisos[] = 'Se guardo la casa, pero no se pudo actualizar el catalogo general.';
+        }
+
+        echo json_encode([
+            'ok'              => true,
+            'mensaje'         => 'Casa actualizada',
+            'porcentaje_neto' => $porcentaje,
+            'avisos'          => $avisos,
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -229,9 +287,10 @@ try {
 
     // ---------- Crear una casa ----------
     if ($accion === 'crear') {
-        $nombre   = texto($datos['nombre'] ?? '', 100);
-        $etiqueta = texto($datos['etiqueta'] ?? '', 30);
-        $orden    = (int) ($datos['orden'] ?? 0);
+        $nombre     = texto($datos['nombre'] ?? '', 100);
+        $etiqueta   = texto($datos['etiqueta'] ?? '', 30);
+        $orden      = (int) ($datos['orden'] ?? 0);
+        $porcentaje = aPorcentaje($datos['porcentaje_neto'] ?? CASAS_PORCENTAJE_DEFECTO);
 
         if (mb_strlen($nombre) < 2) {
             throw new RuntimeException('Escribe el nombre de la casa (al menos 2 letras)');
@@ -289,15 +348,16 @@ try {
 
         try {
             $stmt = $pdo->prepare(
-                'INSERT INTO casas (codigo_casa, nombre, etiqueta, orden, tabla_productos)
-                 VALUES (:codigo, :nombre, :etiqueta, :orden, :tabla)'
+                'INSERT INTO casas (codigo_casa, nombre, etiqueta, orden, tabla_productos, porcentaje_neto)
+                 VALUES (:codigo, :nombre, :etiqueta, :orden, :tabla, :porcentaje)'
             );
             $stmt->execute([
-                'codigo'   => $codigoCasa,
-                'nombre'   => $nombre,
-                'etiqueta' => $etiqueta,
-                'orden'    => $orden,
-                'tabla'    => $tabla,
+                'codigo'     => $codigoCasa,
+                'nombre'     => $nombre,
+                'etiqueta'   => $etiqueta,
+                'orden'      => $orden,
+                'tabla'      => $tabla,
+                'porcentaje' => $porcentaje,
             ]);
 
         } catch (PDOException $e) {
@@ -403,7 +463,7 @@ try {
             throw new RuntimeException('Ninguna fila se pudo leer; revisa los datos');
         }
 
-        $columnas = ['codigo_proveedor', 'nombre', 'marca', 'categoria', 'precio_menudeo', 'precio_mayoreo'];
+        $columnas = ['codigo_proveedor', 'nombre', 'marca', 'categoria', 'precio_mayoreo'];
 
         $pdo->beginTransaction();
 

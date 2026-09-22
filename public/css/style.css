@@ -974,14 +974,11 @@ select.form-control {
     margin: 0;
 }
 
-.venta-item select.select-precio {
+.item-precio {
     grid-area: precio;
-    height: 38px;
-    padding: 0 2rem 0 0.6rem;
     font-size: 0.85rem;
-    border-radius: 8px;
-    background-position: right 0.6rem center;
-    background-size: 12px;
+    font-weight: 600;
+    color: #222222;
 }
 
 .item-unitario {
@@ -1075,7 +1072,7 @@ select.form-control {
         padding-right: 0.75rem; /* que no quede debajo de la X */
     }
 
-    .venta-item select.select-precio,
+    .item-precio,
     .input-cantidad {
         margin-top: 0.5rem;
     }
@@ -2096,17 +2093,8 @@ select.form-control {
 
     .item-nombre     { font-size: 1.35rem; }
     .item-meta       { font-size: 1.1rem; }
-    .item-unitario   { font-size: 1.1rem; }
+    .item-precio     { font-size: 1.1rem; }
     .item-subtotal   { font-size: 1.5rem; }
-
-    .venta-item select.select-precio {
-        height: 56px;
-        padding: 0 2.6rem 0 0.8rem;
-        font-size: 1.05rem;
-        border-radius: 12px;
-        background-position: right 0.8rem center;
-        background-size: 16px;
-    }
 
     .input-qty {
         width: 78px;
@@ -2786,4 +2774,137 @@ select.form-control {
 .search-result-item:hover .codigo-prod,
 .search-result-item:focus .codigo-prod {
     background: #ffffff;
+}
+
+/* ── Alta de clientes (pestaña dentro de Usuarios) ─────────────────────────
+   Las pestañas Usuarios / Clientes usan el mismo control segmentado del
+   Dashboard; aquí solo se les da aire respecto al panel de abajo. */
+#tabs-usuarios {
+    margin-bottom: 1rem;
+}
+
+/* Enlace "Ver en mapa" que acompaña a la dirección del cliente. */
+.enlace-mapa {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.4rem;
+    color: var(--ga-naranja-oscuro);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.enlace-mapa:hover {
+    text-decoration: underline;
+}
+
+/* Botón "Ver lista" junto al campo de cliente en la pantalla de Venta. Convive
+   con el buscador de productos: mismo tamaño que el botón de agregar. */
+.cliente-lista-btn {
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border: 1px solid #aaaaaa;
+    border-radius: 10px;
+    background: #f7f7f7;
+    color: var(--ga-carbon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.3rem;
+}
+
+.cliente-lista-btn:hover {
+    background: #ececec;
+}
+
+/* El campo de cliente no lleva la lupa absoluta del buscador de productos, así
+   que no necesita el hueco a la derecha que deja ".search-container input". */
+#cliente {
+    padding-right: 1rem;
+}
+
+/* Recordatorio del porcentaje con que se calcula el neto de la casa activa,
+   arriba del listado de Inventario. */
+.casa-neto-info {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0.25rem 0 0.75rem;
+    padding: 0.5rem 0.85rem;
+    background: #f2f5f2;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    color: var(--ga-carbon);
+}
+
+.casa-neto-info i {
+    color: var(--ga-naranja-oscuro);
+}
+
+/* Bloque de saldo a favor en la pantalla de Venta: recuerda cuánto tiene el
+   cliente y cuánto se le está descontando. */
+.bloque-saldo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.25rem;
+    margin-bottom: 1rem;
+    padding: 0.7rem 1rem;
+    background: #eef6ee;
+    border: 1px solid #cfe4cf;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    color: var(--ga-carbon);
+}
+
+.saldo-linea strong { white-space: nowrap; }
+.saldo-desc strong  { color: #08660b; }
+.saldo-pagar        { margin-left: auto; }
+.saldo-pagar strong { font-size: 1.05rem; }
+
+/* Registrar abono dentro del detalle de una venta a crédito (Historial). */
+.abono-form {
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px dashed #cccccc;
+}
+
+.abono-campos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.35rem;
+}
+
+.abono-campos .form-control { flex: 1 1 120px; }
+.abono-campos .btn-save     { flex: 0 0 auto; }
+
+/* Línea que muestra el saldo a favor descontado en una venta. */
+.detalle-saldo-aplicado {
+    margin-top: 0.75rem;
+    padding: 0.6rem 0.9rem;
+    background: #eef6ee;
+    border: 1px solid #cfe4cf;
+    border-radius: 8px;
+    color: var(--ga-carbon);
+}
+
+.detalle-saldo-aplicado p { margin: 0; }
+
+/* Botón de WhatsApp y separador en el panel "Enviar nota" del Historial. */
+.btn-wa {
+    background: #25d366;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.btn-wa:hover { background: #1ebe5b; }
+
+.env-sep {
+    border: none;
+    border-top: 1px dashed #cccccc;
+    margin: 1.1rem 0;
 }

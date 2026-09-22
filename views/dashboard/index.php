@@ -47,8 +47,16 @@ $casas = ordenarCasas($casas);
                 <!-- Cliente -->
                 <div class="form-group">
                     <label for="cliente">Cliente:</label>
-                    <input type="text" id="cliente" name="cliente" class="form-control"
-                           maxlength="150" placeholder="Ej. Juan Pérez o Tlapalería X">
+                    <div class="search-container">
+                        <input type="text" id="cliente" name="cliente" class="form-control"
+                               maxlength="150" autocomplete="off"
+                               placeholder="Escribe nombre, apellido o comercio…">
+                        <button type="button" id="btn-lista-clientes" class="cliente-lista-btn"
+                                title="Ver lista de clientes" aria-label="Ver lista de clientes">
+                            <i class="ph ph-list-bullets"></i>
+                        </button>
+                    </div>
+                    <div id="resultados-cliente" class="search-results" hidden></div>
                 </div>
 
                 <!-- Proveedor (Casa) -->
@@ -100,6 +108,8 @@ $casas = ordenarCasas($casas);
                         <input type="date" id="fecha_vencimiento" class="form-control">
                     </div>
                 </div>
+
+                <div id="bloque-saldo" class="bloque-saldo" hidden></div>
 
                 <div id="aviso-venta" class="aviso" hidden></div>
 

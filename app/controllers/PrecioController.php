@@ -66,7 +66,7 @@ try {
 
         $stmt = $pdo->prepare(
             "SELECT codigo_interno, codigo_proveedor, nombre, marca,
-                    precio_mayoreo, precio_menudeo, activo
+                    precio_mayoreo, activo
                FROM {$tabla} WHERE codigo_interno = :codigo LIMIT 1"
         );
         $stmt->execute(['codigo' => $codigo]);
@@ -93,16 +93,15 @@ try {
     $codigo = $datos['codigo'] ?? '';
     $tabla  = tablaDe($codigo);
 
-    // Un campo vacio significa "no tocar ese precio", no "ponerlo en cero".
+    // Un campo vacio significa "no tocar el precio", no "ponerlo en cero".
     $nuevoMayoreo = aPrecio($datos['precio_mayoreo'] ?? null);
-    $nuevoMenudeo = aPrecio($datos['precio_menudeo'] ?? null);
 
-    if ($nuevoMayoreo === null && $nuevoMenudeo === null) {
-        throw new RuntimeException('Escribe al menos un precio para actualizar');
+    if ($nuevoMayoreo === null) {
+        throw new RuntimeException('Escribe el precio bruto para actualizar');
     }
 
     $stmt = $pdo->prepare(
-        "SELECT nombre, precio_mayoreo, precio_menudeo FROM {$tabla}
+        "SELECT nombre, precio_mayoreo FROM {$tabla}
           WHERE codigo_interno = :codigo LIMIT 1"
     );
     $stmt->execute(['codigo' => $codigo]);
@@ -114,17 +113,13 @@ try {
         exit;
     }
 
-    $mayoreoFinal = $nuevoMayoreo ?? ($antes['precio_mayoreo'] === null ? null : (float) $antes['precio_mayoreo']);
-    $menudeoFinal = $nuevoMenudeo ?? ($antes['precio_menudeo'] === null ? null : (float) $antes['precio_menudeo']);
+    $mayoreoAntes = $antes['precio_mayoreo'] === null ? null : (float) $antes['precio_mayoreo'];
 
-    $sinCambios = ($mayoreoFinal === ($antes['precio_mayoreo'] === null ? null : (float) $antes['precio_mayoreo']))
-               && ($menudeoFinal === ($antes['precio_menudeo'] === null ? null : (float) $antes['precio_menudeo']));
-
-    if ($sinCambios) {
+    if ($nuevoMayoreo === $mayoreoAntes) {
         echo json_encode([
             'ok'      => true,
             'cambios' => 0,
-            'mensaje' => 'Los precios quedaron igual, no hubo nada que guardar',
+            'mensaje' => 'El precio quedo igual, no hubo nada que guardar',
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -134,13 +129,10 @@ try {
     $pdo->prepare('SET @usuario_actual = :id')->execute(['id' => $usuarioId]);
 
     $stmt = $pdo->prepare(
-        "UPDATE {$tabla}
-            SET precio_mayoreo = :mayoreo, precio_menudeo = :menudeo
-          WHERE codigo_interno = :codigo"
+        "UPDATE {$tabla} SET precio_mayoreo = :mayoreo WHERE codigo_interno = :codigo"
     );
     $stmt->execute([
-        'mayoreo' => $mayoreoFinal,
-        'menudeo' => $menudeoFinal,
+        'mayoreo' => $nuevoMayoreo,
         'codigo'  => $codigo,
     ]);
 
@@ -159,13 +151,8 @@ try {
         'nombre'  => $antes['nombre'],
         'mayoreo' => [
             'antes'     => $antes['precio_mayoreo'],
-            'despues'   => $mayoreoFinal,
-            'tendencia' => $tendencia($antes['precio_mayoreo'], $mayoreoFinal),
-        ],
-        'menudeo' => [
-            'antes'     => $antes['precio_menudeo'],
-            'despues'   => $menudeoFinal,
-            'tendencia' => $tendencia($antes['precio_menudeo'], $menudeoFinal),
+            'despues'   => $nuevoMayoreo,
+            'tendencia' => $tendencia($antes['precio_mayoreo'], $nuevoMayoreo),
         ],
     ], JSON_UNESCAPED_UNICODE);
 

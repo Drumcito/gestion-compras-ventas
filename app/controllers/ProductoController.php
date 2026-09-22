@@ -37,7 +37,7 @@ try {
 
     // vista_catalogo une el catalogo de todas las casas y ya trae el nombre de la casa.
     $sql = 'SELECT codigo_casa, nombre_casa, codigo_interno, codigo_proveedor,
-                   nombre, marca, precio_mayoreo, precio_menudeo
+                   nombre, marca, precio_mayoreo
               FROM vista_catalogo
              WHERE activo = 1
                AND (nombre LIKE :q1 OR codigo_proveedor LIKE :q2 OR codigo_interno LIKE :q3)';
@@ -79,9 +79,13 @@ try {
 
     $productos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // La etiqueta que se ve en la pastilla de color de cada resultado.
+    // Al vendedor le sale el precio NETO: el bruto (mayoreo) mas el porcentaje de
+    // su casa. El bruto no se manda al navegador; lo unico que se cobra es el neto
+    // (y VentaController lo recalcula por su cuenta al guardar).
     foreach ($productos as &$producto) {
-        $producto['nombre_casa'] = etiquetaCasa($producto['codigo_casa']);
+        $producto['nombre_casa']  = etiquetaCasa($producto['codigo_casa']);
+        $producto['precio_neto']  = netoDe($producto['precio_mayoreo'], porcentajeCasa($producto['codigo_casa']));
+        unset($producto['precio_mayoreo']);
     }
     unset($producto);
 

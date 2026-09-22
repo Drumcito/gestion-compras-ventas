@@ -55,7 +55,7 @@ try {
     $marcadores = implode(',', array_fill(0, count($ids), '?'));
 
     $stmt = $pdo->prepare(
-        'SELECT v.id, v.cliente, v.fecha, v.total, v.tipo_pago,
+        'SELECT v.id, v.cliente, v.fecha, v.total, v.credito_aplicado, v.tipo_pago,
                 CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
@@ -462,12 +462,28 @@ function dinero($monto): string
             </tbody>
         </table>
 
+        <?php $saldoAplicado = (float) ($venta['credito_aplicado'] ?? 0); ?>
         <div class="totales">
             <table>
-                <tr class="gran-total">
-                    <td class="rotulo">TOTAL</td>
-                    <td class="monto"><span class="signo">$</span><?= dinero($venta['total']) ?></td>
-                </tr>
+                <?php if ($saldoAplicado > 0): ?>
+                    <tr>
+                        <td class="rotulo">SUBTOTAL</td>
+                        <td class="monto"><span class="signo">$</span><?= dinero($venta['total']) ?></td>
+                    </tr>
+                    <tr>
+                        <td class="rotulo">SALDO A FAVOR</td>
+                        <td class="monto"><span class="signo">-$</span><?= dinero($saldoAplicado) ?></td>
+                    </tr>
+                    <tr class="gran-total">
+                        <td class="rotulo">TOTAL A PAGAR</td>
+                        <td class="monto"><span class="signo">$</span><?= dinero(max($venta['total'] - $saldoAplicado, 0)) ?></td>
+                    </tr>
+                <?php else: ?>
+                    <tr class="gran-total">
+                        <td class="rotulo">TOTAL</td>
+                        <td class="monto"><span class="signo">$</span><?= dinero($venta['total']) ?></td>
+                    </tr>
+                <?php endif; ?>
             </table>
         </div>
 

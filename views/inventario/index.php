@@ -38,6 +38,9 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
                         <button type="button" class="chip chip-nuevo" id="btn-nueva-casa">
                             <i class="ph ph-plus" aria-hidden="true"></i> Nueva casa
                         </button>
+                        <button type="button" class="chip" id="btn-editar-casa">
+                            <i class="ph ph-pencil-simple" aria-hidden="true"></i> Editar casa
+                        </button>
                     <?php endif; ?>
                 </div>
 
@@ -56,6 +59,7 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
                 </div>
             </div>
 
+            <div id="casa-neto-info" class="casa-neto-info" hidden></div>
             <div id="resumen-inventario" class="resumen-periodo"></div>
             <div id="aviso-inventario" class="aviso" hidden></div>
 

@@ -29,3 +29,10 @@ app/config/seed/consultas.sql
 app/config/migrations/gabe_system_hosting.sql
 # Herramienta local para generar hashes (nunca al servidor)
 generar_hash.php
+
+# Config de correo real (nunca se sube)
+config/smtp.local.php
+config/smtp.prod.php
+
+# Notas PDF generadas al vuelo (no se versionan)
+public/notas/

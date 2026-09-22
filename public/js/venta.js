@@ -14,6 +14,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const aviso        = document.getElementById('aviso-venta');
     const btnGuardar   = document.getElementById('btn-guardar');
 
+    const inputCliente      = document.getElementById('cliente');
+    const resultadosCliente = document.getElementById('resultados-cliente');
+    const btnListaClientes  = document.getElementById('btn-lista-clientes');
+    const bloqueSaldo       = document.getElementById('bloque-saldo');
+
+    // Cliente elegido del catálogo (con su saldo a favor). Un nombre tecleado a
+    // mano no cuenta: solo un cliente elegido de la lista lleva id y saldo.
+    let clienteSel = { id: null, nombre: '', saldo: 0 };
+
     // Cada linea guarda su propia casa: un mismo ticket puede mezclar proveedores.
     let items = [];
 
@@ -123,9 +132,11 @@ document.addEventListener('DOMContentLoaded', () => {
             fila.setAttribute('role', 'button');
             fila.tabIndex = 0;
 
-            const precios = [];
-            if (p.precio_menudeo !== null) precios.push('Menudeo ' + money(Number(p.precio_menudeo)));
-            if (p.precio_mayoreo !== null) precios.push('Mayoreo ' + money(Number(p.precio_mayoreo)));
+            // El precio que se muestra y se cobra es el neto (lo calcula el
+            // servidor a partir del bruto y el porcentaje de la casa).
+            const precioTexto = p.precio_neto !== null && p.precio_neto !== undefined
+                ? money(Number(p.precio_neto))
+                : 'Sin precio';
 
             // casa-BNS01, casa-BNS02... le da a cada casa su color en el CSS.
             const claseCasa = 'casa-' + String(p.codigo_casa || '').replace(/[^A-Za-z0-9_-]/g, '');
@@ -136,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<span class="res-meta">' +
                     '<span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
                     (p.marca ? ' · ' + esc(p.marca) : '') + '</span>' +
-                '<span class="res-precio">' + (precios.join(' | ') || 'Sin precio') + '</span>';
+                '<span class="res-precio">' + precioTexto + '</span>';
 
             fila.addEventListener('click', () => agregarItem(p));
 
@@ -158,9 +169,152 @@ document.addEventListener('DOMContentLoaded', () => {
         resultados.scrollTop = 0;
     }
 
+    // ---------- Selección de cliente ----------
+    // El cliente puede escribirse a mano (como siempre) o elegirse del catálogo
+    // que se da de alta en Usuarios. Elegir uno solo llena el campo de texto:
+    // la venta sigue guardando el nombre, sin cambiar cómo se guarda ni la nota.
+    let temporizadorCliente = null;
+
+    async function buscarClientes(termino) {
+        const url = '../../app/controllers/ClienteController.php?accion=buscar&q='
+            + encodeURIComponent(termino);
+
+        try {
+            const respuesta = await fetch(url);
+            if (respuesta.status === 401) {
+                mostrarAviso('Tu sesión expiró. Vuelve a iniciar sesión.', 'error');
+                return;
+            }
+            const datos = await respuesta.json();
+            pintarClientes(datos.ok ? datos.clientes : []);
+        } catch (e) {
+            mostrarAviso('No se pudieron cargar los clientes. Revisa tu conexión.', 'error');
+        }
+    }
+
+    function pintarClientes(clientes) {
+        resultadosCliente.innerHTML = '';
+
+        if (!Array.isArray(clientes) || clientes.length === 0) {
+            resultadosCliente.innerHTML = '<p class="sin-resultados">Sin clientes que coincidan</p>';
+            resultadosCliente.hidden = false;
+            return;
+        }
+
+        clientes.forEach((c) => {
+            const persona = [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ');
+            // El comercio es lo que identifica la venta; si no hay, va la persona.
+            const titulo = c.nombre_comercio || persona;
+            const sub    = c.nombre_comercio ? persona : '';
+            const meta   = [sub, c.telefono, c.dia_visita ? 'Visita: ' + c.dia_visita : '']
+                .filter(Boolean).join(' · ');
+
+            const fila = document.createElement('div');
+            fila.className = 'search-result-item';
+            fila.setAttribute('role', 'button');
+            fila.tabIndex = 0;
+
+            fila.innerHTML =
+                '<span class="res-nombre">' + esc(titulo) + '</span>' +
+                (meta ? '<span class="res-meta">' + esc(meta) + '</span>' : '');
+
+            const elegir = () => {
+                inputCliente.value = titulo;
+                resultadosCliente.hidden = true;
+                seleccionarClienteCatalogo(c.id, titulo);
+            };
+
+            fila.addEventListener('click', elegir);
+            fila.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    elegir();
+                }
+            });
+
+            resultadosCliente.appendChild(fila);
+        });
+
+        resultadosCliente.hidden = false;
+        resultadosCliente.scrollTop = 0;
+    }
+
+    // Al elegir un cliente del catálogo se trae su saldo a favor para poder
+    // ofrecerlo como descuento.
+    async function seleccionarClienteCatalogo(id, nombre) {
+        clienteSel = { id: Number(id), nombre: nombre, saldo: 0 };
+
+        try {
+            const d = await (await fetch(
+                '../../app/controllers/ClienteController.php?accion=saldo&cliente_id=' + encodeURIComponent(id)
+            )).json();
+            clienteSel.saldo = d.ok ? Number(d.saldo) : 0;
+        } catch (e) {
+            clienteSel.saldo = 0;
+        }
+        actualizarSaldo();
+    }
+
+    // Saldo a favor que se aplica: todo el disponible, con tope en el total de la
+    // venta (no se puede descontar más de lo que cuesta).
+    function creditoAAplicar() {
+        if (!clienteSel.id || clienteSel.saldo <= 0) return 0;
+        const total = items.reduce((s, i) => s + i.precio * i.cantidad, 0);
+        return Math.min(clienteSel.saldo, total);
+    }
+
+    function actualizarSaldo() {
+        if (!clienteSel.id || clienteSel.saldo <= 0) {
+            bloqueSaldo.hidden = true;
+            bloqueSaldo.innerHTML = '';
+            return;
+        }
+
+        const total    = items.reduce((s, i) => s + i.precio * i.cantidad, 0);
+        const aplicado  = creditoAAplicar();
+
+        bloqueSaldo.hidden = false;
+        bloqueSaldo.innerHTML =
+            '<span class="saldo-linea">Saldo a favor del cliente: <strong>' + money(clienteSel.saldo) + '</strong></span>' +
+            (aplicado > 0
+                ? '<span class="saldo-linea saldo-desc">Se aplica a esta venta: <strong>-' + money(aplicado) + '</strong></span>' +
+                  '<span class="saldo-linea saldo-pagar">A pagar: <strong>' + money(Math.max(total - aplicado, 0)) + '</strong></span>'
+                : '');
+    }
+
+    inputCliente.addEventListener('input', () => {
+        // Al teclear, se pierde la liga con el cliente del catálogo (y su saldo)
+        // hasta que se vuelva a elegir uno de la lista.
+        if (clienteSel.id !== null) {
+            clienteSel = { id: null, nombre: '', saldo: 0 };
+            actualizarSaldo();
+        }
+
+        clearTimeout(temporizadorCliente);
+        const termino = inputCliente.value.trim();
+
+        // Con una sola letra ya buscamos: el catálogo de clientes es chico y así
+        // aparece pronto. Vacío cierra el desplegable.
+        if (termino.length < 1) {
+            resultadosCliente.hidden = true;
+            return;
+        }
+        temporizadorCliente = setTimeout(() => buscarClientes(termino), 250);
+    });
+
+    // El botón de lista alterna el catálogo completo (primeros 50 activos).
+    btnListaClientes.addEventListener('click', () => {
+        if (!resultadosCliente.hidden) {
+            resultadosCliente.hidden = true;
+            return;
+        }
+        buscarClientes('');
+        inputCliente.focus();
+    });
+
     // ---------- Items de la venta ----------
     function agregarItem(producto) {
-        if (producto.precio_menudeo === null && producto.precio_mayoreo === null) {
+        if (producto.precio_neto === null || producto.precio_neto === undefined) {
             mostrarAviso('Ese producto no tiene precio cargado, no se puede vender.', 'error');
             return;
         }
@@ -177,10 +331,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 codigo_interno: producto.codigo_interno,
                 codigo_visible: codigoVisible(producto),
                 nombre:         producto.nombre,
-                precio_mayoreo: producto.precio_mayoreo === null ? null : Number(producto.precio_mayoreo),
-                precio_menudeo: producto.precio_menudeo === null ? null : Number(producto.precio_menudeo),
-                // La Jaladera no maneja mayoreo: si no hay precio, se queda en menudeo.
-                tipo_precio:    producto.precio_menudeo !== null ? 'menudeo' : 'mayoreo',
+                // Precio neto ya calculado por el servidor (bruto + % de la casa).
+                precio:         Number(producto.precio_neto),
                 cantidad:       1,
             });
         }
@@ -191,48 +343,31 @@ document.addEventListener('DOMContentLoaded', () => {
         pintarItems();
     }
 
-    function precioDe(item) {
-        return item.tipo_precio === 'mayoreo' ? item.precio_mayoreo : item.precio_menudeo;
-    }
-
     function pintarItems() {
         listaItems.innerHTML = '';
 
         if (items.length === 0) {
             listaItems.innerHTML = '<p class="venta-vacia">Aún no has agregado piezas a esta venta.</p>';
             totalVenta.textContent = money(0);
+            actualizarSaldo();
             return;
         }
 
         let total = 0;
 
         items.forEach((item, indice) => {
-            const precio = precioDe(item);
-            const subtotal = precio * item.cantidad;
+            const subtotal = item.precio * item.cantidad;
             total += subtotal;
 
             const fila = document.createElement('div');
             fila.className = 'venta-item';
 
-            const opcionMayoreo = item.precio_mayoreo === null
-                ? '<option value="mayoreo" disabled>Mayoreo (no disponible)</option>'
-                : '<option value="mayoreo"' + (item.tipo_precio === 'mayoreo' ? ' selected' : '') + '>Mayoreo</option>';
-
-            const opcionMenudeo = item.precio_menudeo === null
-                ? '<option value="menudeo" disabled>Menudeo (no disponible)</option>'
-                : '<option value="menudeo"' + (item.tipo_precio === 'menudeo' ? ' selected' : '') + '>Menudeo</option>';
-
-            // Todo va suelto dentro de la fila para que el CSS lo acomode en dos
-            // renglones: arriba nombre / precio / cantidad / subtotal y abajo
-            // casa / precio unitario, alineados entre sí.
+            // Un solo precio (el neto): ya no hay selector menudeo/mayoreo.
             fila.innerHTML =
                 '<p class="item-nombre">' + esc(item.nombre) + '</p>' +
                 '<p class="item-meta">' + esc(item.casa_nombre) +
                     ' · <span class="codigo-prod">' + esc(item.codigo_visible) + '</span></p>' +
-                '<select class="form-control select-precio" data-i="' + indice + '" aria-label="Tipo de precio">' +
-                    opcionMenudeo + opcionMayoreo +
-                '</select>' +
-                '<span class="item-unitario">' + money(precio) + ' c/u</span>' +
+                '<span class="item-precio">' + money(item.precio) + ' c/u</span>' +
                 '<input type="number" class="input-qty input-cantidad" data-i="' + indice + '" ' +
                        'value="' + item.cantidad + '" min="1" step="1" aria-label="Cantidad">' +
                 '<div class="item-subtotal">' + money(subtotal) + '</div>' +
@@ -244,6 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         totalVenta.textContent = money(total);
+        actualizarSaldo();
     }
 
     // ---------- Eventos ----------
@@ -269,11 +405,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const i = e.target.dataset.i;
         if (i === undefined) return;
 
-        if (e.target.classList.contains('select-precio')) {
-            items[i].tipo_precio = e.target.value;
-            pintarItems();
-        }
-
         if (e.target.classList.contains('input-cantidad')) {
             const cantidad = parseInt(e.target.value, 10);
             items[i].cantidad = (isNaN(cantidad) || cantidad < 1) ? 1 : cantidad;
@@ -294,6 +425,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.form-group')) resultados.hidden = true;
+
+        // El desplegable de clientes se cierra al hacer clic fuera del campo, su
+        // lista o el botón de lista (un clic en un resultado ya lo cierra solo).
+        if (!e.target.closest('#cliente, #resultados-cliente, #btn-lista-clientes')) {
+            resultadosCliente.hidden = true;
+        }
     });
 
     // ---------- Guardar ----------
@@ -310,12 +447,13 @@ document.addEventListener('DOMContentLoaded', () => {
         btnGuardar.textContent = 'Guardando...';
 
         const cuerpo = {
-            cliente:   document.getElementById('cliente').value.trim(),
-            tipo_pago: tipoPago.value,
+            cliente:          document.getElementById('cliente').value.trim(),
+            cliente_id:       clienteSel.id,
+            credito_aplicado: creditoAAplicar(),
+            tipo_pago:        tipoPago.value,
             items: items.map((i) => ({
                 casa:           i.casa,
                 codigo_interno: i.codigo_interno,
-                tipo_precio:    i.tipo_precio,
                 cantidad:       i.cantidad,
             })),
         };
@@ -340,6 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // desaparezca antes de alcanzar a imprimirla.
                 mostrarAvisoConNota(datos.venta_id, datos.total, cuerpo.cliente);
                 items = [];
+                clienteSel = { id: null, nombre: '', saldo: 0 };
                 form.reset();
                 camposCredito.hidden = true;
                 pintarItems();

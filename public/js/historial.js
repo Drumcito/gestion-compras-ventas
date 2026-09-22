@@ -377,6 +377,16 @@ document.addEventListener('DOMContentLoaded', () => {
               '</div>'
             : '';
 
+        // Saldo a favor que se usó como descuento en esta venta (aplica a contado
+        // y a crédito).
+        const creditoAplicado = Number(v.credito_aplicado || 0);
+        const bloqueSaldoAplicado = creditoAplicado > 0
+            ? '<div class="detalle-saldo-aplicado">' +
+                '<p>Saldo a favor aplicado: <strong>-' + money(creditoAplicado) + '</strong> · ' +
+                   'A pagar: <strong>' + money(Math.max(Number(v.total) - creditoAplicado, 0)) + '</strong></p>' +
+              '</div>'
+            : '';
+
         let credito = '';
 
         if (v.tipo_pago === 'credito') {
@@ -387,6 +397,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     ' · recibió ' + esc(a.recibio) + (a.nota ? ' · ' + esc(a.nota) : '') + '</li>'
                   ).join('') + '</ul>';
 
+            // Solo el vendedor dueño o un admin pueden ir agregando abonos.
+            const formAbono = v.puede_editar
+                ? '<div class="abono-form">' +
+                    '<label class="detalle-sub" for="abono-monto">Registrar abono</label>' +
+                    '<div class="abono-campos">' +
+                        '<input type="number" id="abono-monto" class="form-control" min="0.01" step="0.01" placeholder="Monto">' +
+                        '<input type="text" id="abono-nota" class="form-control" maxlength="255" placeholder="Nota (opcional)">' +
+                        '<button type="button" class="btn-save" id="btn-abonar" data-id="' + v.id + '">Abonar</button>' +
+                    '</div>' +
+                    '<div id="abono-aviso" class="aviso" hidden></div>' +
+                  '</div>'
+                : '';
+
             credito =
                 '<div class="detalle-credito">' +
                     '<h3>Crédito</h3>' +
@@ -394,6 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                        'Saldo pendiente: <strong>' + money(v.saldo ? v.saldo.saldo_pendiente : v.total) + '</strong>' +
                        (v.fecha_vencimiento ? ' · Vence: ' + fechaLegible(v.fecha_vencimiento) : '') + '</p>' +
                     abonos +
+                    formAbono +
                 '</div>';
         }
 
@@ -428,12 +452,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<tfoot><tr><td colspan="4" class="num"><strong>Total</strong></td>' +
                 '<td class="num"><strong>' + money(v.total) + '</strong></td><td></td></tr></tfoot>' +
             '</table>' +
+            bloqueSaldoAplicado +
             bloqueDevolucion +
             credito +
             auditoria +
             '<div class="detalle-acciones">' +
                 '<button type="button" class="chip btn-imprimir" data-id="' + v.id + '">' +
                     '<i class="ph ph-printer"></i> Imprimir nota</button>' +
+                '<button type="button" class="chip btn-enviar-nota" data-id="' + v.id + '">' +
+                    '<i class="ph ph-paper-plane-tilt"></i> Enviar nota</button>' +
                 botonEditar +
             '</div>';
     }
@@ -558,19 +585,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 'para las <strong>ventas futuras</strong>. Las ventas ya registradas conservan ' +
                 'el precio con el que se cobraron.</p>' +
             '<div class="form-group">' +
-                '<label for="precio-menudeo">Precio menudeo <span class="detalle-sub">' +
-                    '(actual: ' + actual(p.precio_menudeo) + ')</span></label>' +
-                '<input type="number" id="precio-menudeo" class="form-control" ' +
-                       'min="0" step="0.01" value="' + valor(p.precio_menudeo) + '">' +
-            '</div>' +
-            '<div class="form-group">' +
-                '<label for="precio-mayoreo">Precio mayoreo <span class="detalle-sub">' +
+                '<label for="precio-mayoreo">Precio bruto <span class="detalle-sub">' +
                     '(actual: ' + actual(p.precio_mayoreo) + ')</span></label>' +
                 '<input type="number" id="precio-mayoreo" class="form-control" ' +
                        'min="0" step="0.01" value="' + valor(p.precio_mayoreo) + '">' +
             '</div>' +
-            '<p class="detalle-sub">Deja un campo vacío para no tocar ese precio. ' +
-                'Puedes cambiar solo uno o los dos.</p>' +
+            '<p class="detalle-sub">El precio de venta (neto) se calcula solo, ' +
+                'sumándole el porcentaje de la casa al bruto.</p>' +
             '<div id="precio-aviso" class="aviso" hidden></div>' +
             '<div class="detalle-acciones">' +
                 '<button type="button" class="chip" id="btn-cancelar-precio">Cancelar</button>' +
@@ -592,7 +613,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     codigo:         codigo,
-                    precio_menudeo: document.getElementById('precio-menudeo').value,
                     precio_mayoreo: document.getElementById('precio-mayoreo').value,
                 }),
             });
@@ -608,14 +628,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (datos.cambios === 0) {
                 mostrarAviso(datos.mensaje, 'ok');
             } else {
-                const linea = (etiqueta, d) => {
-                    if (d.tendencia === 'igual') return '';
-                    const antes = d.antes === null ? 'sin precio' : money(d.antes);
-                    return ' ' + etiqueta + ': ' + antes + ' → ' + money(d.despues) + '.';
-                };
+                const d = datos.mayoreo;
+                const antes = d.antes === null ? 'sin precio' : money(d.antes);
                 mostrarAviso(
-                    'Precio de ' + datos.nombre + ' actualizado.' +
-                    linea('Menudeo', datos.menudeo) + linea('Mayoreo', datos.mayoreo),
+                    'Precio de ' + datos.nombre + ' actualizado. Bruto: ' +
+                    antes + ' → ' + money(d.despues) + '.',
                     'ok'
                 );
             }
@@ -632,8 +649,252 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ---------- Abonos (crédito) ----------
+    async function guardarAbono(id) {
+        const avisoAbono = document.getElementById('abono-aviso');
+        const boton      = document.getElementById('btn-abonar');
+        const montoEl    = document.getElementById('abono-monto');
+        const notaEl     = document.getElementById('abono-nota');
+        const monto      = parseFloat(montoEl.value);
+
+        const fallo = (texto) => {
+            avisoAbono.textContent = texto;
+            avisoAbono.className = 'aviso aviso-error';
+            avisoAbono.hidden = false;
+        };
+
+        if (isNaN(monto) || monto <= 0) {
+            fallo('Escribe un monto mayor a cero.');
+            return;
+        }
+
+        boton.disabled = true;
+        boton.textContent = 'Guardando...';
+
+        try {
+            const respuesta = await fetch('../../app/controllers/AbonoController.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ venta_id: Number(id), monto: monto, nota: notaEl.value.trim() }),
+            });
+            const datos = await respuesta.json();
+
+            if (!datos.ok) {
+                fallo(datos.error || 'No se pudo registrar el abono.');
+                return;
+            }
+
+            mostrarAviso(datos.mensaje || 'Abono registrado.',
+                         Number(datos.devolucion) > 0 ? 'devolucion' : 'ok');
+            verDetalle(Number(id));   // Refresca el detalle con el nuevo abono y estado.
+
+        } catch (e) {
+            fallo('Error de conexión.');
+        } finally {
+            boton.disabled = false;
+            boton.textContent = 'Abonar';
+        }
+    }
+
+    // ---------- Enviar nota (WhatsApp / correo) ----------
+    let notaEnviar = null;
+
+    async function abrirEnviarNota(id) {
+        contenido.innerHTML = '<p class="venta-vacia">Preparando...</p>';
+        modal.hidden = false;
+
+        try {
+            const datos = await (await fetch(
+                '../../app/controllers/EnviarNotaController.php?accion=preparar&id=' + encodeURIComponent(id)
+            )).json();
+
+            if (!datos.ok) {
+                contenido.innerHTML = '<p class="aviso aviso-error">' +
+                    esc(datos.error || 'No se pudo preparar la nota') + '</p>';
+                return;
+            }
+            notaEnviar = datos;
+            pintarEnviarNota(datos);
+        } catch (e) {
+            contenido.innerHTML = '<p class="aviso aviso-error">Error de conexión.</p>';
+        }
+    }
+
+    function pintarEnviarNota(d) {
+        const avisoLiga = d.ligado ? '' :
+            '<p class="detalle-sub">Esta venta no está ligada a un cliente del catálogo; escribe el teléfono o el correo a mano.</p>';
+        const avisoSmtp = d.smtp_ok ? '' :
+            '<p class="detalle-sub">El envío por correo aún no está configurado (falta el SMTP). Mientras tanto puedes usar WhatsApp.</p>';
+
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Enviar nota #' + d.venta_id + '</h2>' +
+            avisoLiga +
+            '<p class="detalle-sub">Vista previa: ' +
+                '<a href="' + esc(d.pdf_url) + '" target="_blank" rel="noopener">abrir el PDF</a></p>' +
+            '<div class="form-group">' +
+                '<label for="env-tel">WhatsApp (teléfono del cliente):</label>' +
+                '<input type="text" id="env-tel" class="form-control" maxlength="20" ' +
+                       'value="' + esc(d.telefono || '') + '" placeholder="10 dígitos">' +
+            '</div>' +
+            '<button type="button" class="btn-save btn-wa" id="btn-wa-enviar">' +
+                '<i class="ph ph-whatsapp-logo"></i> Enviar por WhatsApp</button>' +
+            '<hr class="env-sep">' +
+            '<div class="form-group">' +
+                '<label for="env-email">Correo del cliente:</label>' +
+                '<input type="email" id="env-email" class="form-control" maxlength="150" ' +
+                       'value="' + esc(d.email || '') + '" placeholder="cliente@correo.com">' +
+            '</div>' +
+            '<button type="button" class="btn-save" id="btn-correo-enviar">Enviar por correo</button>' +
+            avisoSmtp +
+            '<div id="env-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-volver-detalle" data-id="' + d.venta_id + '">Volver</button>' +
+            '</div>';
+    }
+
+    function enviarWhatsApp() {
+        const avisoEnv = document.getElementById('env-aviso');
+        let digitos = String(document.getElementById('env-tel').value).replace(/\D/g, '');
+
+        if (digitos === '') {
+            avisoEnv.textContent = 'Escribe el teléfono del cliente.';
+            avisoEnv.className = 'aviso aviso-error';
+            avisoEnv.hidden = false;
+            return;
+        }
+
+        // Números de 10 dígitos se asumen de México (lada 52). wa.me pide el
+        // número internacional sin el signo +.
+        if (digitos.length === 10) digitos = '52' + digitos;
+
+        const mensaje = 'Hola, aquí está tu nota de compra #' + notaEnviar.venta_id +
+                        ' de Comercializadora GA-BE: ' + notaEnviar.pdf_url;
+
+        window.open('https://wa.me/' + digitos + '?text=' + encodeURIComponent(mensaje), '_blank');
+    }
+
+    async function enviarNotaCorreo() {
+        const avisoEnv = document.getElementById('env-aviso');
+        const boton    = document.getElementById('btn-correo-enviar');
+        const email    = document.getElementById('env-email').value.trim();
+
+        boton.disabled = true;
+        boton.textContent = 'Enviando...';
+
+        try {
+            const datos = await (await fetch(
+                '../../app/controllers/EnviarNotaController.php?accion=correo',
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ venta_id: notaEnviar.venta_id, email: email }),
+                }
+            )).json();
+
+            avisoEnv.textContent = datos.ok ? datos.mensaje : (datos.error || 'No se pudo enviar.');
+            avisoEnv.className = 'aviso ' + (datos.ok ? 'aviso-ok' : 'aviso-error');
+            avisoEnv.hidden = false;
+        } catch (e) {
+            avisoEnv.textContent = 'Error de conexión.';
+            avisoEnv.className = 'aviso aviso-error';
+            avisoEnv.hidden = false;
+        } finally {
+            boton.disabled = false;
+            boton.textContent = 'Enviar por correo';
+        }
+    }
+
     // ---------- Edicion ----------
     let ventaEditando = null;
+
+    // Buscador para agregar productos a una venta que se está editando. Usa el
+    // mismo controlador que la pantalla de Venta, buscando en todas las casas
+    // (cada resultado ya trae la suya).
+    let resultadosEdicion  = [];
+    let temporizadorEdicion = null;
+
+    async function buscarProductoEdicion(termino) {
+        const cont = document.getElementById('edit-resultados');
+        if (!cont) return;
+
+        if (termino.length < 2) {
+            cont.hidden = true;
+            return;
+        }
+
+        try {
+            const respuesta = await fetch(
+                '../../app/controllers/ProductoController.php?casa=TODAS&q=' + encodeURIComponent(termino)
+            );
+            if (respuesta.status === 401) {
+                mostrarAviso('Tu sesión expiró. Vuelve a iniciar sesión.', 'error');
+                return;
+            }
+            const productos = await respuesta.json();
+            resultadosEdicion = Array.isArray(productos) ? productos : [];
+            pintarResultadosEdicion();
+        } catch (e) {
+            mostrarAviso('No se pudo buscar. Revisa tu conexión.', 'error');
+        }
+    }
+
+    function pintarResultadosEdicion() {
+        const cont = document.getElementById('edit-resultados');
+        if (!cont) return;
+
+        if (resultadosEdicion.length === 0) {
+            cont.innerHTML = '<p class="sin-resultados">Sin coincidencias</p>';
+            cont.hidden = false;
+            return;
+        }
+
+        cont.innerHTML = resultadosEdicion.map((p, idx) => {
+            const claseCasa = 'casa-' + String(p.codigo_casa || '').replace(/[^A-Za-z0-9_-]/g, '');
+            const precio = (p.precio_neto !== null && p.precio_neto !== undefined)
+                ? money(Number(p.precio_neto)) : 'Sin precio';
+
+            return '<div class="search-result-item edit-result-item" role="button" tabindex="0" data-idx="' + idx + '">' +
+                '<span class="res-nombre">' + esc(p.nombre) +
+                    '<span class="res-casa ' + claseCasa + '">' + esc(p.nombre_casa) + '</span></span>' +
+                '<span class="res-meta"><span class="codigo-prod">' + esc(p.codigo_proveedor || p.codigo_interno) + '</span>' +
+                    (p.marca ? ' · ' + esc(p.marca) : '') + '</span>' +
+                '<span class="res-precio">' + precio + '</span></div>';
+        }).join('');
+
+        cont.hidden = false;
+        cont.scrollTop = 0;
+    }
+
+    function agregarItemEdicion(p) {
+        if (!p) return;
+
+        if (p.precio_neto === null || p.precio_neto === undefined) {
+            const a = document.getElementById('edit-aviso');
+            a.textContent = 'Ese producto no tiene precio cargado, no se puede agregar.';
+            a.className = 'aviso aviso-error';
+            a.hidden = false;
+            return;
+        }
+
+        const ya = ventaEditando.items.find((i) => i.codigo_interno === p.codigo_interno);
+        if (ya) {
+            ya.cantidad += 1;
+        } else {
+            ventaEditando.items.push({
+                casa_nombre:      p.nombre_casa,
+                casa_codigo:      p.codigo_casa,
+                codigo_interno:   p.codigo_interno,
+                codigo_proveedor: p.codigo_proveedor,
+                nombre:           p.nombre,
+                tipo_precio:      'neto',
+                precio:           Number(p.precio_neto),
+                cantidad:         1,
+            });
+        }
+
+        resultadosEdicion = [];
+        pintarEdicion();   // Vuelve a dibujar el modal (y limpia el buscador).
+    }
 
     function abrirEdicion(v) {
         ventaEditando = {
@@ -706,6 +967,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<tfoot><tr><td colspan="3" class="num"><strong>Total</strong></td>' +
                 '<td class="num"><strong id="edit-total">' + money(total) + '</strong></td><td></td></tr></tfoot>' +
             '</table>' +
+            '<div class="form-group">' +
+                '<label for="edit-buscar-producto">Agregar producto:</label>' +
+                '<div class="search-container">' +
+                    '<input type="text" id="edit-buscar-producto" class="form-control" ' +
+                           'placeholder="Buscar por nombre o código..." autocomplete="off">' +
+                    '<i class="ph ph-magnifying-glass search-icon" aria-hidden="true"></i>' +
+                '</div>' +
+                '<div id="edit-resultados" class="search-results" hidden></div>' +
+            '</div>' +
             '<div class="form-group">' +
                 '<label for="edit-tipo-pago">Tipo de pago:</label>' +
                 '<select id="edit-tipo-pago" class="form-control">' +
@@ -893,6 +1163,27 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const botonEnviar = e.target.closest('.btn-enviar-nota');
+        if (botonEnviar) {
+            abrirEnviarNota(botonEnviar.dataset.id);
+            return;
+        }
+
+        if (e.target.closest('#btn-wa-enviar')) {
+            enviarWhatsApp();
+            return;
+        }
+
+        if (e.target.closest('#btn-correo-enviar')) {
+            enviarNotaCorreo();
+            return;
+        }
+
+        if (e.target.id === 'btn-volver-detalle') {
+            verDetalle(e.target.dataset.id);
+            return;
+        }
+
         const botonImprimir = e.target.closest('.btn-imprimir');
         if (botonImprimir) {
             const respuesta = await fetch(
@@ -932,6 +1223,18 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const botonAbonar = e.target.closest('#btn-abonar');
+        if (botonAbonar) {
+            guardarAbono(botonAbonar.dataset.id);
+            return;
+        }
+
+        const resItem = e.target.closest('.edit-result-item');
+        if (resItem) {
+            agregarItemEdicion(resultadosEdicion[Number(resItem.dataset.idx)]);
+            return;
+        }
+
         const quitar = e.target.closest('.edit-quitar');
         if (quitar) {
             if (ventaEditando.items.length === 1) {
@@ -943,6 +1246,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             ventaEditando.items.splice(Number(quitar.dataset.i), 1);
             pintarEdicion();
+        }
+    });
+
+    contenido.addEventListener('input', (e) => {
+        if (e.target.id === 'edit-buscar-producto') {
+            clearTimeout(temporizadorEdicion);
+            const termino = e.target.value.trim();
+            temporizadorEdicion = setTimeout(() => buscarProductoEdicion(termino), 300);
+        }
+    });
+
+    contenido.addEventListener('keydown', (e) => {
+        const resItem = e.target.closest('.edit-result-item');
+        if (resItem && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            agregarItemEdicion(resultadosEdicion[Number(resItem.dataset.idx)]);
         }
     });
 

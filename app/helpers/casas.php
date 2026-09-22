@@ -20,11 +20,14 @@
  * en lugar de tronar con "Unknown column".
  */
 const CASAS_RESPALDO = [
-    'BNS02' => ['etiqueta' => 'C1-MC',        'orden' => 1, 'tabla' => 'productos_casa2'],
-    'BNS01' => ['etiqueta' => 'C2-DP',        'orden' => 2, 'tabla' => 'productos_casa1'],
-    'BNS04' => ['etiqueta' => 'C3-CHOLULITA', 'orden' => 3, 'tabla' => 'productos_casa4'],
-    'BNS03' => ['etiqueta' => 'C4-JD',        'orden' => 4, 'tabla' => 'productos_casa3'],
+    'BNS02' => ['etiqueta' => 'C1-MC',        'orden' => 1, 'tabla' => 'productos_casa2', 'porcentaje' => 13.0],
+    'BNS01' => ['etiqueta' => 'C2-DP',        'orden' => 2, 'tabla' => 'productos_casa1', 'porcentaje' => 13.0],
+    'BNS04' => ['etiqueta' => 'C3-CHOLULITA', 'orden' => 3, 'tabla' => 'productos_casa4', 'porcentaje' => 13.0],
+    'BNS03' => ['etiqueta' => 'C4-JD',        'orden' => 4, 'tabla' => 'productos_casa3', 'porcentaje' => 12.0],
 ];
+
+/** Porcentaje que se le suma al bruto para el neto cuando la casa no trae uno. */
+const CASAS_PORCENTAJE_DEFECTO = 13.0;
 
 /** Una tabla de productos siempre se llama asi; nada mas se interpola en SQL. */
 const CASAS_PATRON_TABLA = '/^productos_casa[0-9]{1,3}$/';
@@ -49,20 +52,22 @@ function casasRegistradas(bool $recargar = false): array
 
     try {
         $filas = $pdo->query(
-            'SELECT id, codigo_casa, nombre, etiqueta, orden, tabla_productos, activo FROM casas'
+            'SELECT id, codigo_casa, nombre, etiqueta, orden, tabla_productos, porcentaje_neto, activo FROM casas'
         )->fetchAll(PDO::FETCH_ASSOC);
 
     } catch (PDOException $e) {
-        // Falta la migracion 002: se arma el mapa con los datos de respaldo.
+        // Falta alguna migracion (002 o 004): se arma el mapa con los datos de
+        // respaldo para que el sistema siga funcionando mientras se aplica.
         $filas = [];
 
         foreach ($pdo->query('SELECT id, codigo_casa, nombre, activo FROM casas')->fetchAll(PDO::FETCH_ASSOC) as $fila) {
             $respaldo = CASAS_RESPALDO[$fila['codigo_casa']] ?? null;
 
             $filas[] = $fila + [
-                'etiqueta'        => $respaldo['etiqueta'] ?? $fila['codigo_casa'],
-                'orden'           => $respaldo['orden']    ?? 99,
-                'tabla_productos' => $respaldo['tabla']    ?? '',
+                'etiqueta'        => $respaldo['etiqueta']   ?? $fila['codigo_casa'],
+                'orden'           => $respaldo['orden']      ?? 99,
+                'tabla_productos' => $respaldo['tabla']      ?? '',
+                'porcentaje_neto' => $respaldo['porcentaje'] ?? CASAS_PORCENTAJE_DEFECTO,
             ];
         }
     }
@@ -79,6 +84,7 @@ function casasRegistradas(bool $recargar = false): array
             'etiqueta'        => $fila['etiqueta'] !== '' ? (string) $fila['etiqueta'] : $codigo,
             'orden'           => (int) $fila['orden'],
             'tabla_productos' => (string) $fila['tabla_productos'],
+            'porcentaje_neto' => (float) $fila['porcentaje_neto'],
             'activo'          => (int) $fila['activo'],
         ];
     }
@@ -99,6 +105,30 @@ function ordenCasa(?string $codigoCasa): int
 {
     // Las no registradas se van al final.
     return casasRegistradas()[$codigoCasa]['orden'] ?? 99;
+}
+
+/**
+ * Porcentaje que se le suma al precio bruto (mayoreo) para obtener el neto de
+ * esta casa. Una casa no registrada usa el default, para no dejar sin precio una
+ * venta por un codigo raro.
+ */
+function porcentajeCasa(?string $codigoCasa): float
+{
+    return casasRegistradas()[$codigoCasa]['porcentaje_neto'] ?? CASAS_PORCENTAJE_DEFECTO;
+}
+
+/**
+ * Precio neto (el que se cobra) a partir del bruto y un porcentaje: bruto mas
+ * ese %, redondeado a 2 decimales. Devuelve null si no hay bruto, para que la
+ * pieza sin precio se trate igual que antes (no se puede vender).
+ */
+function netoDe($bruto, $porcentaje): ?float
+{
+    if ($bruto === null || $bruto === '') {
+        return null;
+    }
+
+    return round((float) $bruto * (1 + (float) $porcentaje / 100), 2);
 }
 
 /**
@@ -240,7 +270,7 @@ function refrescarVistaCatalogo(PDO $pdo): void
         $partes[] = 'SELECT ' . $pdo->quote($codigo) . ' AS codigo_casa, '
                   . $pdo->quote($casa['nombre']) . ' AS nombre_casa, '
                   . 'codigo_interno, codigo_proveedor, nombre, marca, categoria, '
-                  . "precio_mayoreo, precio_menudeo, activo FROM {$tabla}";
+                  . "precio_mayoreo, activo FROM {$tabla}";
     }
 
     $pdo->exec('CREATE OR REPLACE VIEW vista_catalogo AS ' . implode(' UNION ALL ', $partes));

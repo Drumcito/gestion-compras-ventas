@@ -59,9 +59,11 @@ try {
         throw new RuntimeException('La venta debe conservar al menos una pieza');
     }
 
-    // Lo ya cobrado al cliente: en contado es el total que pago al hacerla,
-    // en credito la suma de sus abonos.
-    $cobrado = (float) $venta['monto_cobrado'];
+    // Lo ya cubierto al cliente: el efectivo cobrado mas el saldo a favor que se
+    // le aplico a esta venta (ese saldo cuenta como pagado).
+    $cobrado         = (float) $venta['monto_cobrado'];
+    $creditoAplicado = (float) ($venta['credito_aplicado'] ?? 0);
+    $efectivo        = $cobrado + $creditoAplicado;
 
     $stmt = $pdo->prepare('SELECT COUNT(*) FROM pagos_credito WHERE venta_id = :id');
     $stmt->execute(['id' => $ventaId]);
@@ -83,21 +85,17 @@ try {
     foreach ($items as $item) {
         $casa       = $item['casa'] ?? '';
         $codigo     = $item['codigo_interno'] ?? '';
-        $tipoPrecio = $item['tipo_precio'] ?? 'menudeo';
         $cantidad   = (int) ($item['cantidad'] ?? 0);
 
         if (!isset($tablasCasa[$casa]) || !isset($casaIdPorCodigo[$casa])) {
             throw new RuntimeException('Casa no valida en uno de los productos');
-        }
-        if (!in_array($tipoPrecio, ['mayoreo', 'menudeo'], true)) {
-            throw new RuntimeException('Tipo de precio no valido');
         }
         if ($cantidad < 1) {
             throw new RuntimeException('La cantidad debe ser al menos 1');
         }
 
         $stmt = $pdo->prepare(
-            "SELECT nombre, precio_mayoreo, precio_menudeo
+            "SELECT nombre, precio_mayoreo
                FROM {$tablasCasa[$casa]}
               WHERE codigo_interno = :codigo AND activo = 1
               LIMIT 1"
@@ -109,22 +107,23 @@ try {
             throw new RuntimeException("El producto {$codigo} ya no esta disponible");
         }
 
-        $precio = $tipoPrecio === 'mayoreo' ? $producto['precio_mayoreo'] : $producto['precio_menudeo'];
+        // Precio neto: bruto (mayoreo) + porcentaje de la casa, a 2 decimales.
+        $precio = netoDe($producto['precio_mayoreo'], porcentajeCasa($casa));
 
         if ($precio === null) {
-            throw new RuntimeException("{$producto['nombre']} no tiene precio de {$tipoPrecio}");
+            throw new RuntimeException("{$producto['nombre']} no tiene precio cargado");
         }
 
         $lineas[$codigo] = [
             'casa_id'    => $casaIdPorCodigo[$casa],
             'codigo'     => $codigo,
             'nombre'     => $producto['nombre'],
-            'tipoPrecio' => $tipoPrecio,
-            'precio'     => (float) $precio,
+            'tipoPrecio' => 'neto',
+            'precio'     => $precio,
             'cantidad'   => $cantidad,
         ];
 
-        $total += (float) $precio * $cantidad;
+        $total += $precio * $cantidad;
     }
 
     // ---------- Comparar contra lo que habia, para la auditoria ----------
@@ -197,14 +196,15 @@ try {
     // ---------- Guardar ----------
     $pdo->beginTransaction();
 
-    // El estado se recalcula contra el total nuevo. Si el cliente ya pago mas
-    // de lo que ahora cuesta la venta (devolvio mercancia), la venta se cierra
-    // en 'devolucion' y la diferencia es lo que el negocio le debe.
-    if ($cobrado > $total) {
+    // El estado se recalcula contra el total nuevo, contando el efectivo cobrado
+    // mas el saldo a favor aplicado. Si eso supera el total nuevo (p. ej. se quito
+    // mercancia), la venta se cierra en 'devolucion' y la diferencia es lo que el
+    // negocio le debe al cliente.
+    if ($efectivo > $total) {
         $estadoPago = 'devolucion';
-    } elseif ($cobrado >= $total) {
+    } elseif ($efectivo >= $total) {
         $estadoPago = 'pagado';
-    } elseif ($cobrado > 0) {
+    } elseif ($efectivo > 0) {
         $estadoPago = 'parcial';
     } else {
         $estadoPago = 'pendiente';
@@ -268,8 +268,8 @@ try {
         'total'       => number_format($total, 2, '.', ''),
         'estado_pago' => $estadoPago,
         'cobrado'     => number_format($cobrado, 2, '.', ''),
-        'saldo'       => number_format(max($total - $cobrado, 0), 2, '.', ''),
-        'devolucion'  => number_format(max($cobrado - $total, 0), 2, '.', ''),
+        'saldo'       => number_format(max($total - $efectivo, 0), 2, '.', ''),
+        'devolucion'  => number_format(max($efectivo - $total, 0), 2, '.', ''),
         'cambios'     => count($cambios),
     ]);
 
