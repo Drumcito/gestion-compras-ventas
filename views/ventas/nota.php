@@ -2,8 +2,10 @@
 /**
  * Nota(s) de venta imprimible(s).
  *
- * La hoja es carta VERTICAL (8.5 x 11 pulgadas) y cada nota va acostada,
- * ocupando 8.5 x 5.5: asi entran dos notas por hoja y se corta a la mitad.
+ * La hoja es carta HORIZONTAL (11 x 8.5 pulgadas) partida en dos mitades
+ * verticales: cada nota ocupa 5.5 x 8.5 y se corta a lo largo, por la linea
+ * punteada del centro. Entran dos notas por hoja, una a la izquierda y otra a
+ * la derecha.
  *
  * Acepta una venta (?id=13) o varias (?ids=13,14,15). Con una sola venta se
  * pueden pasar ademas los datos del cliente que no viven en la base
@@ -25,6 +27,11 @@ const NEGOCIO_TELEFONO = '49728197';
 
 // Tope para que una seleccion enorme no tumbe la pagina.
 const MAX_NOTAS = 100;
+
+// Piezas que caben en una nota. La media hoja ahora mide 5.5 x 8.5 (antes
+// 8.5 x 5.5) y cada renglon ocupa una sola linea, asi que el tope es fijo: con
+// 32 la tabla termina a 7.2 pulgadas y el total, que va al pie, queda libre.
+const MAX_PIEZAS_NOTA = 32;
 
 // ---------- Que ventas se van a imprimir ----------
 $ids = [];
@@ -115,10 +122,10 @@ function dinero($monto): string
     <meta charset="UTF-8">
     <title><?= count($ventas) === 1 ? 'Nota de venta #' . (int) $ventas[0]['id'] : 'Notas de venta (' . count($ventas) . ')' ?> - <?= NEGOCIO_NOMBRE ?></title>
     <style>
-        /* Hoja carta vertical. Cada nota mide 8.5 x 5.5, asi que entran dos
-           por hoja, una arriba y otra abajo. */
+        /* Hoja carta horizontal partida a lo largo: cada nota mide 5.5 x 8.5,
+           una a la izquierda y otra a la derecha. */
         @page {
-            size: letter portrait;
+            size: letter landscape;
             margin: 0;
         }
 
@@ -131,40 +138,51 @@ function dinero($monto): string
         }
 
         .hoja {
-            width: 8.5in;
+            width: 11in;
             margin: 0 auto;
-            background: #ffffff;
         }
 
-        .nota {
-            width: 8.5in;
-            height: 5.5in;
-            padding: 0.3in 0.35in;
+        /* Una hoja completa. El salto de pagina va aqui, en un bloque del
+           tamaño exacto del papel: cortar dentro de un contenedor flex es poco
+           confiable al imprimir, sobre el contenedor mismo no falla. */
+        .par {
+            width: 11in;
+            height: 8.5in;
+            display: flex;
             background: #ffffff;
-            overflow: hidden;
             position: relative;
-        }
-
-        /* Guia de corte entre las dos notas de una misma hoja. */
-        .nota:nth-child(odd)::after {
-            content: '';
-            position: absolute;
-            left: 0.2in;
-            right: 0.2in;
-            bottom: 0;
-            border-bottom: 1px dashed #999999;
-        }
-
-        /* Cada par de notas llena una hoja: la segunda cierra la pagina. */
-        .nota:nth-child(even) {
             break-after: page;
             page-break-after: always;
         }
 
-        .nota:last-child {
+        .par:last-child {
             break-after: auto;
             page-break-after: auto;
         }
+
+        /* Guia de corte por el centro de la hoja. Se dibuja aunque la hoja
+           lleve una sola nota: el corte se hace igual. */
+        .par::after {
+            content: '';
+            position: absolute;
+            top: 0.2in;
+            bottom: 0.2in;
+            left: 50%;
+            border-left: 1px dashed #999999;
+        }
+
+        .nota {
+            width: 5.5in;
+            height: 8.5in;
+            padding: 0.3in 0.28in;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Si una venta trae mas piezas de las que caben, el sobrante se recorta
+           (overflow) en lugar de apretar los bloques y descuadrar la nota. */
+        .nota > * { flex-shrink: 0; }
 
         /* ---------- Encabezado ---------- */
         .encabezado {
@@ -181,37 +199,37 @@ function dinero($monto): string
         }
 
         .marca img {
-            width: 0.72in;
-            height: 0.72in;
+            width: 0.5in;
+            height: 0.5in;
             object-fit: contain;
         }
 
         .marca h1 {
-            font-size: 15pt;
+            font-size: 11pt;
             font-weight: bold;
             letter-spacing: 0.4pt;
             line-height: 1.1;
         }
 
         .marca p {
-            font-size: 8pt;
+            font-size: 6.5pt;
             text-align: center;
             margin-top: 1pt;
         }
 
         .folio {
             text-align: right;
-            font-size: 9pt;
+            font-size: 7.5pt;
             line-height: 1.5;
             white-space: nowrap;
         }
 
-        .folio strong { font-size: 10pt; }
+        .folio strong { font-size: 8.5pt; }
 
         /* ---------- Datos del cliente ---------- */
         .cliente {
-            margin-top: 0.12in;
-            font-size: 8.5pt;
+            margin-top: 0.1in;
+            font-size: 7pt;
             line-height: 1.55;
         }
 
@@ -222,7 +240,7 @@ function dinero($monto): string
 
         .cliente .etiqueta {
             font-weight: bold;
-            width: 0.75in;
+            width: 0.62in;
             flex-shrink: 0;
         }
 
@@ -231,12 +249,12 @@ function dinero($monto): string
         .cliente .dato {
             flex: 1;
             border-bottom: 0.5pt solid #999999;
-            min-height: 12pt;
+            min-height: 10pt;
         }
 
         .fila-corta {
             display: flex;
-            gap: 0.3in;
+            gap: 0.2in;
             margin-top: 2pt;
         }
 
@@ -246,14 +264,26 @@ function dinero($monto): string
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 0.14in;
-            font-size: 8.5pt;
+            margin-top: 0.12in;
+            font-size: 7pt;
+            /* Ancho fijo para que la descripcion pueda recortarse: si los
+               nombres largos hicieran dos renglones, la tabla empujaria el
+               total fuera de la media hoja y se perderia al imprimir. */
+            table-layout: fixed;
+        }
+
+        /* De 27,818 productos del catalogo, solo 5 pasan del ancho de la
+           columna; esos se cortan con puntos suspensivos. */
+        .col-desc {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         th {
             border: 0.75pt solid #000000;
-            padding: 3pt 4pt;
-            font-size: 8pt;
+            padding: 2.5pt 3pt;
+            font-size: 6.5pt;
             letter-spacing: 0.3pt;
             background: #e8e8e8;
             -webkit-print-color-adjust: exact;
@@ -263,15 +293,15 @@ function dinero($monto): string
         td {
             border-left: 0.75pt solid #000000;
             border-right: 0.75pt solid #000000;
-            padding: 2.5pt 4pt;
+            padding: 2pt 3pt;
             vertical-align: top;
         }
 
         tbody tr:last-child td { border-bottom: 0.75pt solid #000000; }
 
-        .col-cant   { width: 0.55in; text-align: center; }
-        .col-precio { width: 1.05in; text-align: right; }
-        .col-importe{ width: 1.15in; text-align: right; }
+        .col-cant   { width: 0.38in; text-align: center; }
+        .col-precio { width: 0.72in; text-align: right; }
+        .col-importe{ width: 0.8in;  text-align: right; }
 
         .signo {
             float: left;
@@ -280,7 +310,7 @@ function dinero($monto): string
 
         /* Cuando la venta trae mas piezas de las que caben en media hoja. */
         .mas-piezas {
-            font-size: 7.5pt;
+            font-size: 6.5pt;
             font-style: italic;
             padding: 2pt 4pt;
         }
@@ -289,13 +319,15 @@ function dinero($monto): string
         .totales {
             display: flex;
             justify-content: flex-end;
-            margin-top: 0.1in;
+            /* La nota ahora es alta: el total se va al pie, como en la de papel. */
+            margin-top: auto;
+            padding-top: 0.1in;
         }
 
         .totales table {
-            width: 2.9in;
+            width: 2.3in;
             margin-top: 0;
-            font-size: 10pt;
+            font-size: 8.5pt;
         }
 
         .totales td {
@@ -304,18 +336,18 @@ function dinero($monto): string
         }
 
         .totales .rotulo { text-align: right; font-weight: bold; }
-        .totales .monto  { text-align: right; width: 1.15in; }
+        .totales .monto  { text-align: right; width: 0.95in; }
 
         .totales .gran-total td {
             border-top: 1pt solid #000000;
-            font-size: 11.5pt;
+            font-size: 10pt;
             font-weight: bold;
             padding-top: 3pt;
         }
 
         .pie {
-            margin-top: 0.1in;
-            font-size: 7.5pt;
+            margin-top: 0.08in;
+            font-size: 6.5pt;
             color: #444444;
             display: flex;
             justify-content: space-between;
@@ -323,7 +355,7 @@ function dinero($monto): string
 
         /* ---------- Solo en pantalla ---------- */
         .barra {
-            max-width: 8.5in;
+            max-width: 11in;
             margin: 0.2in auto;
             display: flex;
             gap: 0.5rem;
@@ -354,11 +386,13 @@ function dinero($monto): string
             font-weight: 600;
         }
 
-        /* En pantalla se separan las notas para distinguirlas; al imprimir van
-           pegadas porque el corte lo marca la linea punteada. */
+        /* En pantalla se separan las hojas para distinguirlas; al imprimir cada
+           una llena el papel y el corte lo marca la linea punteada del centro. */
         @media screen {
-            .nota { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
-            .nota:nth-child(even) { margin-bottom: 0.25in; }
+            .par {
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+                margin-bottom: 0.25in;
+            }
         }
 
         /* A proposito no lleva <meta viewport>: es un documento de 8.5in para
@@ -384,7 +418,9 @@ function dinero($monto): string
 </div>
 
 <div class="hoja">
-<?php foreach ($ventas as $venta): ?>
+<?php foreach (array_chunk($ventas, 2) as $par): ?>
+    <div class="par">
+    <?php foreach ($par as $venta): ?>
     <?php
     $items  = $itemsPorVenta[$venta['id']] ?? [];
     $fecha  = (new DateTime($venta['fecha']))->format('d/m/Y');
@@ -393,9 +429,8 @@ function dinero($monto): string
     // que ya tenga guardado cada una.
     $cliente = ($unaSola && $clienteManual !== '') ? $clienteManual : ($venta['cliente'] ?? '');
 
-    // En media hoja caben unas 13 piezas; el resto se resume para no
-    // desbordar el recuadro y descuadrar la hoja.
-    $visibles = array_slice($items, 0, 13);
+    // Lo que no cabe se resume en un renglon, para no desbordar la media hoja.
+    $visibles = array_slice($items, 0, MAX_PIEZAS_NOTA);
     $ocultas  = count($items) - count($visibles);
     ?>
     <div class="nota">
@@ -438,7 +473,7 @@ function dinero($monto): string
             <thead>
                 <tr>
                     <th class="col-cant">CANT</th>
-                    <th>DESCRIPCION</th>
+                    <th class="col-desc">DESCRIPCION</th>
                     <th class="col-precio">P. UNITARIO</th>
                     <th class="col-importe">IMPORTE</th>
                 </tr>
@@ -447,7 +482,7 @@ function dinero($monto): string
                 <?php foreach ($visibles as $i): ?>
                     <tr>
                         <td class="col-cant"><?= (int) $i['cantidad'] ?></td>
-                        <td><?= e($i['nombre_producto']) ?></td>
+                        <td class="col-desc"><?= e($i['nombre_producto']) ?></td>
                         <td class="col-precio"><span class="signo">$</span><?= dinero($i['precio_aplicado']) ?></td>
                         <td class="col-importe"><span class="signo">$</span><?= dinero($i['subtotal']) ?></td>
                     </tr>
@@ -491,6 +526,8 @@ function dinero($monto): string
             <span>Atendió: <?= e(trim($venta['vendedor'])) ?></span>
             <span><?= ucfirst(e($venta['tipo_pago'])) ?></span>
         </div>
+    </div>
+    <?php endforeach; ?>
     </div>
 <?php endforeach; ?>
 </div>
