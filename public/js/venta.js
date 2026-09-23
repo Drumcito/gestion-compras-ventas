@@ -419,6 +419,100 @@ document.addEventListener('DOMContentLoaded', () => {
         pintarItems();
     });
 
+    // ---------- Nuevo producto (casa Otros) ----------
+    // Para piezas que no estan en ningun catalogo: se capturan a mano, el servidor
+    // las guarda en la casa Otros y regresan como un resultado mas del buscador.
+    const RUTA_OTRO      = '../../app/controllers/OtroProductoController.php';
+    const modalOtro      = document.getElementById('modal-otro');
+    const formOtro       = document.getElementById('form-otro');
+    const otroNombre     = document.getElementById('otro-nombre');
+    const otroBruto      = document.getElementById('otro-bruto');
+    const otroFinal      = document.getElementById('otro-final');
+    const otroPorcentaje = document.getElementById('otro-porcentaje');
+    const otroAviso      = document.getElementById('otro-aviso');
+    const btnGuardarOtro = document.getElementById('btn-guardar-otro');
+
+    let porcentajeOtros = 13;
+
+    // Mismo calculo que netoDe() en el servidor: bruto + %, a 2 decimales.
+    function actualizarFinalOtro() {
+        const bruto = parseFloat(otroBruto.value);
+        const neto  = isNaN(bruto) ? 0 : Math.round(bruto * (1 + porcentajeOtros / 100) * 100) / 100;
+        otroFinal.textContent = money(neto);
+    }
+
+    async function abrirModalOtro() {
+        formOtro.reset();
+        otroAviso.hidden = true;
+        actualizarFinalOtro();
+        modalOtro.hidden = false;
+        otroNombre.focus();
+
+        // El porcentaje es el de la casa Otros (el admin lo puede cambiar).
+        try {
+            const d = await (await fetch(RUTA_OTRO + '?accion=info')).json();
+            if (d.ok) {
+                porcentajeOtros = Number(d.porcentaje);
+                otroPorcentaje.textContent = porcentajeOtros.toLocaleString('es-MX');
+                actualizarFinalOtro();
+            }
+        } catch (e) {
+            // Se queda con el 13% de siempre; el servidor calcula el precio real.
+        }
+    }
+
+    function cerrarModalOtro() {
+        modalOtro.hidden = true;
+    }
+
+    document.getElementById('btn-agregar-otro').addEventListener('click', abrirModalOtro);
+    document.getElementById('btn-cerrar-otro').addEventListener('click', cerrarModalOtro);
+    document.getElementById('btn-cancelar-otro').addEventListener('click', cerrarModalOtro);
+    modalOtro.addEventListener('click', (e) => {
+        if (e.target === modalOtro) cerrarModalOtro();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modalOtro.hidden) cerrarModalOtro();
+    });
+    otroBruto.addEventListener('input', actualizarFinalOtro);
+
+    formOtro.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        otroAviso.hidden = true;
+
+        btnGuardarOtro.disabled = true;
+        btnGuardarOtro.textContent = 'Guardando...';
+
+        try {
+            const respuesta = await fetch(RUTA_OTRO, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nombre:       otroNombre.value.trim(),
+                    precio_bruto: otroBruto.value,
+                }),
+            });
+            const datos = await respuesta.json();
+
+            if (!datos.ok) {
+                otroAviso.textContent = datos.error || 'No se pudo guardar el producto.';
+                otroAviso.className = 'aviso aviso-error';
+                otroAviso.hidden = false;
+                return;
+            }
+
+            cerrarModalOtro();
+            agregarItem(datos.producto);
+        } catch (err) {
+            otroAviso.textContent = 'Error de conexión al guardar.';
+            otroAviso.className = 'aviso aviso-error';
+            otroAviso.hidden = false;
+        } finally {
+            btnGuardarOtro.disabled = false;
+            btnGuardarOtro.textContent = 'Guardar';
+        }
+    });
+
     tipoPago.addEventListener('change', () => {
         camposCredito.hidden = tipoPago.value !== 'credito';
     });

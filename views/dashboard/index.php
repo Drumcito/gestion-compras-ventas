@@ -88,6 +88,14 @@ $casas = ordenarCasas($casas);
                     <p class="venta-vacia">Aún no has agregado piezas a esta venta.</p>
                 </div>
 
+                <!-- Pieza que no está en el catálogo: se captura a mano y va a la casa Otros -->
+                <div class="venta-otro">
+                    <button type="button" class="btn-agregar-otro" id="btn-agregar-otro"
+                            title="Agregar un producto que no está en el catálogo">
+                        <i class="ph ph-plus"></i> Nuevo producto
+                    </button>
+                </div>
+
                 <!-- Tipo de pago -->
                 <div class="form-group">
                     <label for="tipo_pago">Tipo de pago:</label>
@@ -123,6 +131,38 @@ $casas = ordenarCasas($casas);
             </form>
         </div>
     </main>
+
+    <!-- Nuevo producto (casa Otros) -->
+    <div id="modal-otro" class="modal" hidden>
+        <div class="modal-caja">
+            <button type="button" class="modal-cerrar" id="btn-cerrar-otro" title="Cerrar">
+                <i class="ph ph-x"></i>
+            </button>
+            <form id="form-otro" autocomplete="off">
+                <h2 class="detalle-titulo">Nuevo producto</h2>
+                <p class="detalle-sub">Se guarda en la casa <strong>Otros</strong> y se agrega a esta venta.</p>
+
+                <div class="form-group">
+                    <label for="otro-nombre">Nombre o descripción del producto:</label>
+                    <input type="text" id="otro-nombre" class="form-control" maxlength="150" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="otro-bruto">Precio antes del <span id="otro-porcentaje">13</span>%:</label>
+                    <input type="number" id="otro-bruto" class="form-control" min="0.01" step="0.01" required>
+                </div>
+
+                <p class="otro-final">Precio final: <strong id="otro-final">$0.00</strong></p>
+
+                <div id="otro-aviso" class="aviso" hidden></div>
+
+                <div class="detalle-acciones">
+                    <button type="button" class="chip" id="btn-cancelar-otro">Cancelar</button>
+                    <button type="submit" class="btn-save" id="btn-guardar-otro">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
 
     <script src="<?= recurso('js/venta.js') ?>"></script>

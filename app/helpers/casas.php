@@ -247,6 +247,206 @@ function catalogoDeProductos(PDO $pdo, array $codigos, array $columnas = ['nombr
     return $catalogo;
 }
 
+/** DDL de una tabla de catalogo, igual a las cuatro que ya existen. */
+function ddlTablaProductos(string $tabla, int $numero): string
+{
+    return "CREATE TABLE `{$tabla}` (
+      `id` INT NOT NULL AUTO_INCREMENT,
+      `codigo_proveedor` VARCHAR(50) NOT NULL,
+      `codigo_interno` VARCHAR(20) DEFAULT NULL,
+      `nombre` VARCHAR(150) NOT NULL,
+      `marca` VARCHAR(60) DEFAULT NULL,
+      `categoria` VARCHAR(60) DEFAULT NULL,
+      `codigo_sat` VARCHAR(20) DEFAULT NULL,
+      `precio_mayoreo` DECIMAL(10,2) DEFAULT NULL,
+      `piezas_inner` INT DEFAULT NULL,
+      `piezas_master` INT DEFAULT NULL,
+      `fecha_precio_proveedor` DATE DEFAULT NULL,
+      `activo` TINYINT(1) NOT NULL DEFAULT 1,
+      `fecha_creacion` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      `fecha_actualizacion` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (`id`),
+      UNIQUE KEY `codigo_interno` (`codigo_interno`),
+      KEY `idx_p{$numero}_codigo_proveedor` (`codigo_proveedor`),
+      KEY `idx_p{$numero}_nombre` (`nombre`),
+      KEY `idx_p{$numero}_marca` (`marca`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+}
+
+/**
+ * Trigger que guarda en historial_precios cada cambio de precio, igual que el de
+ * las otras casas. @usuario_actual es lo que le dice quien hizo el cambio.
+ */
+function ddlTriggerPrecios(string $tabla, int $numero, string $codigoCasa): string
+{
+    return "CREATE TRIGGER `trg_precio_casa{$numero}_update`
+    AFTER UPDATE ON `{$tabla}` FOR EACH ROW
+    BEGIN
+        IF NOT (OLD.precio_mayoreo <=> NEW.precio_mayoreo) THEN
+            INSERT INTO historial_precios (casa_id, codigo_interno_producto, tipo_precio, precio_anterior, precio_nuevo, usuario_id)
+            VALUES ((SELECT id FROM casas WHERE codigo_casa = '{$codigoCasa}'), NEW.codigo_interno, 'mayoreo', OLD.precio_mayoreo, NEW.precio_mayoreo, @usuario_actual);
+        END IF;
+    END";
+}
+
+/** El numero mas alto ya usado, para seguir la serie sin repetir. */
+function siguienteNumero(array $valores, string $patron): int
+{
+    $maximo = 0;
+
+    foreach ($valores as $valor) {
+        if (preg_match($patron, (string) $valor, $coincidencia)) {
+            $maximo = max($maximo, (int) $coincidencia[1]);
+        }
+    }
+
+    return $maximo + 1;
+}
+
+/**
+ * Da de alta una casa: su tabla de productos, la fila en `casas`, el trigger de
+ * historial de precios y la vista del buscador. Los datos ya deben venir
+ * validados (nombre, etiqueta y orden unicos y con formato).
+ *
+ * @return array{codigo_casa:string, tabla:string, avisos:string[]}
+ */
+function crearCasa(PDO $pdo, string $nombre, string $etiqueta, int $orden, float $porcentaje): array
+{
+    // Sin las columnas de la migracion 002 el INSERT truena; mejor decirlo claro.
+    $columnas = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.columns
+          WHERE table_schema = DATABASE() AND table_name = 'casas'
+            AND column_name IN ('etiqueta', 'orden', 'tabla_productos')"
+    )->fetchColumn();
+
+    if ($columnas < 3) {
+        throw new RuntimeException(
+            'Falta aplicar la migracion 002_casas_dinamicas.sql en la base de datos; '
+            . 'sin ella no se pueden crear casas.'
+        );
+    }
+
+    $casas = casasRegistradas();
+
+    $codigoCasa = 'BNS' . str_pad(
+        (string) siguienteNumero(array_keys($casas), '/^BNS0*(\d+)$/'),
+        2, '0', STR_PAD_LEFT
+    );
+
+    // El numero de la tabla va por su propia serie: no coincide con el del
+    // codigo ni con el de la etiqueta (BNS03 es productos_casa3 pero se
+    // muestra como C4-JD).
+    $numeroTabla = siguienteNumero(
+        array_column($casas, 'tabla_productos'),
+        '/^productos_casa(\d+)$/'
+    );
+
+    // Por si quedo una tabla huerfana de un intento anterior.
+    $existentes = $pdo->query(
+        "SELECT table_name FROM information_schema.tables
+          WHERE table_schema = DATABASE() AND table_name LIKE 'productos_casa%'"
+    )->fetchAll(PDO::FETCH_COLUMN);
+
+    $numeroTabla = max($numeroTabla, siguienteNumero($existentes, '/^productos_casa(\d+)$/'));
+    $tabla       = 'productos_casa' . $numeroTabla;
+
+    if (!preg_match(CASAS_PATRON_TABLA, $tabla)) {
+        throw new RuntimeException('No se pudo calcular el nombre de la tabla');
+    }
+
+    // Un CREATE TABLE hace commit implicito, asi que esto no puede ir dentro
+    // de una transaccion: si el INSERT falla, se deshace a mano la tabla.
+    $pdo->exec(ddlTablaProductos($tabla, $numeroTabla));
+
+    try {
+        $stmt = $pdo->prepare(
+            'INSERT INTO casas (codigo_casa, nombre, etiqueta, orden, tabla_productos, porcentaje_neto)
+             VALUES (:codigo, :nombre, :etiqueta, :orden, :tabla, :porcentaje)'
+        );
+        $stmt->execute([
+            'codigo'     => $codigoCasa,
+            'nombre'     => $nombre,
+            'etiqueta'   => $etiqueta,
+            'orden'      => $orden,
+            'tabla'      => $tabla,
+            'porcentaje' => $porcentaje,
+        ]);
+
+    } catch (PDOException $e) {
+        $pdo->exec("DROP TABLE IF EXISTS `{$tabla}`");
+        throw $e;
+    }
+
+    // La lista en memoria ya cambio.
+    casasRegistradas(true);
+
+    $avisos = [];
+
+    // El trigger de historial de precios y la vista del buscador son DDL:
+    // en algunos hostings el usuario de la base no tiene permiso. Si fallan,
+    // la casa igual sirve, pero hay que decir que quedo a medias.
+    try {
+        $pdo->exec(ddlTriggerPrecios($tabla, $numeroTabla, $codigoCasa));
+    } catch (PDOException $e) {
+        error_log('Trigger de ' . $tabla . ': ' . $e->getMessage());
+        $avisos[] = 'No se pudo crear el registro automatico de cambios de precio '
+                  . 'para esta casa (falta permiso de TRIGGER en la base). Todo lo demas funciona.';
+    }
+
+    try {
+        refrescarVistaCatalogo($pdo);
+    } catch (PDOException $e) {
+        error_log('vista_catalogo: ' . $e->getMessage());
+        $avisos[] = 'No se pudo actualizar el catalogo general, asi que los productos de '
+                  . 'esta casa todavia no apareceran al buscar en "Todas las casas".';
+    }
+
+    return ['codigo_casa' => $codigoCasa, 'tabla' => $tabla, 'avisos' => $avisos];
+}
+
+/** Nombre y etiqueta de la casa donde caen los productos capturados a mano en Venta. */
+const CASA_OTROS_NOMBRE   = 'Otros';
+const CASA_OTROS_ETIQUETA = 'OTROS';
+
+/** Codigo de la casa "Otros", o null si todavia no existe. Se busca por nombre. */
+function codigoCasaOtros(): ?string
+{
+    foreach (casasRegistradas() as $codigo => $casa) {
+        if (mb_strtolower($casa['nombre']) === mb_strtolower(CASA_OTROS_NOMBRE)
+            && tablaDeCasa($codigo) !== null) {
+            return $codigo;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Codigo de la casa "Otros"; si no existe la crea (al final del orden y con el
+ * porcentaje por defecto), para que el vendedor no dependa del administrador.
+ */
+function asegurarCasaOtros(PDO $pdo): string
+{
+    $codigo = codigoCasaOtros();
+
+    if ($codigo !== null) {
+        return $codigo;
+    }
+
+    $orden = 1;
+    foreach (casasRegistradas() as $casa) {
+        $orden = max($orden, $casa['orden'] + 1);
+    }
+
+    $nueva = crearCasa($pdo, CASA_OTROS_NOMBRE, CASA_OTROS_ETIQUETA, min($orden, 999), CASAS_PORCENTAJE_DEFECTO);
+
+    foreach ($nueva['avisos'] as $aviso) {
+        error_log('Casa Otros: ' . $aviso);
+    }
+
+    return $nueva['codigo_casa'];
+}
+
 /**
  * Reescribe vista_catalogo, que une el catalogo de todas las casas y es la que
  * usa el buscador de Ventas. Hay que llamarla cada vez que nace una casa: si no,

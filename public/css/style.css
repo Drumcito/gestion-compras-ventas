@@ -939,6 +939,40 @@ select.form-control {
     margin: 0;
 }
 
+/* Botón "+ Nuevo producto" debajo de la lista: pieza fuera de catálogo. */
+.venta-otro {
+    margin: -0.75rem 0 1.5rem;
+}
+
+.btn-agregar-otro {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #ffffff;
+    color: #08660b;
+    border: 1px dashed #08660b;
+    border-radius: 20px;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.btn-agregar-otro:hover {
+    background: #eef3ee;
+}
+
+/* Precio final (bruto + %) que se ve mientras se teclea el precio. */
+.otro-final {
+    font-size: 1.1rem;
+    margin: 0 0 1rem;
+}
+
+.otro-final strong {
+    color: #08660b;
+}
+
 /* Dos renglones alineados: arriba nombre / tipo de precio / cantidad /
    subtotal (el desplegable y la cantidad a la misma altura) y abajo la casa
    junto al precio unitario. */
