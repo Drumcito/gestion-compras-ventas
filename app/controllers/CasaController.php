@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id'])) {
 // boton: ocultarlo en pantalla no impide que alguien llame al controlador.
 if (($_SESSION['user_role'] ?? '') !== 'admin') {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'Solo un administrador puede crear casas o agregar productos']);
+    echo json_encode(['ok' => false, 'error' => 'Solo un administrador puede modificar el inventario']);
     exit;
 }
 
@@ -387,6 +387,46 @@ try {
             'errores'   => $errores,
             'total'     => $total,
             'etiqueta'  => etiquetaCasa($codigoCasa),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ---------- Borrar (dar de baja) un producto ----------
+    // Baja logica, no DELETE: las ventas ya registradas guardan el codigo_interno
+    // y el historial de precios depende de la fila. Con activo = 0 el producto
+    // desaparece del inventario y del buscador (todo filtra activo = 1), pero lo
+    // que ya se vendio queda intacto.
+    if ($accion === 'eliminar') {
+        $codigo = (string) ($datos['codigo'] ?? '');
+        $tabla  = tablaDeProducto($codigo);
+
+        if ($tabla === null) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Codigo de producto no valido']);
+            exit;
+        }
+
+        // Se lee el nombre para confirmarlo en el aviso y, de paso, verificar que
+        // el producto siga activo (no borrar dos veces desde pestanas distintas).
+        $stmt = $pdo->prepare(
+            "SELECT nombre FROM `{$tabla}` WHERE codigo_interno = :codigo AND activo = 1 LIMIT 1"
+        );
+        $stmt->execute(['codigo' => $codigo]);
+        $nombre = $stmt->fetchColumn();
+
+        if ($nombre === false) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'El producto ya no esta en el inventario']);
+            exit;
+        }
+
+        $pdo->prepare("UPDATE `{$tabla}` SET activo = 0 WHERE codigo_interno = :codigo")
+            ->execute(['codigo' => $codigo]);
+
+        echo json_encode([
+            'ok'     => true,
+            'nombre' => $nombre,
+            'casa'   => etiquetaCasa(substr($codigo, 0, (int) strpos($codigo, '-'))),
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }

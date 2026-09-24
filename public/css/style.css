@@ -2332,6 +2332,59 @@ select.form-control {
     white-space: nowrap;
 }
 
+/* Editar precio + la "x" de borrar, alineados en el pie de la fila. */
+.producto-acciones {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Botón redondo con la "x" al costado del producto. Rojo solo al pasar el mouse
+   para que no compita con "Editar precio". */
+.btn-borrar-prod {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    padding: 0;
+    border: 1px solid #e0a0a0;
+    border-radius: 50%;
+    background: #ffffff;
+    color: #b71c1c;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-borrar-prod:hover,
+.btn-borrar-prod:focus-visible {
+    background: #b71c1c;
+    border-color: #b71c1c;
+    color: #ffffff;
+    outline: none;
+}
+
+/* Botón de confirmar la baja dentro del modal: mismo tamaño que .btn-save
+   pero en rojo, porque es una acción destructiva. */
+.btn-borrar-confirmar {
+    background-color: #b71c1c;
+    color: #ffffff;
+    border: none;
+    padding: 0.75rem 2.5rem;
+    border-radius: 20px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-borrar-confirmar:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .paginacion {
     display: flex;
     align-items: center;

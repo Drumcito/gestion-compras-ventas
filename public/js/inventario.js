@@ -187,7 +187,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 '</div>' +
                 '<div class="venta-fila-derecha">' +
                     '<div class="precios-producto">' + precios + '</div>' +
-                    (window.ES_ADMIN ? '<span class="chip btn-editar-precio">Editar precio</span>' : '') +
+                    (window.ES_ADMIN
+                        ? '<div class="producto-acciones">' +
+                              '<span class="chip btn-editar-precio">Editar precio</span>' +
+                              '<button type="button" class="btn-borrar-prod" ' +
+                                  'title="Borrar producto" aria-label="Borrar producto" ' +
+                                  'data-codigo="' + esc(p.codigo_interno) + '" ' +
+                                  'data-nombre="' + esc(p.nombre) + '">' +
+                                  '<i class="ph ph-x" aria-hidden="true"></i>' +
+                              '</button>' +
+                          '</div>'
+                        : '') +
                 '</div>';
 
             listaProductos.appendChild(fila);
@@ -299,8 +309,71 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ---------- Casa nueva y alta de productos (solo admin) ----------
+    // ---------- Borrar producto (solo admin) ----------
     const RUTA_CASA = '../../app/controllers/CasaController.php';
+
+    /**
+     * Pide confirmar la baja antes de mandarla. Se reutiliza el modal del precio
+     * (mismo contenedor y mismo cierre con Escape / clic fuera), solo cambia lo
+     * que se pinta dentro.
+     */
+    function confirmarBorrado(codigo, nombre) {
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Borrar producto</h2>' +
+            '<p class="aviso aviso-error">¿Seguro que deseas borrar <strong>"' + esc(nombre) +
+                '"</strong> de la casa ' + esc(etiquetaActual()) + '?</p>' +
+            '<p class="detalle-sub">El producto deja de aparecer en el inventario y en el ' +
+                'buscador de ventas. Las ventas ya registradas no se modifican.</p>' +
+            '<div id="inv-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-cancelar-borrado">Cancelar</button>' +
+                '<button type="button" class="btn-borrar-confirmar" id="btn-confirmar-borrado" ' +
+                    'data-codigo="' + esc(codigo) + '">Sí, borrar</button>' +
+            '</div>';
+
+        modal.hidden = false;
+    }
+
+    async function borrarProducto(codigo) {
+        const avisoForm = document.getElementById('inv-aviso');
+        const boton = document.getElementById('btn-confirmar-borrado');
+
+        const fallar = (texto) => {
+            avisoForm.textContent = texto;
+            avisoForm.className = 'aviso aviso-error';
+            avisoForm.hidden = false;
+            boton.disabled = false;
+            boton.textContent = 'Sí, borrar';
+        };
+
+        boton.disabled = true;
+        boton.textContent = 'Borrando...';
+
+        try {
+            const datos = await (await fetch(RUTA_CASA + '?accion=eliminar', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ codigo: codigo }),
+            })).json();
+
+            if (!datos.ok) {
+                fallar(datos.error || 'No se pudo borrar el producto.');
+                return;
+            }
+
+            modal.hidden = true;
+            mostrarAviso('Se borró "' + datos.nombre + '" de ' + etiquetaActual() + '.', 'ok');
+
+            // El conteo de la casa cambió: recargar las casas refresca las pestañas
+            // y vuelve a pintar la lista sin el producto.
+            cargarCasas(casaActual);
+
+        } catch (e) {
+            fallar('Error de conexión.');
+        }
+    }
+
+    // ---------- Casa nueva y alta de productos (solo admin) ----------
 
     const modalCasa     = document.getElementById('modal-casa');
     const contenidoCasa = document.getElementById('contenido-casa');
@@ -989,6 +1062,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     listaProductos.addEventListener('click', (e) => {
         if (!window.ES_ADMIN) return;
+
+        // La "x" vive dentro de la fila, así que hay que atenderla antes de que el
+        // clic caiga en la fila y abra el editor de precio.
+        const borrar = e.target.closest('.btn-borrar-prod');
+        if (borrar) {
+            e.stopPropagation();
+            confirmarBorrado(borrar.dataset.codigo, borrar.dataset.nombre);
+            return;
+        }
+
         const fila = e.target.closest('.producto-fila');
         if (fila) abrirPrecio(fila.dataset.codigo);
     });
@@ -996,6 +1079,9 @@ document.addEventListener('DOMContentLoaded', () => {
     listaProductos.addEventListener('keydown', (e) => {
         if (!window.ES_ADMIN) return;
         if (e.key !== 'Enter' && e.key !== ' ') return;
+        // El botón de borrar se activa solo con Enter/Espacio; que no dispare
+        // además la apertura del precio.
+        if (e.target.closest('.btn-borrar-prod')) return;
         const fila = e.target.closest('.producto-fila');
         if (fila) { e.preventDefault(); abrirPrecio(fila.dataset.codigo); }
     });
@@ -1003,6 +1089,10 @@ document.addEventListener('DOMContentLoaded', () => {
     contenido.addEventListener('click', (e) => {
         if (e.target.id === 'btn-cancelar-inv') modal.hidden = true;
         if (e.target.id === 'btn-guardar-inv') guardarPrecio(e.target.dataset.codigo);
+
+        if (e.target.id === 'btn-cancelar-borrado') modal.hidden = true;
+        const btnBorrar = e.target.closest('#btn-confirmar-borrado');
+        if (btnBorrar) borrarProducto(btnBorrar.dataset.codigo);
     });
 
     btnCerrar.addEventListener('click', () => { modal.hidden = true; });
