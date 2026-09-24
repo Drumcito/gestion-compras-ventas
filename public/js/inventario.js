@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCerrar      = document.getElementById('btn-cerrar-inventario');
 
     const RUTA_INV    = '../../app/controllers/InventarioController.php';
-    const RUTA_PRECIO = '../../app/controllers/PrecioController.php';
+    const RUTA_EDITAR = '../../app/controllers/EditarProductoController.php';
 
     let casaActual   = null;
     let paginaActual = 1;
@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<div class="precios-producto">' + precios + '</div>' +
                     (window.ES_ADMIN
                         ? '<div class="producto-acciones">' +
-                              '<span class="chip btn-editar-precio">Editar precio</span>' +
+                              '<span class="chip btn-editar-precio">Editar</span>' +
                               '<button type="button" class="btn-borrar-prod" ' +
                                   'title="Borrar producto" aria-label="Borrar producto" ' +
                                   'data-codigo="' + esc(p.codigo_interno) + '" ' +
@@ -209,14 +209,14 @@ document.addEventListener('DOMContentLoaded', () => {
         btnSiguiente.disabled = datos.pagina >= datos.paginas;
     }
 
-    // ---------- Editar precio ----------
-    async function abrirPrecio(codigo) {
+    // ---------- Editar producto (nombre, código, precio y casa) ----------
+    async function abrirEditor(codigo) {
         contenido.innerHTML = '<p class="venta-vacia">Cargando...</p>';
         modal.hidden = false;
 
         try {
             const datos = await (await fetch(
-                RUTA_PRECIO + '?accion=consultar&codigo=' + encodeURIComponent(codigo)
+                RUTA_EDITAR + '?accion=consultar&codigo=' + encodeURIComponent(codigo)
             )).json();
 
             if (!datos.ok) {
@@ -225,54 +225,125 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            pintarFormulario(datos.producto);
+            pintarEditor(datos);
 
         } catch (e) {
             contenido.innerHTML = '<p class="aviso aviso-error">Error de conexión.</p>';
         }
     }
 
-    function pintarFormulario(p) {
-        const valor = (n) => (n === null ? '' : Number(n).toFixed(2));
+    function pintarEditor(datos) {
+        const p     = datos.producto;
+        const casas = datos.casas || [];
+        const valor = (n) => (n === null || n === '' ? '' : Number(n).toFixed(2));
+
+        // Porcentaje y etiqueta de cada casa, para calcular el neto en vivo y
+        // avisar cuando se elige una casa distinta a la actual.
+        const pct  = {};
+        const etiq = {};
+        casas.forEach((c) => { pct[c.codigo_casa] = Number(c.porcentaje_neto); etiq[c.codigo_casa] = c.etiqueta; });
+
+        const opciones = casas.map((c) =>
+            '<option value="' + esc(c.codigo_casa) + '"' +
+                (c.codigo_casa === datos.casa_actual ? ' selected' : '') + '>' +
+                esc(c.etiqueta) + ' — ' + esc(c.nombre) +
+            '</option>'
+        ).join('');
 
         contenido.innerHTML =
-            '<h2 class="detalle-titulo">Editar precio</h2>' +
-            '<div class="detalle-cabecera">' +
-                '<p><strong>' + esc(p.nombre) + '</strong></p>' +
-                '<p class="detalle-sub"><span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
-                    (p.marca ? ' · ' + esc(p.marca) : '') + '</p>' +
-            '</div>' +
-            '<p class="aviso aviso-info">El precio nuevo aplica a partir de este momento. ' +
-                'Las ventas ya registradas conservan el precio con el que se cobraron.</p>' +
+            '<h2 class="detalle-titulo">Editar producto</h2>' +
+            '<p class="detalle-sub">Código interno: <span class="codigo-prod">' + esc(p.codigo_interno) + '</span></p>' +
             '<div class="form-group">' +
-                '<label for="inv-mayoreo">Precio bruto <span class="detalle-sub">' +
-                    '(actual: ' + money(p.precio_mayoreo) + ')</span></label>' +
-                '<input type="number" id="inv-mayoreo" class="form-control" min="0" step="0.01" ' +
-                       'value="' + valor(p.precio_mayoreo) + '">' +
+                '<label for="ed-nombre">Nombre / concepto</label>' +
+                '<input type="text" id="ed-nombre" class="form-control" maxlength="150" value="' + esc(p.nombre) + '">' +
             '</div>' +
-            '<p class="detalle-sub">El precio de venta (neto) se calcula solo, sumándole el porcentaje de la casa.</p>' +
+            '<div class="form-group">' +
+                '<label for="ed-codigo">Código del proveedor <span class="detalle-sub">(opcional)</span></label>' +
+                '<input type="text" id="ed-codigo" class="form-control" maxlength="50" value="' + esc(p.codigo_proveedor || '') + '">' +
+            '</div>' +
+            '<div class="alta-dos">' +
+                '<div class="form-group">' +
+                    '<label for="ed-marca">Marca <span class="detalle-sub">(opcional)</span></label>' +
+                    '<input type="text" id="ed-marca" class="form-control" maxlength="60" value="' + esc(p.marca || '') + '">' +
+                '</div>' +
+                '<div class="form-group">' +
+                    '<label for="ed-categoria">Categoría <span class="detalle-sub">(opcional)</span></label>' +
+                    '<input type="text" id="ed-categoria" class="form-control" maxlength="60" value="' + esc(p.categoria || '') + '">' +
+                '</div>' +
+            '</div>' +
+            '<div class="alta-dos">' +
+                '<div class="form-group">' +
+                    '<label for="ed-mayoreo">Precio bruto</label>' +
+                    '<input type="number" id="ed-mayoreo" class="form-control" min="0" step="0.01" value="' + valor(p.precio_mayoreo) + '">' +
+                '</div>' +
+                '<div class="form-group">' +
+                    '<label for="ed-casa">Casa</label>' +
+                    '<select id="ed-casa" class="form-control">' + opciones + '</select>' +
+                '</div>' +
+            '</div>' +
+            '<p id="ed-neto" class="detalle-sub"></p>' +
+            '<div id="ed-aviso-mover" class="aviso aviso-info" hidden></div>' +
+            '<p class="aviso aviso-info">El precio de venta (neto) se calcula solo, sumándole el porcentaje de la casa. ' +
+                'Las ventas ya registradas conservan el nombre, la casa y el precio con el que se cobraron.</p>' +
             '<div id="inv-aviso" class="aviso" hidden></div>' +
             '<div class="detalle-acciones">' +
-                '<button type="button" class="chip" id="btn-cancelar-inv">Cancelar</button>' +
-                '<button type="button" class="btn-save" id="btn-guardar-inv" ' +
-                    'data-codigo="' + p.codigo_interno + '">Guardar precio</button>' +
+                '<button type="button" class="chip" id="btn-cancelar-editar">Cancelar</button>' +
+                '<button type="button" class="btn-save" id="btn-guardar-editar" ' +
+                    'data-codigo="' + esc(p.codigo_interno) + '">Guardar</button>' +
             '</div>';
+
+        const selCasa = document.getElementById('ed-casa');
+        const inpPrec = document.getElementById('ed-mayoreo');
+        const lineaN  = document.getElementById('ed-neto');
+        const avisoM  = document.getElementById('ed-aviso-mover');
+
+        // Recalcula el neto en vivo y avisa cuando se va a mover de casa.
+        function refrescar() {
+            const casa  = selCasa.value;
+            const bruto = parseFloat(inpPrec.value);
+            const porc  = pct[casa] || 0;
+
+            lineaN.innerHTML = isNaN(bruto)
+                ? 'Precio de venta = bruto + ' + porc + '% de ' + esc(etiq[casa] || casa)
+                : 'Precio de venta en <strong>' + esc(etiq[casa] || casa) + '</strong>: ' +
+                  money(Math.round(bruto * (1 + porc / 100) * 100) / 100) + ' (bruto + ' + porc + '%)';
+
+            if (casa !== datos.casa_actual) {
+                avisoM.hidden = false;
+                avisoM.innerHTML = 'Se va a <strong>mover a ' + esc(etiq[casa] || casa) + '</strong>: se crea ahí ' +
+                    'con un código interno nuevo y se da de baja en ' + esc(etiq[datos.casa_actual] || datos.casa_actual) +
+                    '. Las ventas anteriores no se modifican.';
+            } else {
+                avisoM.hidden = true;
+            }
+        }
+
+        selCasa.addEventListener('change', refrescar);
+        inpPrec.addEventListener('input', refrescar);
+        refrescar();
+
+        document.getElementById('ed-nombre').focus();
     }
 
-    async function guardarPrecio(codigo) {
+    async function guardarProducto(codigo) {
         const avisoForm = document.getElementById('inv-aviso');
-        const boton = document.getElementById('btn-guardar-inv');
+        const boton = document.getElementById('btn-guardar-editar');
 
         boton.disabled = true;
         boton.textContent = 'Guardando...';
 
         try {
-            const datos = await (await fetch(RUTA_PRECIO, {
+            const datos = await (await fetch(RUTA_EDITAR, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    codigo:         codigo,
-                    precio_mayoreo: document.getElementById('inv-mayoreo').value,
+                    codigo:           codigo,
+                    casa_destino:     document.getElementById('ed-casa').value,
+                    nombre:           document.getElementById('ed-nombre').value,
+                    codigo_proveedor: document.getElementById('ed-codigo').value,
+                    marca:            document.getElementById('ed-marca').value,
+                    categoria:        document.getElementById('ed-categoria').value,
+                    precio_mayoreo:   document.getElementById('ed-mayoreo').value,
                 }),
             })).json();
 
@@ -284,20 +355,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             modal.hidden = true;
+            mostrarAviso(datos.mensaje || 'Producto actualizado.', 'ok');
 
-            if (datos.cambios === 0) {
-                mostrarAviso(datos.mensaje, 'ok');
-            } else {
-                const d = datos.mayoreo;
-                const antes = d.antes === null ? 'sin precio' : money(d.antes);
-                mostrarAviso(
-                    'Precio de ' + datos.nombre + ' actualizado. Bruto: ' +
-                    antes + ' → ' + money(d.despues) + '.',
-                    'ok'
-                );
-            }
-
-            cargarProductos();
+            // Recargar las casas refresca los conteos (importante si se movió) y
+            // vuelve a pintar la lista de la casa que se está viendo.
+            cargarCasas(casaActual);
 
         } catch (e) {
             avisoForm.textContent = 'Error de conexión.';
@@ -305,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
             avisoForm.hidden = false;
         } finally {
             boton.disabled = false;
-            boton.textContent = 'Guardar precio';
+            boton.textContent = 'Guardar';
         }
     }
 
@@ -1073,22 +1135,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const fila = e.target.closest('.producto-fila');
-        if (fila) abrirPrecio(fila.dataset.codigo);
+        if (fila) abrirEditor(fila.dataset.codigo);
     });
 
     listaProductos.addEventListener('keydown', (e) => {
         if (!window.ES_ADMIN) return;
         if (e.key !== 'Enter' && e.key !== ' ') return;
         // El botón de borrar se activa solo con Enter/Espacio; que no dispare
-        // además la apertura del precio.
+        // además la apertura del editor.
         if (e.target.closest('.btn-borrar-prod')) return;
         const fila = e.target.closest('.producto-fila');
-        if (fila) { e.preventDefault(); abrirPrecio(fila.dataset.codigo); }
+        if (fila) { e.preventDefault(); abrirEditor(fila.dataset.codigo); }
     });
 
     contenido.addEventListener('click', (e) => {
-        if (e.target.id === 'btn-cancelar-inv') modal.hidden = true;
-        if (e.target.id === 'btn-guardar-inv') guardarPrecio(e.target.dataset.codigo);
+        if (e.target.id === 'btn-cancelar-editar') modal.hidden = true;
+        const btnGuardar = e.target.closest('#btn-guardar-editar');
+        if (btnGuardar) guardarProducto(btnGuardar.dataset.codigo);
 
         if (e.target.id === 'btn-cancelar-borrado') modal.hidden = true;
         const btnBorrar = e.target.closest('#btn-confirmar-borrado');
