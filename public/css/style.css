@@ -3004,3 +3004,67 @@ select.form-control {
     border-top: 1px dashed #cccccc;
     margin: 1.1rem 0;
 }
+
+/* ===== FICHA DEL CLIENTE ===== */
+
+.clientes-buscador {
+    flex: 1;
+    min-width: 260px;
+}
+
+/* Una fila de cliente se abre: conviene que se note. */
+.usuario-fila[role="button"] {
+    cursor: pointer;
+}
+
+.usuario-fila[role="button"]:hover {
+    background: #f2f7f2;
+}
+
+.usuario-fila[role="button"]:focus-visible {
+    outline: 2px solid var(--ga-carbon);
+    outline-offset: 2px;
+}
+
+/* Etiqueta y dato, alineados en dos columnas. */
+.ficha {
+    margin: 1rem 0 1.25rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.ficha-renglon {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    padding: 0.55rem 0.1rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.ficha-etiqueta {
+    flex: 0 0 8.5rem;
+    font-weight: 600;
+    color: #555555;
+    font-size: 0.9rem;
+}
+
+.ficha-valor {
+    flex: 1;
+    min-width: 12rem;
+    word-break: break-word;
+}
+
+/* Lo que el cliente no tiene capturado, en gris y en cursiva: se distingue de
+   un dato real sin gritar. */
+.ficha-falta {
+    color: #999999;
+    font-style: italic;
+}
+
+.ficha-saldo-favor {
+    color: #08660b;
+    font-weight: 700;
+}
+
+@media (max-width: 520px) {
+    .ficha-etiqueta { flex-basis: 100%; }
+}

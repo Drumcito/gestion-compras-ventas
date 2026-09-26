@@ -26,9 +26,12 @@ try {
 
     $stmt = $pdo->prepare(
         'SELECT v.id, v.cliente, v.fecha, v.total, v.credito_aplicado, v.tipo_pago,
-                CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor
+                CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
+                c.direccion AS cliente_direccion, c.codigo_postal AS cliente_cp,
+                c.telefono  AS cliente_telefono
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
+           LEFT JOIN clientes c ON c.id = v.cliente_id
           WHERE v.id = :id'
     );
     $stmt->execute(['id' => $ventaId]);

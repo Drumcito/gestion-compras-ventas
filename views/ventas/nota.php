@@ -63,9 +63,12 @@ try {
 
     $stmt = $pdo->prepare(
         'SELECT v.id, v.cliente, v.fecha, v.total, v.credito_aplicado, v.tipo_pago,
-                CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor
+                CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
+                c.direccion AS cliente_direccion, c.codigo_postal AS cliente_cp,
+                c.telefono  AS cliente_telefono
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
+           LEFT JOIN clientes c ON c.id = v.cliente_id
           WHERE v.id IN (' . $marcadores . ')
           ORDER BY v.id'
     );
@@ -97,7 +100,8 @@ try {
     exit('No se pudo generar la nota.');
 }
 
-// Los datos capturados al imprimir solo aplican cuando es una sola venta.
+// Lo que se captura al imprimir solo aplica cuando es una sola venta: con
+// varias no se sabria a cual pertenece.
 $unaSola   = count($ventas) === 1;
 $direccion = $unaSola ? trim($_GET['direccion'] ?? '') : '';
 $cp        = $unaSola ? trim($_GET['cp'] ?? '') : '';
@@ -105,6 +109,21 @@ $cp        = $unaSola ? trim($_GET['cp'] ?? '') : '';
 // El telefono se limita a 10 digitos: se descarta cualquier otro caracter.
 $telefono  = $unaSola ? substr(preg_replace('/\D/', '', $_GET['telefono'] ?? ''), 0, 10) : '';
 $clienteManual = $unaSola ? trim($_GET['cliente'] ?? '') : '';
+
+/**
+ * Dato del cliente para la nota: manda lo que se escribio al imprimir y, si no
+ * vino nada, lo que el cliente tenga guardado. Asi la nota sale completa aunque
+ * se imprima de corrido, sin pasar por la captura, y aunque sean varias notas
+ * (cada una toma lo suyo).
+ */
+function datoCliente(?string $capturado, array $venta, string $columna): string
+{
+    if ($capturado !== null && trim($capturado) !== '') {
+        return trim($capturado);
+    }
+
+    return trim((string) ($venta[$columna] ?? ''));
+}
 
 function e(?string $texto): string
 {
@@ -429,6 +448,12 @@ function dinero($monto): string
     // que ya tenga guardado cada una.
     $cliente = ($unaSola && $clienteManual !== '') ? $clienteManual : ($venta['cliente'] ?? '');
 
+    // Direccion, C.P. y telefono del cliente registrado, salvo que se hayan
+    // escrito otros al imprimir.
+    $notaDireccion = datoCliente($direccion, $venta, 'cliente_direccion');
+    $notaCp        = datoCliente($cp,        $venta, 'cliente_cp');
+    $notaTelefono  = datoCliente($telefono,  $venta, 'cliente_telefono');
+
     // Lo que no cabe se resume en un renglon, para no desbordar la media hoja.
     $visibles = array_slice($items, 0, MAX_PIEZAS_NOTA);
     $ocultas  = count($items) - count($visibles);
@@ -455,16 +480,16 @@ function dinero($monto): string
             </div>
             <div class="campo">
                 <span class="etiqueta">DIRECCION:</span>
-                <span class="dato"><?= e($direccion) ?></span>
+                <span class="dato"><?= e($notaDireccion) ?></span>
             </div>
             <div class="fila-corta">
                 <div class="campo">
                     <span class="etiqueta">C.P.</span>
-                    <span class="dato"><?= e($cp) ?></span>
+                    <span class="dato"><?= e($notaCp) ?></span>
                 </div>
                 <div class="campo">
                     <span class="etiqueta">Tel.</span>
-                    <span class="dato"><?= e($telefono) ?></span>
+                    <span class="dato"><?= e($notaTelefono) ?></span>
                 </div>
             </div>
         </div>

@@ -62,10 +62,31 @@ function construirNotaPdf(array $venta, array $items): string
     $pdf->Ln(4);
 
     // ---------- Cliente ----------
+    // Direccion, C.P. y telefono salen del cliente registrado (tabla clientes).
+    // Los renglones que no tenga dato no se dibujan: la nota no deja huecos.
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->Cell(22, 6, nota_txt('Cliente:'), 0, 0);
     $pdf->SetFont('Arial', '', 10);
     $pdf->Cell(0, 6, nota_txt($venta['cliente'] !== null && $venta['cliente'] !== '' ? $venta['cliente'] : 'Publico en general'), 0, 1);
+
+    $renglones = [
+        'Direccion:' => $venta['cliente_direccion'] ?? '',
+        'C.P.:'      => $venta['cliente_cp'] ?? '',
+        'Tel.:'      => $venta['cliente_telefono'] ?? '',
+    ];
+
+    foreach ($renglones as $etiqueta => $valor) {
+        if (trim((string) $valor) === '') {
+            continue;
+        }
+
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->Cell(22, 5.5, nota_txt($etiqueta), 0, 0);
+        $pdf->SetFont('Arial', '', 10);
+        // MultiCell por si la direccion no cabe en un renglon.
+        $pdf->MultiCell(0, 5.5, nota_txt($valor), 0, 'L');
+    }
+
     $pdf->Ln(2);
 
     // ---------- Tabla de productos ----------

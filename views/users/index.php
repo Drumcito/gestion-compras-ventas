@@ -52,9 +52,20 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
         <!-- Panel: clientes (comercios que se visitan) -->
         <section class="card-form card-historial" id="panel-clientes" hidden>
             <div class="filtros">
-                <button type="button" class="btn-save" id="btn-nuevo-cliente">
-                    <i class="ph ph-plus"></i> Dar de alta cliente
-                </button>
+                <div class="filtros-rango">
+                    <div class="search-container clientes-buscador">
+                        <input type="text" id="buscar-cliente" class="form-control"
+                               placeholder="Buscar por comercio, nombre, teléfono, RFC o dirección…"
+                               autocomplete="off">
+                        <i class="ph ph-magnifying-glass search-icon" aria-hidden="true"></i>
+                    </div>
+
+                    <button type="button" class="btn-save" id="btn-nuevo-cliente">
+                        <i class="ph ph-plus"></i> Dar de alta cliente
+                    </button>
+                </div>
+
+                <p class="resumen-periodo" id="conteo-clientes"></p>
             </div>
 
             <div id="aviso-clientes" class="aviso" hidden></div>

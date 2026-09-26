@@ -7,6 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const contenido = document.getElementById('contenido-cliente');
     const btnNuevo  = document.getElementById('btn-nuevo-cliente');
     const btnCerrar = document.getElementById('btn-cerrar-cliente');
+    const buscador  = document.getElementById('buscar-cliente');
+    const conteo    = document.getElementById('conteo-clientes');
+
+    // El catálogo completo, tal como llegó. El buscador filtra sobre esto en
+    // memoria: son unos cientos de clientes, así que no vale la pena ir al
+    // servidor en cada tecla.
+    let todos = [];
 
     const RUTA = '../../app/controllers/ClienteController.php';
 
@@ -55,7 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            pintar(datos.clientes);
+            todos = datos.clientes;
+            filtrar();
 
         } catch (e) {
             mostrarAviso('Error de conexión.', 'error', 0);
@@ -63,11 +71,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /** Nombre de pila y apellidos, en un solo texto. */
+    function nombrePersona(c) {
+        return [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ');
+    }
+
+    /** Como se identifica al cliente: el comercio manda sobre la persona. */
+    function titulo(c) {
+        return c.nombre_comercio || nombrePersona(c);
+    }
+
+    function filtrar() {
+        const termino = buscador.value.trim().toLowerCase();
+
+        // Se busca en todo lo que sirve para dar con un cliente en el mostrador:
+        // comercio, nombre, teléfono, RFC, dirección y día de visita.
+        const encontrados = termino === ''
+            ? todos
+            : todos.filter((c) => [
+                c.nombre_comercio, nombrePersona(c), c.telefono,
+                c.rfc, c.direccion, c.codigo_postal, c.dia_visita, c.email,
+              ].filter(Boolean).join(' ').toLowerCase().includes(termino));
+
+        pintar(encontrados);
+
+        conteo.textContent = termino === ''
+            ? todos.length + ' cliente' + (todos.length === 1 ? '' : 's')
+            : encontrados.length + ' de ' + todos.length + ' cliente' +
+              (todos.length === 1 ? '' : 's');
+    }
+
     function pintar(clientes) {
         lista.innerHTML = '';
 
         if (!clientes.length) {
-            lista.innerHTML = '<p class="venta-vacia">Aún no hay clientes dados de alta.</p>';
+            lista.innerHTML = '<p class="venta-vacia">' +
+                (todos.length === 0
+                    ? 'Aún no hay clientes dados de alta.'
+                    : 'Ningún cliente coincide con lo que buscaste.') + '</p>';
             return;
         }
 
@@ -75,9 +116,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const fila = document.createElement('div');
             fila.className = 'venta-fila usuario-fila' + (Number(c.activo) ? '' : ' usuario-inactivo');
 
-            const nombre = [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ');
-            const titulo = c.nombre_comercio ? esc(c.nombre_comercio) : esc(nombre);
-            const sub    = c.nombre_comercio ? esc(nombre) : '';
+            // Toda la fila abre la ficha; los botones de acción se atienden antes.
+            fila.setAttribute('role', 'button');
+            fila.tabIndex = 0;
+
+            const nombre = nombrePersona(c);
+            const tituloFila = c.nombre_comercio ? esc(c.nombre_comercio) : esc(nombre);
+            const sub        = c.nombre_comercio ? esc(nombre) : '';
 
             const meta = [
                 c.telefono ? esc(c.telefono) : '',
@@ -92,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             fila.innerHTML =
                 '<div class="venta-fila-datos">' +
-                    '<p class="venta-fila-cliente">' + titulo +
+                    '<p class="venta-fila-cliente">' + tituloFila +
                         (sub ? ' <span class="detalle-sub">' + sub + '</span>' : '') + '</p>' +
                     (meta ? '<p class="venta-fila-meta">' + meta + '</p>' : '') +
                     (c.direccion || mapa
@@ -116,6 +161,92 @@ document.addEventListener('DOMContentLoaded', () => {
             fila.dataset.cliente = JSON.stringify(c);
             lista.appendChild(fila);
         });
+    }
+
+    // ---------- Ficha del cliente ----------
+    // Todo lo que se sabe del cliente en una sola vista, ordenado. Se abre al
+    // dar clic en su renglón; desde aquí se pasa a editarlo.
+    const money = (n) => '$' + Number(n).toLocaleString('es-MX',
+        { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    function renglon(etiqueta, valor, extra) {
+        const vacio = valor === null || valor === undefined || String(valor).trim() === '';
+
+        return '<div class="ficha-renglon">' +
+            '<span class="ficha-etiqueta">' + esc(etiqueta) + '</span>' +
+            '<span class="ficha-valor' + (vacio ? ' ficha-falta' : '') + '">' +
+                (vacio ? 'Sin registrar' : esc(valor)) +
+                (!vacio && extra ? ' ' + extra : '') +
+            '</span>' +
+        '</div>';
+    }
+
+    async function abrirFicha(c) {
+        const mapa = enlaceMapa(c);
+        const persona = nombrePersona(c);
+
+        // Lo que le falta para que su nota salga completa.
+        const faltan = [
+            ['dirección', c.direccion],
+            ['C.P.', c.codigo_postal],
+            ['teléfono', c.telefono],
+        ].filter(([, v]) => !v || String(v).trim() === '').map(([n]) => n);
+
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">' + esc(titulo(c)) + '</h2>' +
+            (c.nombre_comercio && persona
+                ? '<p class="detalle-sub">' + esc(persona) + '</p>'
+                : '') +
+            (Number(c.activo) ? '' : '<p class="aviso aviso-alerta">Este cliente está inactivo.</p>') +
+            (faltan.length > 0
+                ? '<p class="aviso aviso-alerta">Le falta' + (faltan.length === 1 ? '' : 'n') + ' ' +
+                  // "C.P." ya trae punto: no se le pone otro.
+                  esc(faltan.join(', ')) + (faltan[faltan.length - 1].endsWith('.') ? '' : '.') +
+                  ' Sin eso, su nota impresa sale con ' +
+                  (faltan.length === 1 ? 'ese renglón' : 'esos renglones') + ' en blanco.</p>'
+                : '') +
+
+            '<div class="ficha">' +
+                renglon('Teléfono', c.telefono) +
+                renglon('Correo', c.email) +
+                renglon('Dirección', c.direccion,
+                    mapa ? '<a href="' + esc(mapa) + '" target="_blank" rel="noopener" class="enlace-mapa">' +
+                           '<i class="ph ph-map-pin"></i> Ver en mapa</a>' : '') +
+                renglon('C.P.', c.codigo_postal) +
+                renglon('RFC', c.rfc) +
+                renglon('Día de visita', c.dia_visita) +
+                '<div class="ficha-renglon">' +
+                    '<span class="ficha-etiqueta">Saldo a favor</span>' +
+                    '<span class="ficha-valor" id="ficha-saldo">Consultando…</span>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-cerrar-ficha">Cerrar</button>' +
+                '<button type="button" class="btn-save" id="btn-editar-ficha" ' +
+                    'data-id="' + c.id + '">Editar datos</button>' +
+            '</div>';
+
+        modal.hidden = false;
+
+        // El saldo no es una columna: se calcula sumando sus ventas, por eso va
+        // aparte y la ficha no se queda esperándolo para mostrarse.
+        try {
+            const datos = await (await fetch(
+                RUTA + '?accion=saldo&cliente_id=' + encodeURIComponent(c.id)
+            )).json();
+
+            const saldo = datos.ok ? Number(datos.saldo) : 0;
+            const caja  = document.getElementById('ficha-saldo');
+
+            if (caja) {
+                caja.textContent = saldo > 0 ? money(saldo) : 'Sin saldo';
+                caja.className = 'ficha-valor' + (saldo > 0 ? ' ficha-saldo-favor' : ' ficha-falta');
+            }
+        } catch (e) {
+            const caja = document.getElementById('ficha-saldo');
+            if (caja) caja.textContent = 'No se pudo consultar';
+        }
     }
 
     // ---------- Formulario ----------
@@ -274,12 +405,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const borrar = e.target.closest('.btn-eliminar-cliente');
-        if (borrar) eliminar(borrar.dataset.id, borrar.dataset.nombre);
+        if (borrar) {
+            eliminar(borrar.dataset.id, borrar.dataset.nombre);
+            return;
+        }
+
+        // Cualquier otra parte del renglón abre la ficha.
+        const fila = e.target.closest('.usuario-fila');
+        if (fila) abrirFicha(JSON.parse(fila.dataset.cliente));
+    });
+
+    lista.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        if (e.target.closest('button')) return;
+
+        const fila = e.target.closest('.usuario-fila');
+        if (fila) {
+            e.preventDefault();
+            abrirFicha(JSON.parse(fila.dataset.cliente));
+        }
+    });
+
+    let temporizadorBusqueda = null;
+
+    buscador.addEventListener('input', () => {
+        clearTimeout(temporizadorBusqueda);
+        temporizadorBusqueda = setTimeout(filtrar, 150);
     });
 
     contenido.addEventListener('click', (e) => {
         if (e.target.id === 'btn-cancelar-cliente') modal.hidden = true;
         if (e.target.id === 'btn-guardar-cliente') guardar(e.target.dataset.id);
+        if (e.target.id === 'btn-cerrar-ficha') modal.hidden = true;
+
+        if (e.target.id === 'btn-editar-ficha') {
+            const cliente = todos.find((c) => String(c.id) === e.target.dataset.id);
+            if (cliente) abrirFormulario(cliente);
+        }
     });
 
     cargar();

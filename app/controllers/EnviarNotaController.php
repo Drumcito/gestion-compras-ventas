@@ -20,7 +20,8 @@ function cargarVenta(PDO $pdo, int $ventaId): ?array
         'SELECT v.id, v.cliente, v.cliente_id, v.fecha, v.total, v.credito_aplicado, v.tipo_pago,
                 CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
                 c.telefono AS cliente_telefono, c.email AS cliente_email,
-                c.nombre_comercio AS cliente_comercio
+                c.nombre_comercio AS cliente_comercio,
+                c.direccion AS cliente_direccion, c.codigo_postal AS cliente_cp
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
            LEFT JOIN clientes c ON c.id = v.cliente_id
