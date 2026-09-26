@@ -241,6 +241,19 @@ try {
     echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 
 } catch (PDOException $e) {
+    // La revision de numero repetido ya se hizo arriba, pero entre esa consulta
+    // y el INSERT cabe otra alta con el mismo numero. Ahi manda el indice UNICO
+    // de la tabla: se traduce su error (1062) al mismo mensaje, en lugar de
+    // soltar un "error al procesar" que no dice nada.
+    if ((int) $e->errorInfo[1] === 1062) {
+        http_response_code(400);
+        echo json_encode([
+            'ok'    => false,
+            'error' => 'Ese número de empleado ya está registrado',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     error_log($e->getMessage());
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Error al procesar la solicitud']);

@@ -30,11 +30,16 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
     <main class="main-content">
         <h1 class="page-title">Usuarios</h1>
 
-        <div class="segmentado" role="tablist" aria-label="Secciones de usuarios" id="tabs-usuarios">
+        <div class="segmentado segmentado-seccion" role="tablist"
+             aria-label="Secciones de usuarios" id="tabs-usuarios">
             <button type="button" class="segmento segmento-activo" role="tab"
-                    aria-selected="true" data-panel="panel-usuarios">Usuarios</button>
+                    aria-selected="true" data-panel="panel-usuarios">
+                <i class="ph ph-user-circle" aria-hidden="true"></i> Usuarios
+            </button>
             <button type="button" class="segmento" role="tab"
-                    aria-selected="false" data-panel="panel-clientes">Clientes</button>
+                    aria-selected="false" data-panel="panel-clientes">
+                <i class="ph ph-storefront" aria-hidden="true"></i> Clientes
+            </button>
         </div>
 
         <!-- Panel: usuarios del sistema (vendedores / admin) -->

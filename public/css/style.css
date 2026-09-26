@@ -2872,11 +2872,71 @@ select.form-control {
     background: #ffffff;
 }
 
-/* ── Alta de clientes (pestaña dentro de Usuarios) ─────────────────────────
-   Las pestañas Usuarios / Clientes usan el mismo control segmentado del
-   Dashboard; aquí solo se les da aire respecto al panel de abajo. */
-#tabs-usuarios {
-    margin-bottom: 1rem;
+/* ── Pestañas Usuarios / Clientes ──────────────────────────────────────────
+   Parten del control segmentado del Dashboard, pero aquí no son un ajuste
+   menor: son el interruptor entre dos secciones distintas de la pantalla, así
+   que van más grandes, centradas bajo el título y con su icono. */
+.segmentado-seccion {
+    display: flex;
+    margin: 0 auto 1.25rem;
+    width: fit-content;
+    max-width: 100%;
+    border: 1px solid #b9b9b9;
+    border-radius: 26px;
+    background: #ffffff;
+    padding: 0.25rem;
+    gap: 0.25rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.segmentado-seccion .segmento {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1.6rem;
+    border-radius: 22px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #555555;
+    transition: background 0.15s, color 0.15s;
+}
+
+/* El separador del control chico aquí estorba: las pastillas ya se distinguen. */
+.segmentado-seccion .segmento + .segmento {
+    border-left: none;
+}
+
+.segmentado-seccion .segmento i {
+    font-size: 1.15rem;
+}
+
+.segmentado-seccion .segmento:hover {
+    background: #eef3ee;
+    color: var(--ga-carbon);
+}
+
+.segmentado-seccion .segmento-activo,
+.segmentado-seccion .segmento-activo:hover {
+    background: var(--ga-carbon);
+    color: #ffffff;
+}
+
+.segmentado-seccion .segmento:focus-visible {
+    outline: 2px solid var(--ga-carbon);
+    outline-offset: 2px;
+}
+
+/* En celular las dos pastillas se reparten el ancho. */
+@media (max-width: 480px) {
+    .segmentado-seccion {
+        width: 100%;
+    }
+
+    .segmentado-seccion .segmento {
+        flex: 1;
+        padding: 0.55rem 0.5rem;
+    }
 }
 
 /* Enlace "Ver en mapa" que acompaña a la dirección del cliente. */
