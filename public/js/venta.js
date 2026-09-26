@@ -17,6 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputCliente      = document.getElementById('cliente');
     const resultadosCliente = document.getElementById('resultados-cliente');
     const btnListaClientes  = document.getElementById('btn-lista-clientes');
+    const bloqueGuardarCli  = document.getElementById('bloque-guardar-cliente');
+    const chkGuardarCliente = document.getElementById('guardar-cliente');
     const bloqueSaldo       = document.getElementById('bloque-saldo');
 
     // Cliente elegido del catálogo (con su saldo a favor). Un nombre tecleado a
@@ -245,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ofrecerlo como descuento.
     async function seleccionarClienteCatalogo(id, nombre) {
         clienteSel = { id: Number(id), nombre: nombre, saldo: 0 };
+        actualizarGuardarCliente();
 
         try {
             const d = await (await fetch(
@@ -263,6 +266,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!clienteSel.id || clienteSel.saldo <= 0 || !aplicarSaldo) return 0;
         const total = items.reduce((s, i) => s + i.precio * i.cantidad, 0);
         return Math.min(clienteSel.saldo, total);
+    }
+
+    /**
+     * La casilla de "guardar este cliente" solo tiene sentido cuando hay un
+     * nombre escrito que no corresponde a nadie del catalogo. Al elegir uno de
+     * la lista desaparece: ese ya esta registrado.
+     */
+    function actualizarGuardarCliente() {
+        const hayNombre = inputCliente.value.trim() !== '';
+        const mostrar   = hayNombre && clienteSel.id === null;
+
+        bloqueGuardarCli.hidden = !mostrar;
+
+        if (!mostrar) {
+            chkGuardarCliente.checked = false;
+        }
     }
 
     function actualizarSaldo() {
@@ -304,6 +323,8 @@ document.addEventListener('DOMContentLoaded', () => {
             aplicarSaldo = true;
             actualizarSaldo();
         }
+
+        actualizarGuardarCliente();
 
         clearTimeout(temporizadorCliente);
         const termino = inputCliente.value.trim();
@@ -592,6 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cuerpo = {
             cliente:          document.getElementById('cliente').value.trim(),
             cliente_id:       clienteSel.id,
+            guardar_cliente:  chkGuardarCliente.checked,
             credito_aplicado: creditoAAplicar(),
             tipo_pago:        tipoPago.value,
             items: items.map((i) => ({
@@ -624,6 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clienteSel = { id: null, nombre: '', saldo: 0 };
                 aplicarSaldo = true;
                 form.reset();
+                actualizarGuardarCliente();
                 camposCredito.hidden = true;
                 pintarItems();
             } else {

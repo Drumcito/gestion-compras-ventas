@@ -57,6 +57,13 @@ $casas = ordenarCasas($casas);
                         </button>
                     </div>
                     <div id="resultados-cliente" class="search-results" hidden></div>
+
+                    <!-- Solo se ofrece cuando el nombre se tecleo a mano: elegir
+                         uno de la lista ya implica que esta en el catalogo. -->
+                    <label class="guardar-cliente" id="bloque-guardar-cliente" hidden>
+                        <input type="checkbox" id="guardar-cliente">
+                        <span>Guardar este cliente en el catálogo</span>
+                    </label>
                 </div>
 
                 <!-- Proveedor (Casa) -->

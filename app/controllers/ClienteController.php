@@ -176,6 +176,171 @@ try {
         exit;
     }
 
+    // ---------- Que le falta a los clientes de varias ventas ----------
+    // Para cuando se imprimen varias notas de golpe: dice de que clientes son
+    // los datos incompletos, sin tener que abrir venta por venta. Abierta a
+    // cualquier usuario con sesion, igual que la consulta de una sola.
+    if ($accion === 'faltantes') {
+        $ids = [];
+
+        foreach (explode(',', (string) ($_GET['ids'] ?? '')) as $valor) {
+            $numero = (int) trim($valor);
+            if ($numero > 0) {
+                $ids[] = $numero;
+            }
+        }
+
+        // Mismo tope que la hoja de notas.
+        $ids = array_slice(array_values(array_unique($ids)), 0, 100);
+
+        if ($ids === []) {
+            echo json_encode(['ok' => true, 'clientes' => [], 'sin_cliente' => 0]);
+            exit;
+        }
+
+        $marcadores = implode(',', array_fill(0, count($ids), '?'));
+
+        // Un cliente puede tener varias ventas en la tanda: se reporta una sola
+        // vez, diciendo cuantas notas suyas van.
+        $stmt = $pdo->prepare(
+            "SELECT c.id,
+                    COALESCE(NULLIF(c.nombre_comercio, ''),
+                             TRIM(CONCAT_WS(' ', c.nombres, c.apellido_paterno, c.apellido_materno))) AS nombre,
+                    c.direccion, c.codigo_postal, c.telefono,
+                    COUNT(v.id) AS notas
+               FROM ventas v
+               JOIN clientes c ON c.id = v.cliente_id
+              WHERE v.id IN ({$marcadores})
+              GROUP BY c.id, c.nombre_comercio, c.nombres, c.apellido_paterno,
+                       c.apellido_materno, c.direccion, c.codigo_postal, c.telefono
+              ORDER BY nombre"
+        );
+        $stmt->execute($ids);
+
+        $incompletos = [];
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $cliente) {
+            $faltantes = [];
+
+            foreach (['direccion' => 'dirección', 'codigo_postal' => 'C.P.', 'telefono' => 'teléfono'] as $campo => $etiqueta) {
+                if (trim((string) $cliente[$campo]) === '') {
+                    $faltantes[] = ['campo' => $campo, 'nombre' => $etiqueta];
+                }
+            }
+
+            if ($faltantes === []) {
+                continue;
+            }
+
+            $incompletos[] = [
+                'id'        => (int) $cliente['id'],
+                'nombre'    => $cliente['nombre'],
+                'notas'     => (int) $cliente['notas'],
+                'faltantes' => $faltantes,
+            ];
+        }
+
+        // Las ventas con el nombre tecleado a mano: se devuelven una por una para
+        // poder ofrecer darlas de alta ahi mismo.
+        $stmt = $pdo->prepare(
+            "SELECT id, cliente FROM ventas
+              WHERE id IN ({$marcadores}) AND cliente_id IS NULL
+              ORDER BY id"
+        );
+        $stmt->execute($ids);
+
+        $sinCliente = [];
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $venta) {
+            $sinCliente[] = [
+                'venta_id' => (int) $venta['id'],
+                'nombre'   => trim((string) $venta['cliente']),
+            ];
+        }
+
+        echo json_encode([
+            'ok'          => true,
+            'clientes'    => $incompletos,
+            'sin_cliente' => $sinCliente,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ---------- Dar de alta al cliente de una venta tecleada a mano ----------
+    // Abierta a cualquier usuario con sesion, pero muy acotada: solo actua sobre
+    // ventas que NO tienen cliente, y lo unico que hace es crear (o reusar) un
+    // cliente y ligarselo. No puede tocar ningun cliente que ya exista.
+    if ($accion === 'registrar_desde_venta') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['ok' => false, 'error' => 'Metodo no permitido']);
+            exit;
+        }
+
+        $datos   = json_decode(file_get_contents('php://input'), true) ?: [];
+        $ventaId = (int) ($datos['venta_id'] ?? 0);
+
+        $stmt = $pdo->prepare('SELECT id, cliente, cliente_id FROM ventas WHERE id = :id');
+        $stmt->execute(['id' => $ventaId]);
+        $venta = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$venta) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Venta no encontrada']);
+            exit;
+        }
+
+        if ($venta['cliente_id'] !== null) {
+            throw new RuntimeException('Esa venta ya está ligada a un cliente');
+        }
+
+        // El nombre puede venir corregido desde la nota; si no, el de la venta.
+        $nombre = limpiar($datos['nombre'] ?? '', 150);
+
+        if ($nombre === '') {
+            $nombre = trim((string) $venta['cliente']);
+        }
+
+        $cp = limpiar($datos['codigo_postal'] ?? '', 10);
+        if ($cp !== '' && !preg_match('/^\d{4,5}$/', $cp)) {
+            throw new RuntimeException('El código postal debe ser de 4 o 5 dígitos');
+        }
+
+        $telefono = limpiar($datos['telefono'] ?? '', 20);
+        if ($telefono !== '' && !preg_match('/^\d{10}$/', $telefono)) {
+            throw new RuntimeException('El teléfono debe ser de 10 dígitos');
+        }
+
+        $pdo->beginTransaction();
+
+        try {
+            $clienteId = altaRapidaCliente($pdo, $nombre, [
+                'direccion'     => limpiar($datos['direccion'] ?? '', 255),
+                'codigo_postal' => $cp,
+                'telefono'      => $telefono,
+            ]);
+
+            // La condicion del WHERE evita pisar una liga puesta entretanto.
+            $pdo->prepare(
+                'UPDATE ventas SET cliente_id = :cliente, cliente = :nombre
+                  WHERE id = :id AND cliente_id IS NULL'
+            )->execute(['cliente' => $clienteId, 'nombre' => $nombre, 'id' => $ventaId]);
+
+            $pdo->commit();
+
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        echo json_encode([
+            'ok'         => true,
+            'cliente_id' => $clienteId,
+            'nombre'     => $nombre,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // ---------- Completar datos que faltan (desde la nota) ----------
     // Tambien abierta a cualquier usuario con sesion, pero MUY acotada: solo
     // toca direccion, C.P. y telefono, y solo cuando estan vacios. Asi el

@@ -26,6 +26,10 @@ $datos = json_decode(file_get_contents('php://input'), true);
 
 $cliente          = trim($datos['cliente'] ?? '');
 $clienteId        = (int) ($datos['cliente_id'] ?? 0);
+
+// Casilla "guardar este cliente en el catalogo": solo aplica cuando el nombre se
+// tecleo a mano, sin elegir a nadie de la lista.
+$guardarCliente   = !empty($datos['guardar_cliente']);
 $tipoPago         = $datos['tipo_pago'] ?? 'contado';
 $fechaVencimiento = $datos['fecha_vencimiento'] ?? null;
 $pagoInicial      = (float) ($datos['pago_inicial'] ?? 0);
@@ -109,6 +113,16 @@ try {
         if (!$stmt->fetch()) {
             $clienteId = 0;
         }
+    }
+
+    // Nombre tecleado + casilla marcada: se da de alta y la venta queda ligada,
+    // asi desde la primera compra acumula saldo y sale completa en la nota.
+    $clienteNuevo = false;
+
+    if ($clienteId === 0 && $guardarCliente && $cliente !== '') {
+        // Si el nombre ya estaba registrado, se liga con ese en vez de duplicar:
+        // por eso el aviso lo decide el helper y no esta linea.
+        $clienteId = altaRapidaCliente($pdo, $cliente, [], $clienteNuevo);
     }
 
     // Saldo a favor que se puede aplicar como descuento: nunca mas que lo que el
@@ -204,6 +218,8 @@ try {
         'venta_id'         => $ventaId,
         'total'            => number_format($total, 2, '.', ''),
         'credito_aplicado' => number_format($creditoAplicado, 2, '.', ''),
+        'cliente_id'       => $clienteId > 0 ? $clienteId : null,
+        'cliente_nuevo'    => $clienteNuevo,
         'por_pagar'        => number_format($porPagar, 2, '.', ''),
     ]);
 

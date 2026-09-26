@@ -1382,9 +1382,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const ids = seleccionadas();
         if (ids.length === 0) return;
 
-        // Con varias ventas no se piden dirección ni teléfono: cada nota sale
-        // con el cliente que ya tenga guardado y los demás renglones en blanco.
-        window.open('../ventas/nota.php?ids=' + ids.join(','), '_blank');
+        // Cada nota sale con lo que su cliente tenga guardado. Antes de imprimir
+        // se revisa a quiénes les falta algún dato: si nadie debe nada, imprime
+        // de frente sin estorbar.
+        NotaDatos.abrirVarias({
+            ids:        ids,
+            contenedor: contenido,
+            rutaApp:    '../../app/controllers/',
+            rutaNota:   '../ventas/nota.php',
+            mostrar:    () => { modal.hidden = false; },
+            alCerrar:   () => { modal.hidden = true; },
+        });
     });
 
     btnProductos.addEventListener('click', verProductos);

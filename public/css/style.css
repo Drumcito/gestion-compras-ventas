@@ -3155,3 +3155,61 @@ select.form-control {
 @media (max-width: 520px) {
     .ficha-etiqueta { flex-basis: 100%; }
 }
+
+/* ===== DATOS FALTANTES AL IMPRIMIR VARIAS NOTAS ===== */
+
+/* Un bloque por cliente incompleto: su nombre, qué le falta y los campos
+   justos para completarlo sin salir de la impresión. */
+.falta-cliente {
+    border: 1px solid #e0e0e0;
+    border-left: 4px solid #d9a441;
+    border-radius: 10px;
+    padding: 0.9rem 1rem 0.35rem;
+    margin-bottom: 0.9rem;
+    background: #fcfcfb;
+}
+
+.falta-nombre {
+    margin: 0 0 0.7rem;
+    font-weight: 700;
+    color: var(--ga-carbon);
+}
+
+.falta-nombre .detalle-sub {
+    font-weight: 400;
+}
+
+/* Casilla para dar de alta en el catálogo al cliente que se tecleó a mano. */
+.guardar-cliente {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.5rem;
+    cursor: pointer;
+    font-size: 0.92rem;
+    color: #444444;
+}
+
+/* Se anula el estilo de ".form-group input", pensado para campos de texto. */
+.guardar-cliente input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    accent-color: #08660b;
+    cursor: pointer;
+}
+
+.guardar-cliente[hidden] {
+    display: none !important;
+}
+
+/* Cliente que hay que dar de alta: se distingue del que solo tiene huecos. */
+.falta-cliente-nuevo {
+    border-left-color: #1976d2;
+}
+
+.falta-cliente-nuevo .guardar-cliente {
+    margin: 0 0 0.75rem;
+    font-weight: 600;
+    color: var(--ga-carbon);
+}
