@@ -296,7 +296,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const acciones =
             '<div class="detalle-acciones">' +
                 '<button type="button" class="chip" id="btn-productos-pdf">' +
-                    '<i class="ph ph-file-pdf" aria-hidden="true"></i> Guardar en PDF' +
+                    '<i class="ph ph-file-pdf" aria-hidden="true"></i> PDF de todo' +
+                '</button>' +
+                '<button type="button" class="chip" id="btn-productos-pdf-casa">' +
+                    '<i class="ph ph-files" aria-hidden="true"></i> PDF, una hoja por casa' +
                 '</button>' +
             '</div>';
 
@@ -304,7 +307,13 @@ document.addEventListener('DOMContentLoaded', () => {
             '<p class="detalle-sub">Casas y productos ordenados de más vendido a menos.</p>';
     }
 
-    function abrirResumenPdf() {
+    /**
+     * Abre la hoja imprimible del resumen con los filtros de la pantalla.
+     *
+     * @param porCasa true = cada casa arranca en hoja nueva, para repartir el
+     *                reporte por proveedor; false = todo corrido.
+     */
+    function abrirResumenPdf(porCasa) {
         const desde = inputDesde.value;
         const hasta = inputHasta.value || desde;
 
@@ -315,7 +324,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         window.open(
             'productos.php?desde=' + desde + '&hasta=' + hasta +
-            '&usuario=' + (filtroUsuario.value || 0),
+            '&usuario=' + (filtroUsuario.value || 0) +
+            (porCasa ? '&porcasa=1' : ''),
             '_blank'
         );
     }
@@ -466,79 +476,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ---------- Nota imprimible ----------
-    // Direccion, C.P. y telefono no viven en la base: se capturan aqui, solo
-    // para lo que se va a imprimir. El folio y la fecha salen de la venta.
+    // La captura vive en public/js/nota_datos.js porque es la misma que usa la
+    // pantalla de Venta: avisa si al cliente le faltan datos y deja guardarlos.
     let ventaDeLaNota = null;
 
     function abrirImpresion(v) {
         ventaDeLaNota = v.id;
-        contenido.innerHTML =
-            '<h2 class="detalle-titulo">Imprimir nota — Venta #' + v.id + '</h2>' +
-            '<p class="aviso aviso-info">Estos datos son solo para la nota impresa. ' +
-                'Todos son opcionales: lo que dejes vacío sale como renglón en blanco ' +
-                'para llenarlo a mano.</p>' +
-            '<div class="form-group">' +
-                '<label for="nota-cliente">Cliente:</label>' +
-                '<input type="text" id="nota-cliente" class="form-control" maxlength="150" ' +
-                       'value="' + esc(v.cliente || '') + '">' +
-            '</div>' +
-            '<div class="form-group">' +
-                '<label for="nota-direccion">Dirección:</label>' +
-                '<input type="text" id="nota-direccion" class="form-control" maxlength="150">' +
-            '</div>' +
-            '<div class="form-group">' +
-                '<label for="nota-cp">C.P.:</label>' +
-                '<input type="text" id="nota-cp" class="form-control" maxlength="5" inputmode="numeric">' +
-            '</div>' +
-            '<div class="form-group">' +
-                '<label for="nota-telefono">Teléfono:</label>' +
-                '<input type="tel" id="nota-telefono" class="form-control" maxlength="10" ' +
-                       'inputmode="numeric" placeholder="10 dígitos">' +
-                '<span class="detalle-sub" id="nota-tel-aviso"></span>' +
-            '</div>' +
-            '<div class="detalle-acciones">' +
-                '<button type="button" class="chip" id="btn-cancelar-nota">Cancelar</button>' +
-                '<button type="button" class="btn-save" id="btn-generar-nota" ' +
-                    'data-id="' + v.id + '">Imprimir</button>' +
-            '</div>';
 
-        // Solo digitos en C.P. y telefono. El recorte va DESPUES de limpiar:
-        // maxlength cuenta tambien las letras, asi que al teclear una por error
-        // se perdian digitos validos (o se colaba uno de mas).
-        ['nota-cp', 'nota-telefono'].forEach((id) => {
-            document.getElementById(id).addEventListener('input', (e) => {
-                e.target.value = e.target.value.replace(/\D/g, '').slice(0, e.target.maxLength);
-                if (id === 'nota-telefono') {
-                    const faltan = 10 - e.target.value.length;
-                    document.getElementById('nota-tel-aviso').textContent =
-                        e.target.value.length === 0 || faltan === 0
-                            ? '' : 'Faltan ' + faltan + ' dígito' + (faltan === 1 ? '' : 's');
-                }
-            });
+        NotaDatos.abrir({
+            ventaId:    v.id,
+            cliente:    v.cliente || '',
+            clienteId:  Number(v.cliente_id) || 0,
+            contenedor: contenido,
+            rutaApp:    '../../app/controllers/',
+            rutaNota:   '../ventas/nota.php',
+            // Igual que antes: al salir de la captura se vuelve al detalle de la
+            // venta. La nota se abre en otra pestaña, así que el modal no estorba.
+            alCerrar:   () => verDetalle(ventaDeLaNota),
         });
-
-        document.getElementById('nota-cliente').focus();
-    }
-
-    function generarNota(ventaId) {
-        const telefono = document.getElementById('nota-telefono').value;
-
-        if (telefono !== '' && telefono.length !== 10) {
-            document.getElementById('nota-tel-aviso').textContent =
-                'El teléfono debe tener 10 dígitos o quedar vacío.';
-            return;
-        }
-
-        const parametros = new URLSearchParams({
-            id:        ventaId,
-            cliente:   document.getElementById('nota-cliente').value.trim(),
-            direccion: document.getElementById('nota-direccion').value.trim(),
-            cp:        document.getElementById('nota-cp').value,
-            telefono:  telefono,
-        });
-
-        window.open('../ventas/nota.php?' + parametros.toString(), '_blank');
-        modal.hidden = true;
     }
 
     // ---------- Precio del catalogo ----------
@@ -813,6 +768,92 @@ document.addEventListener('DOMContentLoaded', () => {
     let resultadosEdicion  = [];
     let temporizadorEdicion = null;
 
+    // ---------- Cliente de la venta que se edita ----------
+    // Mismo comportamiento que en la pantalla de Venta: el nombre se puede
+    // teclear libre, y ademas se puede ligar a un cliente del catalogo. Teclear
+    // encima rompe la liga, porque ya no se sabe a quien se refiere.
+    let clientesEdicion     = [];
+    let temporizadorCliente = null;
+
+    function textoLigaCliente() {
+        return ventaEditando && ventaEditando.cliente_id
+            ? 'Ligada a un cliente registrado. Escribe encima para desligarla.'
+            : 'Sin cliente del catálogo: la venta solo guarda el nombre escrito.';
+    }
+
+    function refrescarLigaCliente() {
+        const p = document.getElementById('edit-cliente-liga');
+        if (p) p.textContent = textoLigaCliente();
+    }
+
+    async function buscarClientesEdicion(termino) {
+        const cont = document.getElementById('edit-resultados-cliente');
+        if (!cont) return;
+
+        try {
+            const respuesta = await fetch(
+                '../../app/controllers/ClienteController.php?accion=buscar&q=' + encodeURIComponent(termino)
+            );
+
+            if (respuesta.status === 401) {
+                mostrarAviso('Tu sesión expiró. Vuelve a iniciar sesión.', 'error');
+                return;
+            }
+
+            const datos = await respuesta.json();
+            clientesEdicion = datos.ok && Array.isArray(datos.clientes) ? datos.clientes : [];
+            pintarClientesEdicion();
+
+        } catch (e) {
+            mostrarAviso('No se pudieron cargar los clientes. Revisa tu conexión.', 'error');
+        }
+    }
+
+    function pintarClientesEdicion() {
+        const cont = document.getElementById('edit-resultados-cliente');
+        if (!cont) return;
+
+        if (clientesEdicion.length === 0) {
+            cont.innerHTML = '<p class="sin-resultados">Sin clientes que coincidan</p>';
+            cont.hidden = false;
+            return;
+        }
+
+        cont.innerHTML = clientesEdicion.map((c, idx) => {
+            const persona = [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ');
+            // El comercio es lo que identifica la venta; si no hay, va la persona.
+            const titulo = c.nombre_comercio || persona;
+            const meta = [c.nombre_comercio ? persona : '', c.telefono,
+                          c.dia_visita ? 'Visita: ' + c.dia_visita : ''].filter(Boolean).join(' · ');
+
+            return '<div class="search-result-item edit-cliente-item" role="button" tabindex="0" ' +
+                        'data-idx="' + idx + '">' +
+                '<span class="res-nombre">' + esc(titulo) + '</span>' +
+                (meta ? '<span class="res-meta">' + esc(meta) + '</span>' : '') +
+            '</div>';
+        }).join('');
+
+        cont.hidden = false;
+        cont.scrollTop = 0;
+    }
+
+    function elegirClienteEdicion(indice) {
+        const c = clientesEdicion[indice];
+        if (!c || !ventaEditando) return;
+
+        const persona = [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ');
+        const titulo  = c.nombre_comercio || persona;
+
+        ventaEditando.cliente    = titulo;
+        ventaEditando.cliente_id = Number(c.id);
+
+        const campo = document.getElementById('edit-cliente');
+        if (campo) campo.value = titulo;
+
+        document.getElementById('edit-resultados-cliente').hidden = true;
+        refrescarLigaCliente();
+    }
+
     async function buscarProductoEdicion(termino) {
         const cont = document.getElementById('edit-resultados');
         if (!cont) return;
@@ -900,6 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ventaEditando = {
             id:        v.id,
             cliente:   v.cliente || '',
+            cliente_id: Number(v.cliente_id) || 0,
             tipo_pago: v.tipo_pago,
             fecha_vencimiento: v.fecha_vencimiento || '',
             items: v.items.map((i) => ({
@@ -957,8 +999,17 @@ document.addEventListener('DOMContentLoaded', () => {
             '<h2 class="detalle-titulo">Editando venta #' + v.id + '</h2>' +
             '<div class="form-group">' +
                 '<label for="edit-cliente">Cliente:</label>' +
-                '<input type="text" id="edit-cliente" class="form-control" maxlength="150" ' +
-                       'value="' + esc(v.cliente) + '">' +
+                '<div class="search-container">' +
+                    '<input type="text" id="edit-cliente" class="form-control" maxlength="150" ' +
+                           'autocomplete="off" placeholder="Escribe nombre, apellido o comercio…" ' +
+                           'value="' + esc(v.cliente) + '">' +
+                    '<button type="button" id="edit-lista-clientes" class="cliente-lista-btn" ' +
+                            'title="Ver lista de clientes" aria-label="Ver lista de clientes">' +
+                        '<i class="ph ph-list-bullets"></i>' +
+                    '</button>' +
+                '</div>' +
+                '<div id="edit-resultados-cliente" class="search-results" hidden></div>' +
+                '<p class="detalle-sub" id="edit-cliente-liga">' + textoLigaCliente() + '</p>' +
             '</div>' +
             '<table class="tabla-detalle">' +
                 '<thead><tr><th>Producto</th><th class="num">C/U</th><th class="num">Cant.</th>' +
@@ -1005,7 +1056,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const cuerpo = {
             venta_id:  v.id,
-            cliente:   document.getElementById('edit-cliente').value.trim(),
+            cliente:    document.getElementById('edit-cliente').value.trim(),
+            cliente_id: v.cliente_id || 0,
             tipo_pago: document.getElementById('edit-tipo-pago').value,
             fecha_vencimiento: document.getElementById('edit-vencimiento')?.value || null,
             items: v.items.map((i) => ({
@@ -1143,8 +1195,31 @@ document.addEventListener('DOMContentLoaded', () => {
     contenido.addEventListener('click', async (e) => {
         // closest: el click puede caer en el icono de adentro del boton.
         if (e.target.closest('#btn-productos-pdf')) {
-            abrirResumenPdf();
+            abrirResumenPdf(false);
             return;
+        }
+
+        if (e.target.closest('#btn-productos-pdf-casa')) {
+            abrirResumenPdf(true);
+            return;
+        }
+
+        const itemCliente = e.target.closest('.edit-cliente-item');
+        if (itemCliente) {
+            elegirClienteEdicion(Number(itemCliente.dataset.idx));
+            return;
+        }
+
+        // El boton de la lista muestra el catalogo completo, sin escribir nada.
+        if (e.target.closest('#edit-lista-clientes')) {
+            buscarClientesEdicion('');
+            return;
+        }
+
+        // Un clic fuera cierra el desplegable de clientes.
+        if (!e.target.closest('#edit-cliente, #edit-resultados-cliente, #edit-lista-clientes')) {
+            const lista = document.getElementById('edit-resultados-cliente');
+            if (lista) lista.hidden = true;
         }
 
         const botonPrecio = e.target.closest('.btn-precio');
@@ -1194,16 +1269,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (e.target.id === 'btn-cancelar-nota') {
-            verDetalle(ventaDeLaNota);
-            return;
-        }
-
-        if (e.target.id === 'btn-generar-nota') {
-            generarNota(e.target.dataset.id);
-            return;
-        }
-
         if (e.target.id === 'btn-editar-venta') {
             const respuesta = await fetch(
                 '../../app/controllers/HistorialController.php?accion=detalle&id=' + e.target.dataset.id
@@ -1250,6 +1315,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     contenido.addEventListener('input', (e) => {
+        // El nombre se guarda en el estado a cada tecla: pintarEdicion() se
+        // vuelve a ejecutar al cambiar una cantidad y si no, se perderia.
+        if (e.target.id === 'edit-cliente' && ventaEditando) {
+            ventaEditando.cliente = e.target.value;
+
+            if (ventaEditando.cliente_id) {
+                ventaEditando.cliente_id = 0;
+                refrescarLigaCliente();
+            }
+
+            clearTimeout(temporizadorCliente);
+            const termino = e.target.value.trim();
+
+            // Con una sola letra ya se busca: el catalogo de clientes es chico.
+            if (termino === '') {
+                document.getElementById('edit-resultados-cliente').hidden = true;
+            } else {
+                temporizadorCliente = setTimeout(() => buscarClientesEdicion(termino), 250);
+            }
+            return;
+        }
+
         if (e.target.id === 'edit-buscar-producto') {
             clearTimeout(temporizadorEdicion);
             const termino = e.target.value.trim();
@@ -1258,6 +1345,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     contenido.addEventListener('keydown', (e) => {
+        const itemCliente = e.target.closest('.edit-cliente-item');
+        if (itemCliente && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            elegirClienteEdicion(Number(itemCliente.dataset.idx));
+            return;
+        }
+
         const resItem = e.target.closest('.edit-result-item');
         if (resItem && (e.key === 'Enter' || e.key === ' ')) {
             e.preventDefault();

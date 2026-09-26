@@ -145,6 +145,107 @@ try {
         exit;
     }
 
+    // ---------- Datos de contacto (para la nota impresa) ----------
+    // Abierta a cualquier usuario con sesion: el vendedor los necesita para
+    // llenar la nota. Solo devuelve lo que sale impreso, nada mas.
+    if ($accion === 'datos') {
+        $clienteId = (int) ($_GET['cliente_id'] ?? 0);
+
+        $stmt = $pdo->prepare(
+            'SELECT id, direccion, codigo_postal, telefono FROM clientes WHERE id = :id'
+        );
+        $stmt->execute(['id' => $clienteId]);
+        $cliente = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$cliente) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Cliente no encontrado']);
+            exit;
+        }
+
+        // Que le falta para que la nota salga completa.
+        $faltantes = [];
+
+        foreach (['direccion' => 'dirección', 'codigo_postal' => 'C.P.', 'telefono' => 'teléfono'] as $campo => $nombre) {
+            if (trim((string) $cliente[$campo]) === '') {
+                $faltantes[] = ['campo' => $campo, 'nombre' => $nombre];
+            }
+        }
+
+        echo json_encode(['ok' => true, 'cliente' => $cliente, 'faltantes' => $faltantes], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ---------- Completar datos que faltan (desde la nota) ----------
+    // Tambien abierta a cualquier usuario con sesion, pero MUY acotada: solo
+    // toca direccion, C.P. y telefono, y solo cuando estan vacios. Asi el
+    // vendedor puede dejar guardado lo que le falto al cliente sin poder
+    // cambiarle nada de lo que el administrador ya capturo.
+    if ($accion === 'completar') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['ok' => false, 'error' => 'Metodo no permitido']);
+            exit;
+        }
+
+        $datos     = json_decode(file_get_contents('php://input'), true) ?: [];
+        $clienteId = (int) ($datos['cliente_id'] ?? 0);
+
+        $stmt = $pdo->prepare('SELECT direccion, codigo_postal, telefono FROM clientes WHERE id = :id');
+        $stmt->execute(['id' => $clienteId]);
+        $actual = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$actual) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Cliente no encontrado']);
+            exit;
+        }
+
+        $nuevos = [
+            'direccion'     => limpiar($datos['direccion'] ?? '', 255),
+            'codigo_postal' => limpiar($datos['codigo_postal'] ?? '', 10),
+            'telefono'      => limpiar($datos['telefono'] ?? '', 20),
+        ];
+
+        if ($nuevos['codigo_postal'] !== '' && !preg_match('/^\d{4,5}$/', $nuevos['codigo_postal'])) {
+            throw new RuntimeException('El código postal debe ser de 4 o 5 dígitos');
+        }
+
+        if ($nuevos['telefono'] !== '' && !preg_match('/^\d{10}$/', $nuevos['telefono'])) {
+            throw new RuntimeException('El teléfono debe ser de 10 dígitos');
+        }
+
+        $guardados = [];
+
+        foreach ($nuevos as $campo => $valor) {
+            // Solo lo que venga con algo y este vacio en la base.
+            if ($valor !== '' && trim((string) $actual[$campo]) === '') {
+                $guardados[$campo] = $valor;
+            }
+        }
+
+        if ($guardados === []) {
+            echo json_encode([
+                'ok'        => true,
+                'guardados' => 0,
+                'mensaje'   => 'No había datos nuevos que guardar',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $asignaciones = implode(', ', array_map(fn($c) => "{$c} = :{$c}", array_keys($guardados)));
+
+        $stmt = $pdo->prepare("UPDATE clientes SET {$asignaciones} WHERE id = :id");
+        $stmt->execute($guardados + ['id' => $clienteId]);
+
+        echo json_encode([
+            'ok'        => true,
+            'guardados' => count($guardados),
+            'campos'    => array_keys($guardados),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // ---------- Saldo a favor de un cliente (para la venta) ----------
     // Abierta a cualquier usuario con sesion: el vendedor la necesita para saber
     // cuanto puede descontar al elegir el cliente.

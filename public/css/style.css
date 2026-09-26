@@ -1572,6 +1572,15 @@ select.form-control {
     font-weight: 400;
 }
 
+/* Algo que conviene atender pero no impide seguir: por ejemplo, un cliente al
+   que le faltan datos cuando se va a imprimir su nota. */
+.aviso-alerta {
+    background-color: #fdf3e2;
+    color: #8a5a10;
+    border: 1px solid #d9a441;
+    font-weight: 400;
+}
+
 /* Casilla con su texto en la misma línea (p. ej. "Reiniciar contraseña").
    Se anula el estilo de ".form-group input", pensado para campos de texto; el
    tamaño va en em para que crezca junto con la etiqueta en tablet. */

@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Aviso de venta guardada con acceso directo a la nota imprimible.
-    function mostrarAvisoConNota(ventaId, total, cliente) {
+    function mostrarAvisoConNota(ventaId, total, cliente, clienteId) {
         clearTimeout(temporizadorAviso);
 
         aviso.className = 'aviso aviso-ok aviso-con-accion';
@@ -80,10 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
         boton.type = 'button';
         boton.className = 'chip btn-imprimir-nota';
         boton.innerHTML = '<i class="ph ph-printer"></i> Imprimir nota';
-        boton.addEventListener('click', () => {
-            const parametros = new URLSearchParams({ id: ventaId, cliente: cliente || '' });
-            window.open('../ventas/nota.php?' + parametros.toString(), '_blank');
-        });
+        boton.addEventListener('click', () => abrirCapturaNota(ventaId, cliente, clienteId));
         aviso.appendChild(boton);
     }
 
@@ -423,6 +420,40 @@ document.addEventListener('DOMContentLoaded', () => {
     // Para piezas que no estan en ningun catalogo: se capturan a mano, el servidor
     // las guarda en la casa Otros y regresan como un resultado mas del buscador.
     const RUTA_OTRO      = '../../app/controllers/OtroProductoController.php';
+    // ---------- Captura de los datos del cliente para la nota ----------
+    // La forma vive en public/js/nota_datos.js: es la misma del historial, y
+    // avisa cuando al cliente registrado le faltan datos.
+    const modalNota     = document.getElementById('modal-nota');
+    const contenidoNota = document.getElementById('contenido-nota');
+
+    function cerrarModalNota() {
+        modalNota.hidden = true;
+    }
+
+    function abrirCapturaNota(ventaId, cliente, clienteId) {
+        modalNota.hidden = false;
+
+        NotaDatos.abrir({
+            ventaId:    ventaId,
+            cliente:    cliente || '',
+            clienteId:  Number(clienteId) || 0,
+            contenedor: contenidoNota,
+            rutaApp:    '../../app/controllers/',
+            rutaNota:   '../ventas/nota.php',
+            alCerrar:   cerrarModalNota,
+        });
+    }
+
+    document.getElementById('btn-cerrar-nota').addEventListener('click', cerrarModalNota);
+
+    modalNota.addEventListener('click', (e) => {
+        if (e.target === modalNota) cerrarModalNota();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modalNota.hidden) cerrarModalNota();
+    });
+
     const modalOtro      = document.getElementById('modal-otro');
     const formOtro       = document.getElementById('form-otro');
     const otroNombre     = document.getElementById('otro-nombre');
@@ -570,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // El aviso lleva el boton de imprimir: es el momento en que se
                 // entrega la nota al cliente. Sin limite de tiempo para que no
                 // desaparezca antes de alcanzar a imprimirla.
-                mostrarAvisoConNota(datos.venta_id, datos.total, cuerpo.cliente);
+                mostrarAvisoConNota(datos.venta_id, datos.total, cuerpo.cliente, cuerpo.cliente_id);
                 items = [];
                 clienteSel = { id: null, nombre: '', saldo: 0 };
                 form.reset();

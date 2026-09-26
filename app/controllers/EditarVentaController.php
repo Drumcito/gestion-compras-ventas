@@ -31,6 +31,29 @@ $tipoPago         = $datos['tipo_pago'] ?? 'contado';
 $fechaVencimiento = $datos['fecha_vencimiento'] ?? null;
 $items            = $datos['items'] ?? [];
 
+// Cliente del catalogo. 0 = la venta queda solo con el nombre tecleado, sin
+// ligarse a ningun cliente registrado.
+$clienteIdNuevo = max(0, (int) ($datos['cliente_id'] ?? 0));
+
+/** Como se llama un cliente registrado, para dejarlo legible en la auditoria. */
+function nombreCliente(PDO $pdo, int $clienteId): ?string
+{
+    if ($clienteId <= 0) {
+        return null;
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT COALESCE(NULLIF(nombre_comercio, ''),
+                         TRIM(CONCAT_WS(' ', nombres, apellido_paterno, apellido_materno))) AS nombre
+           FROM clientes WHERE id = :id"
+    );
+    $stmt->execute(['id' => $clienteId]);
+
+    $nombre = $stmt->fetchColumn();
+
+    return $nombre === false ? null : (string) $nombre;
+}
+
 try {
     $pdo = Database::getConnection();
 
@@ -64,6 +87,27 @@ try {
     $cobrado         = (float) $venta['monto_cobrado'];
     $creditoAplicado = (float) ($venta['credito_aplicado'] ?? 0);
     $efectivo        = $cobrado + $creditoAplicado;
+
+    // ---------- Cliente registrado ----------
+    $clienteIdAnterior = (int) ($venta['cliente_id'] ?? 0);
+    $cambioDeCliente   = $clienteIdNuevo !== $clienteIdAnterior;
+
+    if ($cambioDeCliente) {
+        // El saldo a favor no se guarda: se calcula sumando las ventas de cada
+        // cliente (ver app/helpers/clientes.php). Mover a otro cliente una venta
+        // que ya gasto saldo le regresaria ese gasto al anterior y se lo cargaria
+        // al nuevo, descuadrando a los dos.
+        if ($creditoAplicado > 0) {
+            throw new RuntimeException(
+                'Esta venta ya descontó saldo a favor del cliente, por eso no se le puede '
+                . 'cambiar el cliente. Primero habría que deshacer ese descuento.'
+            );
+        }
+
+        if ($clienteIdNuevo > 0 && nombreCliente($pdo, $clienteIdNuevo) === null) {
+            throw new RuntimeException('El cliente que elegiste ya no existe');
+        }
+    }
 
     $stmt = $pdo->prepare('SELECT COUNT(*) FROM pagos_credito WHERE venta_id = :id');
     $stmt->execute(['id' => $ventaId]);
@@ -147,6 +191,15 @@ try {
         $cambios[] = ['cliente', $clienteAnterior, $clienteNuevo];
     }
 
+    // Se audita con los nombres, no con los ids: asi el historial se lee.
+    if ($cambioDeCliente) {
+        $cambios[] = [
+            'cliente registrado',
+            nombreCliente($pdo, $clienteIdAnterior) ?? 'sin cliente del catálogo',
+            nombreCliente($pdo, $clienteIdNuevo) ?? 'sin cliente del catálogo',
+        ];
+    }
+
     if ($venta['tipo_pago'] !== $tipoPago) {
         $cambios[] = ['tipo_pago', $venta['tipo_pago'], $tipoPago];
     }
@@ -212,12 +265,14 @@ try {
 
     $stmt = $pdo->prepare(
         'UPDATE ventas
-            SET cliente = :cliente, total = :total, tipo_pago = :tipo_pago,
-                estado_pago = :estado_pago, fecha_vencimiento = :fecha_vencimiento
+            SET cliente = :cliente, cliente_id = :cliente_id, total = :total,
+                tipo_pago = :tipo_pago, estado_pago = :estado_pago,
+                fecha_vencimiento = :fecha_vencimiento
           WHERE id = :id'
     );
     $stmt->execute([
         'cliente'           => $clienteNuevo,
+        'cliente_id'        => $clienteIdNuevo > 0 ? $clienteIdNuevo : null,
         'total'             => $total,
         'tipo_pago'         => $tipoPago,
         'estado_pago'       => $estadoPago,

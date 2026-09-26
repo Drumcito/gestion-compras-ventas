@@ -132,6 +132,16 @@ $casas = ordenarCasas($casas);
         </div>
     </main>
 
+    <!-- Datos del cliente para la nota impresa -->
+    <div id="modal-nota" class="modal" hidden>
+        <div class="modal-caja">
+            <button type="button" class="modal-cerrar" id="btn-cerrar-nota" title="Cerrar">
+                <i class="ph ph-x"></i>
+            </button>
+            <div id="contenido-nota"></div>
+        </div>
+    </div>
+
     <!-- Nuevo producto (casa Otros) -->
     <div id="modal-otro" class="modal" hidden>
         <div class="modal-caja">
@@ -165,6 +175,7 @@ $casas = ordenarCasas($casas);
     </div>
 
 
+    <script src="<?= recurso('js/nota_datos.js') ?>"></script>
     <script src="<?= recurso('js/venta.js') ?>"></script>
 </body>
 </html>

@@ -3,8 +3,13 @@
  * Resumen de productos vendidos, imprimible / para guardar en PDF.
  *
  * Mismo estilo que la nota de venta, pero aqui la hoja carta VERTICAL se ocupa
- * completa y el contenido corre de una hoja a la siguiente: primero la casa y
- * debajo su tabla, igual que se ve en pantalla.
+ * completa: primero la casa y debajo su tabla, igual que se ve en pantalla.
+ *
+ * Dos acomodos, segun ?porcasa:
+ *   - corrido (por omision): todas las casas una tras otra, partiendo hojas
+ *     solo cuando se llenan.
+ *   - una hoja por casa (?porcasa=1): cada casa empieza en hoja nueva, para
+ *     poder repartir el reporte por proveedor. Nunca hay dos casas en la misma.
  *
  * Toma los mismos filtros del historial: ?desde=&hasta=&usuario=
  */
@@ -35,6 +40,10 @@ if ($desde > $hasta) {
 }
 
 $filtroUsuario = isset($_GET['usuario']) ? (int) $_GET['usuario'] : 0;
+
+// porcasa=1: cada casa arranca en hoja nueva, para poder repartir el reporte
+// por proveedor. Sin el, todo va corrido como hasta ahora.
+$porCasa = ($_GET['porcasa'] ?? '') === '1';
 
 try {
     $pdo = Database::getConnection();
@@ -87,6 +96,122 @@ function fechaCorta(string $iso): string
 $periodo = $desde === $hasta
     ? fechaCorta($desde)
     : fechaCorta($desde) . ' al ' . fechaCorta($hasta);
+
+/*
+ * Cada parte del reporte se pinta desde una funcion: los dos acomodos (corrido
+ * y una hoja por casa) usan exactamente el mismo marcado, sin duplicarlo.
+ */
+
+function pintarEncabezado(string $periodo, string $vendedor): void
+{ ?>
+    <div class="encabezado">
+        <div class="marca">
+            <img src="../../public/img/GA-BE_logo_oscuro.png" alt="">
+            <div>
+                <h1><?= NEGOCIO_NOMBRE ?></h1>
+                <p>TEL. <?= NEGOCIO_TELEFONO ?></p>
+            </div>
+        </div>
+        <div class="titulo-reporte">
+            <strong>PRODUCTOS VENDIDOS</strong>
+            <?= e($periodo) ?><br>
+            <?= $vendedor !== '' ? 'Vendedor: ' . e($vendedor) : 'Todos los vendedores' ?>
+        </div>
+    </div>
+<?php }
+
+function pintarTotalesPeriodo(array $resumen): void
+{ ?>
+    <div class="totales-periodo">
+        <div class="cifra">
+            <span>PIEZAS VENDIDAS</span>
+            <strong><?= entero($resumen['piezas']) ?></strong>
+        </div>
+        <div class="cifra">
+            <span>PRODUCTOS DISTINTOS</span>
+            <strong><?= entero($resumen['distintos']) ?></strong>
+        </div>
+        <div class="cifra">
+            <span>IMPORTE TOTAL</span>
+            <strong><?= dinero($resumen['importe']) ?></strong>
+        </div>
+    </div>
+<?php }
+
+function pintarBloqueCasa(array $casa, array $deLaCasa): void
+{ ?>
+    <div class="bloque">
+        <div class="bloque-titulo">
+            <span class="bloque-casa"><?= e($casa['casa']) ?></span>
+            <span class="bloque-cifras">
+                <?= entero($casa['piezas']) ?> pieza<?= (int) $casa['piezas'] === 1 ? '' : 's' ?> ·
+                <?= entero($casa['productos']) ?> producto<?= $casa['productos'] === 1 ? '' : 's' ?> ·
+                <?= dinero($casa['importe']) ?>
+            </span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>PRODUCTO</th>
+                    <th class="col-codigo">CÓDIGO</th>
+                    <th class="col-piezas">PIEZAS</th>
+                    <th class="col-ventas">VENTAS</th>
+                    <th class="col-importe">IMPORTE</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($deLaCasa as $p): ?>
+                    <tr>
+                        <td><?= e($p['nombre_producto']) ?></td>
+                        <td class="col-codigo">
+                            <?= e($p['codigo_proveedor'] ?: $p['codigo_interno_producto']) ?>
+                        </td>
+                        <td class="col-piezas"><?= entero($p['piezas']) ?></td>
+                        <td class="col-ventas"><?= entero($p['ventas']) ?></td>
+                        <td class="col-importe"><?= dinero($p['importe']) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2">TOTAL <?= e($casa['casa']) ?></td>
+                    <td class="col-piezas"><?= entero($casa['piezas']) ?></td>
+                    <td class="col-ventas"></td>
+                    <td class="col-importe"><?= dinero($casa['importe']) ?></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+<?php }
+
+function pintarGranTotal(array $resumen): void
+{ ?>
+    <div class="gran-total">
+        <table>
+            <tr>
+                <td class="rotulo">Piezas vendidas:</td>
+                <td class="num"><?= entero($resumen['piezas']) ?></td>
+            </tr>
+            <tr>
+                <td class="rotulo">Productos distintos:</td>
+                <td class="num"><?= entero($resumen['distintos']) ?></td>
+            </tr>
+            <tr class="final">
+                <td class="rotulo">IMPORTE TOTAL:</td>
+                <td class="num"><?= dinero($resumen['importe']) ?></td>
+            </tr>
+        </table>
+    </div>
+<?php }
+
+function pintarPie(): void
+{ ?>
+    <div class="pie">
+        <span>Generado el <?= date('d/m/Y H:i') ?> por <?= e($_SESSION['user_name'] ?? '') ?></span>
+        <span><?= NEGOCIO_NOMBRE ?></span>
+    </div>
+<?php }
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -114,6 +239,13 @@ $periodo = $desde === $hasta
             margin: 0 auto;
             padding: 0.45in 0.5in;
             background: #ffffff;
+        }
+
+        /* Con una hoja por casa hay varias .hoja: cada una cierra su pagina para
+           que ninguna casa comparta papel con otra. */
+        .hoja:not(:last-of-type) {
+            break-after: page;
+            page-break-after: always;
         }
 
         /* ---------- Encabezado ---------- */
@@ -337,6 +469,7 @@ $periodo = $desde === $hasta
 
         @media screen {
             .hoja { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
+            .hoja + .hoja { margin-top: 0.3in; }
         }
 
         /* A proposito no lleva <meta viewport>: es un documento de 8.5in para
@@ -361,117 +494,54 @@ $periodo = $desde === $hasta
     <span class="cuenta">
         <?= entero($resumen['distintos']) ?> producto<?= $resumen['distintos'] === 1 ? '' : 's' ?>
         · <?= count($resumen['por_casa']) ?> casa<?= count($resumen['por_casa']) === 1 ? '' : 's' ?>
+        · <?= $porCasa ? 'una hoja por casa' : 'todo corrido' ?>
     </span>
     <button type="button" onclick="window.close()">Cerrar</button>
     <button type="button" class="principal" onclick="window.print()">Guardar en PDF</button>
 </div>
 
-<div class="hoja">
-    <div class="encabezado">
-        <div class="marca">
-            <img src="../../public/img/GA-BE_logo_oscuro.png" alt="">
-            <div>
-                <h1><?= NEGOCIO_NOMBRE ?></h1>
-                <p>TEL. <?= NEGOCIO_TELEFONO ?></p>
-            </div>
-        </div>
-        <div class="titulo-reporte">
-            <strong>PRODUCTOS VENDIDOS</strong>
-            <?= e($periodo) ?><br>
-            <?= $vendedor !== '' ? 'Vendedor: ' . e($vendedor) : 'Todos los vendedores' ?>
-        </div>
+<?php if ($productos === []): ?>
+
+    <div class="hoja">
+        <?php pintarEncabezado($periodo, $vendedor); ?>
+        <p class="vacio">No hubo ventas en este periodo.</p>
+        <?php pintarPie(); ?>
     </div>
 
-    <?php if ($productos === []): ?>
-        <p class="vacio">No hubo ventas en este periodo.</p>
-    <?php else: ?>
+<?php elseif ($porCasa): ?>
 
-        <div class="totales-periodo">
-            <div class="cifra">
-                <span>PIEZAS VENDIDAS</span>
-                <strong><?= entero($resumen['piezas']) ?></strong>
-            </div>
-            <div class="cifra">
-                <span>PRODUCTOS DISTINTOS</span>
-                <strong><?= entero($resumen['distintos']) ?></strong>
-            </div>
-            <div class="cifra">
-                <span>IMPORTE TOTAL</span>
-                <strong><?= dinero($resumen['importe']) ?></strong>
-            </div>
+    <?php $ultima = count($resumen['por_casa']) - 1; ?>
+    <?php foreach ($resumen['por_casa'] as $i => $casa): ?>
+        <div class="hoja">
+            <?php pintarEncabezado($periodo, $vendedor); ?>
+
+            <?php // Las cifras del periodo van una sola vez, en la primera hoja.
+                  if ($i === 0) { pintarTotalesPeriodo($resumen); } ?>
+
+            <?php pintarBloqueCasa($casa, productosDeCasa($productos, $casa['codigo_casa'])); ?>
+
+            <?php // El total de todo cierra el reporte, en la ultima hoja.
+                  if ($i === $ultima) { pintarGranTotal($resumen); } ?>
+
+            <?php pintarPie(); ?>
         </div>
+    <?php endforeach; ?>
+
+<?php else: ?>
+
+    <div class="hoja">
+        <?php pintarEncabezado($periodo, $vendedor); ?>
+        <?php pintarTotalesPeriodo($resumen); ?>
 
         <?php foreach ($resumen['por_casa'] as $casa): ?>
-            <?php $deLaCasa = productosDeCasa($productos, $casa['codigo_casa']); ?>
-            <div class="bloque">
-                <div class="bloque-titulo">
-                    <span class="bloque-casa"><?= e($casa['casa']) ?></span>
-                    <span class="bloque-cifras">
-                        <?= entero($casa['piezas']) ?> pieza<?= (int) $casa['piezas'] === 1 ? '' : 's' ?> ·
-                        <?= entero($casa['productos']) ?> producto<?= $casa['productos'] === 1 ? '' : 's' ?> ·
-                        <?= dinero($casa['importe']) ?>
-                    </span>
-                </div>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>PRODUCTO</th>
-                            <th class="col-codigo">CÓDIGO</th>
-                            <th class="col-piezas">PIEZAS</th>
-                            <th class="col-ventas">VENTAS</th>
-                            <th class="col-importe">IMPORTE</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($deLaCasa as $p): ?>
-                            <tr>
-                                <td><?= e($p['nombre_producto']) ?></td>
-                                <td class="col-codigo">
-                                    <?= e($p['codigo_proveedor'] ?: $p['codigo_interno_producto']) ?>
-                                </td>
-                                <td class="col-piezas"><?= entero($p['piezas']) ?></td>
-                                <td class="col-ventas"><?= entero($p['ventas']) ?></td>
-                                <td class="col-importe"><?= dinero($p['importe']) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="2">TOTAL <?= e($casa['casa']) ?></td>
-                            <td class="col-piezas"><?= entero($casa['piezas']) ?></td>
-                            <td class="col-ventas"></td>
-                            <td class="col-importe"><?= dinero($casa['importe']) ?></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+            <?php pintarBloqueCasa($casa, productosDeCasa($productos, $casa['codigo_casa'])); ?>
         <?php endforeach; ?>
 
-        <div class="gran-total">
-            <table>
-                <tr>
-                    <td class="rotulo">Piezas vendidas:</td>
-                    <td class="num"><?= entero($resumen['piezas']) ?></td>
-                </tr>
-                <tr>
-                    <td class="rotulo">Productos distintos:</td>
-                    <td class="num"><?= entero($resumen['distintos']) ?></td>
-                </tr>
-                <tr class="final">
-                    <td class="rotulo">IMPORTE TOTAL:</td>
-                    <td class="num"><?= dinero($resumen['importe']) ?></td>
-                </tr>
-            </table>
-        </div>
-
-    <?php endif; ?>
-
-    <div class="pie">
-        <span>Generado el <?= date('d/m/Y H:i') ?> por <?= e($_SESSION['user_name'] ?? '') ?></span>
-        <span><?= NEGOCIO_NOMBRE ?></span>
+        <?php pintarGranTotal($resumen); ?>
+        <?php pintarPie(); ?>
     </div>
-</div>
+
+<?php endif; ?>
 
 </body>
 </html>
