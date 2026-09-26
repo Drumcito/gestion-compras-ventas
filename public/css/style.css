@@ -2957,6 +2957,33 @@ select.form-control {
 
 .saldo-linea strong { white-space: nowrap; }
 .saldo-desc strong  { color: #08660b; }
+
+/* Casilla para decidir si el saldo se descuenta en esta venta. Ocupa el renglon
+   completo para que no se pierda entre las cifras. */
+.saldo-casilla {
+    flex-basis: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+/* Se anula el estilo de ".form-group input", pensado para campos de texto. */
+.saldo-casilla input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    accent-color: #08660b;
+    cursor: pointer;
+}
+
+/* Lo que pasa si se desmarca. */
+.saldo-guardado {
+    flex-basis: 100%;
+    font-size: 0.88rem;
+    color: #4a6a4a;
+}
 .saldo-pagar        { margin-left: auto; }
 .saldo-pagar strong { font-size: 1.05rem; }
 

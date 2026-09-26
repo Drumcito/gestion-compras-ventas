@@ -23,6 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // mano no cuenta: solo un cliente elegido de la lista lleva id y saldo.
     let clienteSel = { id: null, nombre: '', saldo: 0 };
 
+    // Si el saldo a favor del cliente se descuenta en esta venta. Va marcado por
+    // omision (es lo que se espera), pero se puede quitar cuando el cliente
+    // prefiere guardarlo para despues o que se le devuelva en efectivo.
+    let aplicarSaldo = true;
+
     // Cada linea guarda su propia casa: un mismo ticket puede mezclar proveedores.
     let items = [];
 
@@ -255,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Saldo a favor que se aplica: todo el disponible, con tope en el total de la
     // venta (no se puede descontar más de lo que cuesta).
     function creditoAAplicar() {
-        if (!clienteSel.id || clienteSel.saldo <= 0) return 0;
+        if (!clienteSel.id || clienteSel.saldo <= 0 || !aplicarSaldo) return 0;
         const total = items.reduce((s, i) => s + i.precio * i.cantidad, 0);
         return Math.min(clienteSel.saldo, total);
     }
@@ -273,17 +278,30 @@ document.addEventListener('DOMContentLoaded', () => {
         bloqueSaldo.hidden = false;
         bloqueSaldo.innerHTML =
             '<span class="saldo-linea">Saldo a favor del cliente: <strong>' + money(clienteSel.saldo) + '</strong></span>' +
+            '<label class="saldo-casilla">' +
+                '<input type="checkbox" id="usar-saldo"' + (aplicarSaldo ? ' checked' : '') + '>' +
+                ' Descontar el saldo en esta venta' +
+            '</label>' +
             (aplicado > 0
                 ? '<span class="saldo-linea saldo-desc">Se aplica a esta venta: <strong>-' + money(aplicado) + '</strong></span>' +
                   '<span class="saldo-linea saldo-pagar">A pagar: <strong>' + money(Math.max(total - aplicado, 0)) + '</strong></span>'
-                : '');
+                : '<span class="saldo-linea saldo-guardado">El saldo se queda a favor del cliente para otra compra.</span>');
     }
+
+    bloqueSaldo.addEventListener('change', (e) => {
+        if (e.target.id !== 'usar-saldo') return;
+
+        aplicarSaldo = e.target.checked;
+        actualizarSaldo();
+        pintarItems();   // el total a pagar cambia
+    });
 
     inputCliente.addEventListener('input', () => {
         // Al teclear, se pierde la liga con el cliente del catálogo (y su saldo)
         // hasta que se vuelva a elegir uno de la lista.
         if (clienteSel.id !== null) {
             clienteSel = { id: null, nombre: '', saldo: 0 };
+            aplicarSaldo = true;
             actualizarSaldo();
         }
 
@@ -604,6 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 mostrarAvisoConNota(datos.venta_id, datos.total, cuerpo.cliente, cuerpo.cliente_id);
                 items = [];
                 clienteSel = { id: null, nombre: '', saldo: 0 };
+                aplicarSaldo = true;
                 form.reset();
                 camposCredito.hidden = true;
                 pintarItems();

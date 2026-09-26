@@ -543,5 +543,16 @@ function pintarPie(): void
 
 <?php endif; ?>
 
+<script>
+    // Se abre directo el dialogo de impresion, igual que la nota de venta: el
+    // reporte se pide para imprimirlo o guardarlo en PDF, no para leerlo en
+    // pantalla. Con ?auto=0 se puede revisar sin que salte el dialogo.
+    window.addEventListener('load', () => {
+        if (new URLSearchParams(location.search).get('auto') !== '0') {
+            window.print();
+        }
+    });
+</script>
+
 </body>
 </html>
