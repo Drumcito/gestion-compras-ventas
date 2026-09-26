@@ -71,8 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
         aviso.hidden = true;
     }
 
-    // Aviso de venta guardada con acceso directo a la nota imprimible.
-    function mostrarAvisoConNota(ventaId, total, cliente, clienteId) {
+    // Aviso de venta guardada con acceso directo a la nota imprimible y, si se
+    // acaba de dar de alta al cliente, a llenarle los datos.
+    function mostrarAvisoConNota(ventaId, total, cliente, clienteId, clienteNuevo, extra) {
         clearTimeout(temporizadorAviso);
 
         aviso.className = 'aviso aviso-ok aviso-con-accion';
@@ -80,7 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
         aviso.innerHTML = '';
 
         const texto = document.createElement('span');
-        texto.textContent = 'Venta #' + ventaId + ' guardada por $' + total + '.';
+        texto.textContent = 'Venta #' + ventaId + ' guardada por $' + total + '.' +
+            (extra ? ' ' + extra : '');
         aviso.appendChild(texto);
 
         const boton = document.createElement('button');
@@ -89,6 +91,20 @@ document.addEventListener('DOMContentLoaded', () => {
         boton.innerHTML = '<i class="ph ph-printer"></i> Imprimir nota';
         boton.addEventListener('click', () => abrirCapturaNota(ventaId, cliente, clienteId));
         aviso.appendChild(boton);
+
+        // El cliente se guardó solo con su nombre. Aquí se ofrece completarlo,
+        // sin obligar: el formulario aparece únicamente si le dan clic.
+        if (clienteNuevo && clienteId) {
+            texto.textContent += ' ' + cliente + ' quedó dado de alta con su nombre.';
+
+            const completar = document.createElement('button');
+            completar.type = 'button';
+            completar.className = 'chip';
+            completar.innerHTML = '<i class="ph ph-address-book"></i> Llenar sus datos';
+            completar.addEventListener('click',
+                () => abrirDatosCliente(clienteId, cliente, ventaId, total));
+            aviso.appendChild(completar);
+        }
     }
 
     // ---------- Busqueda de productos ----------
@@ -483,6 +499,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function abrirDatosCliente(clienteId, nombre, ventaId, total) {
+        modalNota.hidden = false;
+
+        NotaDatos.completarCliente({
+            clienteId:  clienteId,
+            nombre:     nombre,
+            contenedor: contenidoNota,
+            rutaApp:    '../../app/controllers/',
+            alCerrar:   (guardados) => {
+                cerrarModalNota();
+
+                // Se rehace el aviso en vez de reemplazarlo: así no se pierde el
+                // botón de imprimir la nota, que es lo que sigue.
+                mostrarAvisoConNota(
+                    ventaId, total, nombre, clienteId, false,
+                    guardados > 0 ? 'Datos de ' + nombre + ' guardados.' : ''
+                );
+            },
+        });
+    }
+
     document.getElementById('btn-cerrar-nota').addEventListener('click', cerrarModalNota);
 
     modalNota.addEventListener('click', (e) => {
@@ -641,7 +678,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // El aviso lleva el boton de imprimir: es el momento en que se
                 // entrega la nota al cliente. Sin limite de tiempo para que no
                 // desaparezca antes de alcanzar a imprimirla.
-                mostrarAvisoConNota(datos.venta_id, datos.total, cuerpo.cliente, cuerpo.cliente_id);
+                // El id sale de la respuesta y no del cuerpo: cuando la venta dio
+                // de alta al cliente, el id lo asignó el servidor.
+                mostrarAvisoConNota(datos.venta_id, datos.total, cuerpo.cliente,
+                                    datos.cliente_id, datos.cliente_nuevo);
                 items = [];
                 clienteSel = { id: null, nombre: '', saldo: 0 };
                 aplicarSaldo = true;

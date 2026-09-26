@@ -491,5 +491,111 @@ window.NotaDatos = (function () {
         ctx.imprimir();
     }
 
-    return { abrir: abrir, abrirVarias: abrirVarias };
+    // ------------------------------------------------------------------
+    // Completar los datos de un cliente, fuera de la impresión
+    // ------------------------------------------------------------------
+    // Se usa justo después de dar de alta a alguien desde la venta: queda
+    // guardado solo con su nombre y aquí se le pueden poner los demás datos, sin
+    // obligar a nadie a hacerlo en ese momento.
+
+    async function completarCliente(opciones) {
+        const { clienteId, nombre, contenedor, rutaApp, alCerrar } = opciones;
+
+        contenedor.innerHTML = '<p class="venta-vacia">Cargando...</p>';
+
+        let guardado = { direccion: '', codigo_postal: '', telefono: '' };
+
+        try {
+            const datos = await (await fetch(
+                rutaApp + RUTA_CLIENTE + '?accion=datos&cliente_id=' + encodeURIComponent(clienteId)
+            )).json();
+
+            if (datos.ok) {
+                guardado = {
+                    direccion:     datos.cliente.direccion || '',
+                    codigo_postal: datos.cliente.codigo_postal || '',
+                    telefono:      datos.cliente.telefono || '',
+                };
+            }
+        } catch (e) {
+            // Se captura en blanco; el guardado igual solo llena lo que falte.
+        }
+
+        contenedor.innerHTML =
+            '<h2 class="detalle-titulo">Datos de ' + esc(nombre) + '</h2>' +
+            '<p class="aviso aviso-info">Quedó dado de alta en el catálogo. ' +
+                'Lo que llenes aquí se guarda y saldrá solo en sus próximas notas. ' +
+                'Puedes dejarlo para después: también se completa desde Usuarios ' +
+                'o al imprimir una nota suya.</p>' +
+            '<div class="form-group">' +
+                '<label for="cli-direccion">Dirección:</label>' +
+                '<input type="text" id="cli-direccion" class="form-control" maxlength="255" ' +
+                       'value="' + esc(guardado.direccion) + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label for="cli-cp">C.P.:</label>' +
+                '<input type="text" id="cli-cp" class="form-control" maxlength="5" ' +
+                       'inputmode="numeric" value="' + esc(guardado.codigo_postal) + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label for="cli-telefono">Teléfono:</label>' +
+                '<input type="tel" id="cli-telefono" class="form-control" maxlength="10" ' +
+                       'inputmode="numeric" placeholder="10 dígitos" ' +
+                       'value="' + esc(guardado.telefono) + '">' +
+            '</div>' +
+            '<div id="nota-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-cliente-despues">Después</button>' +
+                '<button type="button" class="btn-save" id="btn-cliente-guardar">Guardar datos</button>' +
+            '</div>';
+
+        ['cli-cp', 'cli-telefono'].forEach((id) => soloDigitos(document.getElementById(id)));
+
+        document.getElementById('btn-cliente-despues')
+            .addEventListener('click', () => alCerrar && alCerrar());
+
+        document.getElementById('btn-cliente-guardar').addEventListener('click', async () => {
+            const boton = document.getElementById('btn-cliente-guardar');
+            const telefono = document.getElementById('cli-telefono').value;
+
+            if (telefono !== '' && telefono.length !== 10) {
+                avisar('El teléfono debe tener 10 dígitos o quedar vacío.', 'error');
+                return;
+            }
+
+            boton.disabled = true;
+            boton.textContent = 'Guardando...';
+
+            try {
+                const datos = await (await fetch(rutaApp + RUTA_CLIENTE + '?accion=completar', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({
+                        cliente_id:    clienteId,
+                        direccion:     document.getElementById('cli-direccion').value.trim(),
+                        codigo_postal: document.getElementById('cli-cp').value,
+                        telefono:      telefono,
+                    }),
+                })).json();
+
+                if (!datos.ok) {
+                    avisar(datos.error || 'No se pudieron guardar los datos.', 'error');
+                    return;
+                }
+
+                if (alCerrar) alCerrar(datos.guardados || 0);
+
+            } catch (e) {
+                avisar('Error de conexión al guardar los datos.', 'error');
+
+            } finally {
+                boton.disabled = false;
+                boton.textContent = 'Guardar datos';
+            }
+        });
+
+        document.getElementById('cli-direccion').focus();
+    }
+
+    return { abrir: abrir, abrirVarias: abrirVarias, completarCliente: completarCliente };
 })();
