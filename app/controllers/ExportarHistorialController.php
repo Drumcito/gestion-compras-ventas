@@ -47,7 +47,8 @@ try {
                 (SELECT COUNT(*) FROM detalle_venta d WHERE d.venta_id = v.id) AS piezas
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
-          WHERE DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicion . '
+          WHERE v.eliminada_en IS NULL
+            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicion . '
           ORDER BY v.fecha DESC, v.id DESC'
     );
     $stmt->execute($parametros);
@@ -64,7 +65,8 @@ try {
            JOIN ventas v  ON v.id = d.venta_id
            JOIN usuarios u ON u.id = v.usuario_id
            JOIN casas c   ON c.id = d.casa_id
-          WHERE DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicion . '
+          WHERE v.eliminada_en IS NULL
+            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicion . '
           ORDER BY v.fecha DESC, v.id DESC, d.id'
     );
     $stmt->execute($parametros);

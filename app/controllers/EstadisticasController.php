@@ -200,7 +200,7 @@ try {
                 COUNT(DISTINCT CASE WHEN v.tipo_pago = 'credito' THEN v.id END) AS ventas_credito
            FROM ventas v
            JOIN detalle_venta d ON d.venta_id = v.id
-          WHERE v.fecha >= :inicio AND v.fecha < :fin{$filtroCasaDetalle}"
+          WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}"
     );
 
     $stmtResumen->execute($parametros($inicio, $fin));
@@ -214,7 +214,8 @@ try {
         "SELECT COALESCE(SUM(saldo_pendiente), 0) AS por_cobrar,
                 COUNT(CASE WHEN saldo_pendiente > 0 THEN 1 END) AS ventas_con_saldo
            FROM vista_estado_ventas
-          WHERE tipo_pago = 'credito' AND fecha >= :inicio AND fecha < :fin"
+          WHERE tipo_pago = 'credito' AND eliminada_en IS NULL
+            AND fecha >= :inicio AND fecha < :fin"
     );
     $stmt->execute(['inicio' => $inicio, 'fin' => $fin]);
     $cobranza = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -228,7 +229,7 @@ try {
                 SUM(d.cantidad) AS piezas
            FROM ventas v
            JOIN detalle_venta d ON d.venta_id = v.id
-          WHERE v.fecha >= :inicio AND v.fecha < :fin{$filtroCasaDetalle}
+          WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}
           GROUP BY clave
           ORDER BY clave"
     );
@@ -258,7 +259,7 @@ try {
                       FROM detalle_venta d
                       JOIN ventas v ON v.id = d.venta_id
                       JOIN casas c ON c.id = d.casa_id
-                     WHERE v.fecha >= :inicio AND v.fecha < :fin{$filtroCasaDetalle}
+                     WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}
                      GROUP BY d.codigo_interno_producto, c.codigo_casa, c.nombre";
 
     $stmt = $pdo->prepare($consultaTop . ' ORDER BY piezas DESC, importe DESC LIMIT 10');
@@ -285,7 +286,7 @@ try {
                        COUNT(DISTINCT d.codigo_interno_producto) AS productos
                   FROM detalle_venta d
                   JOIN ventas v ON v.id = d.venta_id
-                 WHERE v.fecha >= :inicio AND v.fecha < :fin
+                 WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL
                  GROUP BY d.casa_id
            ) t ON t.casa_id = c.id
           WHERE c.activo = 1
@@ -452,7 +453,7 @@ try {
                 SUM(d.cantidad) AS piezas
            FROM ventas v
            JOIN detalle_venta d ON d.venta_id = v.id
-          WHERE v.fecha >= :inicio AND v.fecha < :fin
+          WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL
             AND v.cliente IS NOT NULL AND TRIM(v.cliente) <> ''{$filtroCasaDetalle}
           GROUP BY TRIM(v.cliente)
           ORDER BY importe DESC
@@ -472,7 +473,7 @@ try {
            FROM ventas v
            JOIN detalle_venta d ON d.venta_id = v.id
            JOIN usuarios u ON u.id = v.usuario_id
-          WHERE v.fecha >= :inicio AND v.fecha < :fin{$filtroCasaDetalle}
+          WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}
           GROUP BY u.id, u.nombre, u.apellido, u.numero_empleado
           ORDER BY importe DESC"
     );

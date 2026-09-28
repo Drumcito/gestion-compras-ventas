@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const contenido    = document.getElementById('contenido-detalle');
     const btnCerrar    = document.getElementById('btn-cerrar-detalle');
     const barraSeleccion = document.getElementById('barra-seleccion');
+    const cajaRecuperables = document.getElementById('recuperables');
 
     const money = (n) => '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -51,6 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const [f, h] = sql.split(' ');
         const [a, m, d] = f.split('-');
         return `${d}/${m}/${a} ${h ? h.slice(0, 5) : ''}`.trim();
+    }
+
+    // Solo la fecha (sin hora), para la entrega: "YYYY-MM-DD" -> "DD/MM/YYYY".
+    function fechaSolo(sql) {
+        if (!sql) return '';
+        const [a, m, d] = String(sql).split(' ')[0].split('-');
+        return `${d}/${m}/${a}`;
     }
 
     // ---------- Rangos rapidos ----------
@@ -131,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Cambiar de filtro descarta lo que estuviera seleccionado.
         barraSeleccion.hidden = true;
         llenarVendedores(datos.vendedores || [], datos.usuario);
+        pintarRecuperables(datos.recuperables || []);
 
         const rango = datos.desde === datos.hasta
             ? fechaLegible(datos.desde)
@@ -166,12 +175,35 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? '<span class="etiqueta etiqueta-' + v.estado_pago + '">Crédito · ' + v.estado_pago + '</span>'
                     : '<span class="etiqueta etiqueta-pagado">Contado</span>');
 
+            const entregada = !!v.entregada_en;
+            if (entregada) fila.classList.add('venta-entregada');
+
+            const marcaEntrega = entregada
+                ? '<i class="ph ph-check-circle icono-entregada" title="Entregada el ' +
+                    fechaSolo(v.entregada_en) + '"></i>'
+                : '';
+
+            const botonEntrega =
+                '<button type="button" class="fila-accion btn-entregar' + (entregada ? ' esta-entregada' : '') + '" ' +
+                    'data-id="' + v.id + '" data-entregada="' + (entregada ? '1' : '0') + '" ' +
+                    'data-fecha="' + (v.entregada_en || '') + '" ' +
+                    'title="' + (entregada ? 'Entregada el ' + fechaSolo(v.entregada_en) + ' (clic para cambiar)' : 'Marcar como entregada') + '" ' +
+                    'aria-label="Marcar como entregada">' +
+                    '<i class="ph ' + (entregada ? 'ph-check-circle' : 'ph-check') + '"></i></button>';
+
+            const botonEliminar = v.puede_eliminar
+                ? '<button type="button" class="fila-accion fila-accion-peligro btn-eliminar" ' +
+                    'data-id="' + v.id + '" title="Eliminar venta" aria-label="Eliminar venta">' +
+                    '<i class="ph ph-trash"></i></button>'
+                : '';
+
             fila.innerHTML =
                 '<label class="venta-elegir" title="Seleccionar para imprimir">' +
                     '<input type="checkbox" class="chk-venta" value="' + v.id + '"></label>' +
                 '<div class="venta-fila-datos">' +
                     '<p class="venta-fila-cliente">' + (v.cliente ? esc(v.cliente) : 'Sin cliente') +
                         (v.puede_editar ? '<i class="ph ph-pencil-simple icono-editable" title="Puedes editar esta venta"></i>' : '') +
+                        marcaEntrega +
                     '</p>' +
                     '<p class="venta-fila-meta">#' + v.id + ' · ' + fechaLegible(v.fecha) +
                         ' · ' + esc(v.vendedor) + ' (' + esc(v.numero_empleado) + ')' +
@@ -179,7 +211,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 '</div>' +
                 '<div class="venta-fila-derecha">' + etiquetaPago +
                     '<span class="venta-fila-total">' + money(v.total) + '</span>' +
-                '</div>';
+                '</div>' +
+                '<div class="venta-fila-acciones">' + botonEntrega + botonEliminar + '</div>';
 
             lista.appendChild(fila);
         });
@@ -435,6 +468,18 @@ document.addEventListener('DOMContentLoaded', () => {
             ? '<button type="button" class="btn-save" id="btn-editar-venta" data-id="' + v.id + '">Editar venta</button>'
             : '<p class="detalle-sub">Solo el vendedor que la hizo o un administrador pueden editarla.</p>';
 
+        const botonEntregaDetalle = v.entregada_en
+            ? '<button type="button" class="chip btn-entrega-detalle esta-entregada" data-id="' + v.id + '" ' +
+                'data-fecha="' + v.entregada_en + '"><i class="ph ph-check-circle"></i> Entregada el ' +
+                fechaSolo(v.entregada_en) + '</button>'
+            : '<button type="button" class="chip btn-entrega-detalle" data-id="' + v.id + '" data-fecha="">' +
+                '<i class="ph ph-check"></i> Marcar entregada</button>';
+
+        const botonEliminarDetalle = v.puede_eliminar
+            ? '<button type="button" class="chip chip-peligro btn-eliminar-detalle" data-id="' + v.id + '">' +
+                '<i class="ph ph-trash"></i> Eliminar venta</button>'
+            : '';
+
         const auditoria = (v.auditoria && v.auditoria.length > 0)
             ? '<div class="detalle-auditoria">' +
                 '<h3>Cambios realizados</h3>' +
@@ -471,7 +516,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<i class="ph ph-printer"></i> Imprimir nota</button>' +
                 '<button type="button" class="chip btn-enviar-nota" data-id="' + v.id + '">' +
                     '<i class="ph ph-paper-plane-tilt"></i> Enviar nota</button>' +
+                botonEntregaDetalle +
                 botonEditar +
+                botonEliminarDetalle +
             '</div>';
     }
 
@@ -1106,6 +1153,160 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ---------- Ventas eliminadas recuperables ----------
+    // El servidor manda cuántos segundos le quedan a cada una; aquí se guarda el
+    // instante en que vence y un temporizador redibuja el reloj cada segundo.
+    let recuperablesActivos  = [];
+    let temporizadorRecuperar = null;
+
+    function pintarRecuperables(datos) {
+        const ahora = Date.now();
+        recuperablesActivos = (datos || []).map((r) => ({
+            id:              r.id,
+            cliente:         r.cliente,
+            total:           r.total,
+            vendedor:        r.vendedor,
+            numero_empleado: r.numero_empleado,
+            fin:             ahora + Number(r.segundos_restantes) * 1000,
+        }));
+        dibujarRecuperables();
+    }
+
+    function dibujarRecuperables() {
+        clearTimeout(temporizadorRecuperar);
+
+        const ahora = Date.now();
+        recuperablesActivos = recuperablesActivos.filter((r) => r.fin - ahora > 0);
+
+        if (recuperablesActivos.length === 0) {
+            cajaRecuperables.hidden = true;
+            cajaRecuperables.innerHTML = '';
+            return;
+        }
+
+        const filas = recuperablesActivos.map((r) => {
+            const seg = Math.max(0, Math.round((r.fin - ahora) / 1000));
+            const mm  = String(Math.floor(seg / 60)).padStart(2, '0');
+            const ss  = String(seg % 60).padStart(2, '0');
+
+            return '<div class="recuperable-fila">' +
+                '<div class="recuperable-datos">' +
+                    '<span class="recuperable-cliente">' + (r.cliente ? esc(r.cliente) : 'Sin cliente') + '</span>' +
+                    '<span class="recuperable-meta">#' + r.id + ' · ' + money(r.total) +
+                        ' · ' + esc(r.vendedor) + ' · se borra en ' +
+                        '<strong class="recuperable-reloj">' + mm + ':' + ss + '</strong></span>' +
+                '</div>' +
+                '<button type="button" class="btn-save btn-recuperar" data-id="' + r.id + '">' +
+                    '<i class="ph ph-arrow-counter-clockwise"></i> Recuperar</button>' +
+            '</div>';
+        }).join('');
+
+        cajaRecuperables.innerHTML =
+            '<div class="recuperables-titulo">' +
+                '<i class="ph ph-trash"></i> Eliminadas hace poco · recupéralas antes de que se borren</div>' +
+            filas;
+        cajaRecuperables.hidden = false;
+
+        temporizadorRecuperar = setTimeout(dibujarRecuperables, 1000);
+    }
+
+    async function accionVenta(cuerpo) {
+        const respuesta = await fetch('../../app/controllers/VentaAccionController.php', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(cuerpo),
+        });
+
+        if (respuesta.status === 401) {
+            mostrarAviso('Tu sesión expiró. Vuelve a iniciar sesión.', 'error');
+            return null;
+        }
+
+        return respuesta.json();
+    }
+
+    async function eliminarVenta(id) {
+        if (!confirm('¿Eliminar esta venta? Podrás recuperarla durante los próximos 10 minutos.')) {
+            return;
+        }
+
+        const datos = await accionVenta({ accion: 'eliminar', venta_id: Number(id) });
+        if (!datos) return;
+
+        if (!datos.ok) {
+            mostrarAviso(datos.error || 'No se pudo eliminar la venta.', 'error');
+            return;
+        }
+
+        mostrarAviso(datos.mensaje || 'Venta eliminada.', 'ok');
+        // Recargar trae el listado sin la venta y la lista de recuperables al día.
+        cargar(inputDesde.value, inputHasta.value || inputDesde.value);
+    }
+
+    async function recuperarVenta(id) {
+        const datos = await accionVenta({ accion: 'recuperar', venta_id: Number(id) });
+        if (!datos) return;
+
+        if (!datos.ok) {
+            mostrarAviso(datos.error || 'No se pudo recuperar la venta.', 'error');
+            // Si ya venció, refrescar para quitarla del panel.
+            cargar(inputDesde.value, inputHasta.value || inputDesde.value);
+            return;
+        }
+
+        mostrarAviso(datos.mensaje || 'Venta recuperada.', 'ok');
+        cargar(inputDesde.value, inputHasta.value || inputDesde.value);
+    }
+
+    // ---------- Marcar entrega ----------
+    // Pequeño formulario dentro del modal: pide (o corrige) la fecha de entrega.
+    function abrirEntrega(id, fechaActual) {
+        const hoy = iso(new Date());
+        const yaEntregada = !!fechaActual;
+
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Marcar entrega · Venta #' + id + '</h2>' +
+            '<p class="detalle-sub">Indica la fecha en que se entregó la mercancía al cliente.</p>' +
+            '<div class="form-group">' +
+                '<label for="entrega-fecha">Fecha de entrega:</label>' +
+                '<input type="date" id="entrega-fecha" class="form-control" max="' + hoy + '" ' +
+                       'value="' + (fechaActual || hoy) + '">' +
+            '</div>' +
+            '<div id="entrega-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-cancelar-entrega" data-id="' + id + '">Cancelar</button>' +
+                (yaEntregada
+                    ? '<button type="button" class="chip chip-peligro" id="btn-quitar-entrega" data-id="' + id + '">' +
+                        'Quitar entrega</button>'
+                    : '') +
+                '<button type="button" class="btn-save" id="btn-guardar-entrega" data-id="' + id + '">' +
+                    '<i class="ph ph-check"></i> Confirmar entrega</button>' +
+            '</div>';
+
+        modal.hidden = false;
+    }
+
+    async function marcarEntrega(id, fecha) {
+        const datos = await accionVenta({ accion: 'entregar', venta_id: Number(id), fecha: fecha });
+        if (!datos) return;
+
+        if (!datos.ok) {
+            const a = document.getElementById('entrega-aviso');
+            if (a) {
+                a.textContent = datos.error || 'No se pudo guardar la entrega.';
+                a.className = 'aviso aviso-error';
+                a.hidden = false;
+            } else {
+                mostrarAviso(datos.error || 'No se pudo guardar la entrega.', 'error');
+            }
+            return;
+        }
+
+        modal.hidden = true;
+        mostrarAviso(datos.mensaje || 'Entrega actualizada.', 'ok');
+        cargar(inputDesde.value, inputHasta.value || inputDesde.value);
+    }
+
     // ---------- Eventos ----------
     chips.forEach((chip) => {
         chip.addEventListener('click', () => {
@@ -1158,8 +1359,27 @@ document.addEventListener('DOMContentLoaded', () => {
         // La casilla y su etiqueta seleccionan; no deben abrir el detalle.
         if (e.target.closest('.venta-elegir')) return;
 
+        // Botones de acción de la fila: no abren el detalle.
+        const btnEntregar = e.target.closest('.btn-entregar');
+        if (btnEntregar) {
+            abrirEntrega(btnEntregar.dataset.id, btnEntregar.dataset.fecha || '');
+            return;
+        }
+
+        const btnEliminar = e.target.closest('.btn-eliminar');
+        if (btnEliminar) {
+            eliminarVenta(btnEliminar.dataset.id);
+            return;
+        }
+
         const fila = e.target.closest('.venta-fila');
         if (fila) verDetalle(fila.dataset.id);
+    });
+
+    // Panel de recuperables (fuera de la lista, por eso su propio manejador).
+    cajaRecuperables.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-recuperar');
+        if (btn) recuperarVenta(btn.dataset.id);
     });
 
     lista.addEventListener('change', (e) => {
@@ -1185,6 +1405,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     lista.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
+        // La casilla y los botones de acción tienen su propio comportamiento con
+        // teclado: no deben abrir además el detalle.
+        if (e.target.closest('.venta-elegir') || e.target.closest('.fila-accion')) return;
         const fila = e.target.closest('.venta-fila');
         if (fila) {
             e.preventDefault();
@@ -1196,6 +1419,44 @@ document.addEventListener('DOMContentLoaded', () => {
         // closest: el click puede caer en el icono de adentro del boton.
         if (e.target.closest('#btn-productos-pdf')) {
             abrirResumenPdf(false);
+            return;
+        }
+
+        // ----- Entrega y eliminación desde el detalle -----
+        const btnEntregaDet = e.target.closest('.btn-entrega-detalle');
+        if (btnEntregaDet) {
+            abrirEntrega(btnEntregaDet.dataset.id, btnEntregaDet.dataset.fecha || '');
+            return;
+        }
+
+        const btnEliminarDet = e.target.closest('.btn-eliminar-detalle');
+        if (btnEliminarDet) {
+            modal.hidden = true;
+            eliminarVenta(btnEliminarDet.dataset.id);
+            return;
+        }
+
+        if (e.target.closest('#btn-guardar-entrega')) {
+            const id    = e.target.closest('#btn-guardar-entrega').dataset.id;
+            const fecha = document.getElementById('entrega-fecha').value;
+            if (!fecha) {
+                const a = document.getElementById('entrega-aviso');
+                a.textContent = 'Elige la fecha de entrega.';
+                a.className = 'aviso aviso-error';
+                a.hidden = false;
+                return;
+            }
+            marcarEntrega(id, fecha);
+            return;
+        }
+
+        if (e.target.closest('#btn-quitar-entrega')) {
+            marcarEntrega(e.target.closest('#btn-quitar-entrega').dataset.id, '');
+            return;
+        }
+
+        if (e.target.closest('#btn-cancelar-entrega')) {
+            verDetalle(e.target.closest('#btn-cancelar-entrega').dataset.id);
             return;
         }
 

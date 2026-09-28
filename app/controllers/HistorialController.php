@@ -16,8 +16,25 @@ $usuarioId = (int) $_SESSION['user_id'];
 $esAdmin   = ($_SESSION['user_role'] ?? '') === 'admin';
 $accion    = $_GET['accion'] ?? 'listar';
 
+// Minutos que una venta eliminada sigue siendo recuperable. Debe coincidir con
+// VentaAccionController.
+const MINUTOS_RECUPERACION = 10;
+
 try {
     $pdo = Database::getConnection();
+
+    // Purga de ventas eliminadas cuyo plazo de recuperacion ya vencio: el
+    // borrado suave se vuelve definitivo. Los detalles, abonos y auditoria se
+    // van en cascada (FK ON DELETE CASCADE). Se corre al abrir el historial,
+    // que es el punto por el que siempre se pasa.
+    // MINUTOS_RECUPERACION es una constante entera del propio codigo (no entra
+    // nada del usuario), por eso se interpola directo: INTERVAL no admite
+    // parametros con prepares reales.
+    $pdo->exec(
+        'DELETE FROM ventas
+          WHERE eliminada_en IS NOT NULL
+            AND eliminada_en < (NOW() - INTERVAL ' . MINUTOS_RECUPERACION . ' MINUTE)'
+    );
 
     // ---------- Detalle de una venta ----------
     if ($accion === 'detalle') {
@@ -25,7 +42,7 @@ try {
 
         $stmt = $pdo->prepare(
             'SELECT v.id, v.cliente, v.cliente_id, v.fecha, v.total, v.tipo_pago, v.estado_pago,
-                    v.credito_aplicado, v.fecha_vencimiento, v.usuario_id,
+                    v.credito_aplicado, v.fecha_vencimiento, v.entregada_en, v.usuario_id,
                     CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
                     u.numero_empleado
                FROM ventas v
@@ -101,8 +118,9 @@ try {
         $stmt->execute(['id' => $ventaId]);
         $venta['auditoria'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Todos ven todas las ventas; editar solo el admin o el dueño de la venta.
-        $venta['puede_editar'] = $esAdmin || ((int) $venta['usuario_id'] === $usuarioId);
+        // Todos ven todas las ventas; editar/eliminar solo el admin o el dueño.
+        $venta['puede_editar']   = $esAdmin || ((int) $venta['usuario_id'] === $usuarioId);
+        $venta['puede_eliminar'] = $venta['puede_editar'];
 
         echo json_encode(['ok' => true, 'venta' => $venta], JSON_UNESCAPED_UNICODE);
         exit;
@@ -144,14 +162,15 @@ try {
 
     $stmt = $pdo->prepare(
         'SELECT v.id, v.cliente, v.fecha, v.total, v.monto_cobrado, v.credito_aplicado, v.tipo_pago,
-                v.estado_pago, v.usuario_id,
+                v.estado_pago, v.entregada_en, v.usuario_id,
                 GREATEST(v.monto_cobrado + v.credito_aplicado - v.total, 0) AS devolucion,
                 CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
                 u.numero_empleado,
                 (SELECT COUNT(*) FROM detalle_venta d WHERE d.venta_id = v.id) AS piezas
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
-          WHERE DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicionUsuario . '
+          WHERE v.eliminada_en IS NULL
+            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicionUsuario . '
           ORDER BY v.fecha DESC, v.id DESC'
     );
 
@@ -167,11 +186,38 @@ try {
     $devoluciones = 0.0;
 
     foreach ($ventas as &$venta) {
-        $venta['puede_editar'] = $esAdmin || ((int) $venta['usuario_id'] === $usuarioId);
+        $venta['puede_editar']   = $esAdmin || ((int) $venta['usuario_id'] === $usuarioId);
+        $venta['puede_eliminar'] = $venta['puede_editar'];
         $totalPeriodo += (float) $venta['total'];
         $devoluciones += (float) $venta['devolucion'];
     }
     unset($venta);
+
+    // ---------- Ventas eliminadas todavia recuperables ----------
+    // Salen aparte del listado y de cualquier filtro de fecha: mientras dure el
+    // plazo, el vendedor (o el admin) las tiene siempre a la mano para deshacer
+    // el borrado. Un vendedor solo ve las suyas; el admin, todas.
+    $sqlRecuperables =
+        'SELECT v.id, v.cliente, v.fecha, v.total, v.usuario_id,
+                CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
+                u.numero_empleado,
+                TIMESTAMPDIFF(SECOND, NOW(),
+                    v.eliminada_en + INTERVAL ' . MINUTOS_RECUPERACION . ' MINUTE) AS segundos_restantes
+           FROM ventas v
+           JOIN usuarios u ON u.id = v.usuario_id
+          WHERE v.eliminada_en IS NOT NULL'
+        . ($esAdmin ? '' : ' AND v.usuario_id = :usuario')
+        . ' ORDER BY v.eliminada_en DESC';
+
+    $stmt = $pdo->prepare($sqlRecuperables);
+    $stmt->execute($esAdmin ? [] : ['usuario' => $usuarioId]);
+
+    // Por si la purga aun no corre para alguna: solo devolvemos las que de verdad
+    // siguen dentro del plazo (segundos_restantes > 0).
+    $recuperables = array_values(array_filter(
+        $stmt->fetchAll(PDO::FETCH_ASSOC),
+        fn($r) => (int) $r['segundos_restantes'] > 0
+    ));
 
     // Lista de vendedores para llenar el selector del filtro.
     $vendedores = $pdo->query(
@@ -190,6 +236,7 @@ try {
         'total'        => number_format($totalPeriodo, 2, '.', ''),
         'devoluciones' => number_format($devoluciones, 2, '.', ''),
         'ventas'       => $ventas,
+        'recuperables' => $recuperables,
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (PDOException $e) {

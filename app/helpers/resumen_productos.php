@@ -28,7 +28,8 @@ function resumenProductosVendidos(PDO $pdo, string $desde, string $hasta, int $u
            FROM detalle_venta d
            JOIN ventas v  ON v.id = d.venta_id
            JOIN casas c   ON c.id = d.casa_id
-          WHERE DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicionUsuario . '
+          WHERE v.eliminada_en IS NULL
+            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicionUsuario . '
           GROUP BY c.nombre, c.codigo_casa, d.codigo_interno_producto
           ORDER BY piezas DESC, importe DESC'
     );

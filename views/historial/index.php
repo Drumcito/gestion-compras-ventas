@@ -71,6 +71,9 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
             <div id="resumen-periodo" class="resumen-periodo"></div>
             <div id="aviso-historial" class="aviso" hidden></div>
 
+            <!-- Ventas recién eliminadas: recuperables por 10 minutos -->
+            <div id="recuperables" class="recuperables" hidden></div>
+
             <!-- Listado de ventas -->
             <div id="lista-ventas" class="lista-ventas"></div>
 

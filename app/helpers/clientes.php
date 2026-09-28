@@ -20,7 +20,7 @@ function saldoFavorCliente(PDO $pdo, int $clienteId): float
         'SELECT COALESCE(SUM(GREATEST(monto_cobrado + credito_aplicado - total, 0)), 0)
               - COALESCE(SUM(credito_aplicado), 0) AS saldo
            FROM ventas
-          WHERE cliente_id = :id'
+          WHERE cliente_id = :id AND eliminada_en IS NULL'
     );
     $stmt->execute(['id' => $clienteId]);
 

@@ -3213,3 +3213,142 @@ select.form-control {
     font-weight: 600;
     color: var(--ga-carbon);
 }
+
+/* ===== Entrega y eliminación de ventas (historial) ===== */
+
+/* Botones de acción a la derecha de cada fila (palomita / eliminar). */
+.venta-fila-acciones {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.fila-accion {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    border: 1px solid #cccccc;
+    background: #ffffff;
+    color: #555555;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.fila-accion:hover {
+    background: #f0f7f0;
+    border-color: #08660b;
+    color: #08660b;
+}
+
+.btn-entregar.esta-entregada {
+    background: #e3f4e4;
+    border-color: #08660b;
+    color: #08660b;
+}
+
+.fila-accion-peligro:hover {
+    background: #fdecea;
+    border-color: #e53935;
+    color: #b71c1c;
+}
+
+/* Palomita verde junto al nombre cuando la venta ya se entregó. */
+.icono-entregada {
+    color: #08660b;
+    margin-left: 0.4rem;
+    font-size: 1rem;
+}
+
+.venta-entregada {
+    border-left: 3px solid #08660b;
+}
+
+/* Botón "Entregada el…" dentro del detalle. */
+.btn-entrega-detalle.esta-entregada {
+    background: #e3f4e4;
+    border-color: #08660b;
+    color: #08660b;
+}
+
+/* ----- Panel de ventas recuperables ----- */
+.recuperables {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin: 0 0 1rem;
+    padding: 0.9rem 1rem;
+    background: #fdf3e2;
+    border: 1px solid #d9a441;
+    border-radius: 12px;
+}
+
+.recuperables-titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    color: #8a5a10;
+}
+
+.recuperable-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    background: #ffffff;
+    border: 1px solid #e7cfa0;
+    border-radius: 10px;
+    padding: 0.6rem 0.8rem;
+}
+
+.recuperable-datos {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.recuperable-cliente {
+    font-weight: 600;
+    color: #222222;
+}
+
+.recuperable-meta {
+    font-size: 0.8rem;
+    color: #666666;
+}
+
+.recuperable-reloj {
+    color: #b71c1c;
+    font-variant-numeric: tabular-nums;
+}
+
+.btn-recuperar {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+    .fila-accion {
+        width: 2.6rem;
+        height: 2.6rem;
+        font-size: 1.35rem;
+    }
+
+    .recuperable-fila {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .btn-recuperar {
+        justify-content: center;
+    }
+}
