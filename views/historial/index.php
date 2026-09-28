@@ -50,7 +50,10 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
                         <label for="hasta">Hasta:</label>
                         <input type="date" id="hasta" class="form-control">
                     </div>
-                    <div class="campo-fecha">
+                    <!-- Filtro por vendedor: solo el admin lo usa. El vendedor ve
+                         unicamente sus ventas, asi que el campo va oculto (pero
+                         presente, para que el script siga leyendo su valor). -->
+                    <div class="campo-fecha"<?= $esAdmin ? '' : ' hidden' ?>>
                         <label for="filtro-usuario">Vendedor:</label>
                         <select id="filtro-usuario" class="form-control">
                             <option value="0">Todos</option>

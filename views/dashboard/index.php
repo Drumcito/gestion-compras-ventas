@@ -67,16 +67,21 @@ $casas = ordenarCasas($casas);
                     </label>
                 </div>
 
-                <!-- Proveedor (Casa) -->
-                <div class="form-group">
+                <!-- Proveedor (Casa). El vendedor no elige casa: no debe saber de
+                     cual es cada pieza. Se le busca siempre en todo el catalogo,
+                     por eso el campo va oculto pero con valor "TODAS" para que la
+                     busqueda siga funcionando. -->
+                <div class="form-group"<?= $esAdmin ? '' : ' hidden' ?>>
                     <label for="proveedor">Proveedor (Casa):</label>
                     <select id="proveedor" name="proveedor" class="form-control">
                         <option value="TODAS">Todas las casas (buscar en todo el catálogo)</option>
-                        <?php foreach ($casas as $casa): ?>
-                            <option value="<?= htmlspecialchars($casa['codigo_casa'], ENT_QUOTES, 'UTF-8') ?>">
-                                <?= htmlspecialchars($casa['etiqueta'], ENT_QUOTES, 'UTF-8') ?>
-                            </option>
-                        <?php endforeach; ?>
+                        <?php if ($esAdmin): ?>
+                            <?php foreach ($casas as $casa): ?>
+                                <option value="<?= htmlspecialchars($casa['codigo_casa'], ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars($casa['etiqueta'], ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </select>
                 </div>
 

@@ -7,6 +7,14 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// El inventario es del catalogo (casas, precios): solo del admin. Un vendedor
+// no debe verlo (ni siquiera tecleando la URL): revelaria de que casa es cada
+// producto, que es justo lo que se le oculta.
+if (($_SESSION['user_role'] ?? '') !== 'admin') {
+    header('Location: ../dashboard/index.php');
+    exit;
+}
+
 $nombreUsuario = $_SESSION['user_name'] ?? 'Usuario';
 $rolUsuario = ucfirst($_SESSION['user_role'] ?? 'Rol');
 $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';

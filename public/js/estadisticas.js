@@ -337,10 +337,13 @@ document.addEventListener('DOMContentLoaded', () => {
             kpi('ph-hourglass-medium', 'Por cobrar', money(r.por_cobrar),
                 r.ventas_con_saldo + ' venta' + (r.ventas_con_saldo === 1 ? '' : 's') + ' a crédito con saldo' +
                 (datos.casa !== 'TODAS' ? ' (todas las casas)' : '')) +
-            kpi('ph-tag', 'Cambios de precio',
-                '<span class="kpi-sube"><i class="ph ph-arrow-up"></i>' + entero(p.subidas) + '</span>' +
-                ' &nbsp;<span class="kpi-baja"><i class="ph ph-arrow-down"></i>' + entero(p.bajadas) + '</span>',
-                'subidas y bajadas en ' + entero(p.productos) + ' producto' + (p.productos === 1 ? '' : 's'));
+            // Los cambios de precio son del catalogo (admin); el vendedor no los ve.
+            (window.ES_ADMIN
+                ? kpi('ph-tag', 'Cambios de precio',
+                    '<span class="kpi-sube"><i class="ph ph-arrow-up"></i>' + entero(p.subidas) + '</span>' +
+                    ' &nbsp;<span class="kpi-baja"><i class="ph ph-arrow-down"></i>' + entero(p.bajadas) + '</span>',
+                    'subidas y bajadas en ' + entero(p.productos) + ' producto' + (p.productos === 1 ? '' : 's'))
+                : '');
     }
 
     // ---------- Piezas de cada tarjeta ----------
@@ -479,6 +482,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ---------- Ventas por casa ----------
     function graficaCasas() {
+        // Esta tarjeta solo existe para el admin; para el vendedor no se dibuja.
+        if (!document.getElementById('card-casas')) return;
+
         const metrica = metricas.casas;
         const casas = datos.por_casa;
         const total = casas.reduce((s, c) => s + c[metrica], 0);
@@ -562,21 +568,39 @@ document.addEventListener('DOMContentLoaded', () => {
         const ancho = document.getElementById('grafica-productos').clientWidth;
         const maximo = ancho < 420 ? 16 : (ancho < 620 ? 22 : 30);
 
+        // El vendedor no ve de que casa es cada producto: sin leyenda de casas,
+        // sin columna de casa y con un solo color en las barras.
+        const verCasa = window.ES_ADMIN;
+
         document.getElementById('sub-productos').textContent =
-            'Top 10 por ' + (metrica === 'importe' ? 'importe' : 'piezas') + ' · el color indica la casa';
+            'Top 10 por ' + (metrica === 'importe' ? 'importe' : 'piezas') +
+            (verCasa ? ' · el color indica la casa' : '');
 
         // Leyenda: solo las casas que aparecen, en el orden fijo de las casas.
-        const presentes = datos.casas.filter((c) => lista.some((p) => p.codigo_casa === c.codigo_casa));
-        leyenda('productos', presentes.map((c) => ({ color: colorCasa(c.codigo_casa), texto: c.nombre })));
+        if (verCasa) {
+            const presentes = datos.casas.filter((c) => lista.some((p) => p.codigo_casa === c.codigo_casa));
+            leyenda('productos', presentes.map((c) => ({ color: colorCasa(c.codigo_casa), texto: c.nombre })));
+        } else {
+            leyenda('productos', []);
+        }
 
         tablas.productos = () => tabla(
-            [{ texto: '#' }, { texto: 'Producto', ancha: true }, { texto: 'Casa' }, { texto: 'Piezas', num: true },
-             { texto: 'Importe', num: true }, { texto: 'Ventas', num: true }],
-            lista.map((p, i) => [
-                i + 1,
-                esc(p.nombre) + '<span class="detalle-sub">' + esc(codigoVisible(p)) + '</span>',
-                etiquetaCasa(p.codigo_casa, p.casa), entero(p.piezas), money(p.importe), entero(p.ventas),
-            ])
+            verCasa
+                ? [{ texto: '#' }, { texto: 'Producto', ancha: true }, { texto: 'Casa' }, { texto: 'Piezas', num: true },
+                   { texto: 'Importe', num: true }, { texto: 'Ventas', num: true }]
+                : [{ texto: '#' }, { texto: 'Producto', ancha: true }, { texto: 'Piezas', num: true },
+                   { texto: 'Importe', num: true }, { texto: 'Ventas', num: true }],
+            lista.map((p, i) => verCasa
+                ? [
+                    i + 1,
+                    esc(p.nombre) + '<span class="detalle-sub">' + esc(codigoVisible(p)) + '</span>',
+                    etiquetaCasa(p.codigo_casa, p.casa), entero(p.piezas), money(p.importe), entero(p.ventas),
+                  ]
+                : [
+                    i + 1,
+                    esc(p.nombre) + '<span class="detalle-sub">' + esc(codigoVisible(p)) + '</span>',
+                    entero(p.piezas), money(p.importe), entero(p.ventas),
+                  ])
         );
         refrescarTabla('productos');
 
@@ -596,7 +620,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     label: metrica === 'importe' ? 'Importe' : 'Piezas',
                     data: lista.map((p) => p[metrica]),
-                    backgroundColor: lista.map((p) => colorCasa(p.codigo_casa)),
+                    // Color por casa solo para el admin; el vendedor las ve todas
+                    // del mismo color (no debe distinguir la casa).
+                    backgroundColor: verCasa ? lista.map((p) => colorCasa(p.codigo_casa)) : color.ventas,
                     borderRadius: 4,
                     borderSkipped: 'start',
                     maxBarThickness: 22,
@@ -620,7 +646,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             label: (item) => {
                                 const p = lista[item.dataIndex];
                                 return [
-                                    ' ' + p.casa + ' · ' + codigoVisible(p),
+                                    // La casa solo se nombra para el admin.
+                                    ' ' + (verCasa ? p.casa + ' · ' : '') + codigoVisible(p),
                                     ' ' + entero(p.piezas) + ' piezas · ' + money(p.importe),
                                     ' en ' + entero(p.ventas) + ' venta' + (p.ventas === 1 ? '' : 's'),
                                 ];
@@ -636,6 +663,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Barras divergentes: las subidas hacia arriba y las bajadas hacia abajo,
     // sobre el mismo eje (numero de cambios).
     function graficaPrecios() {
+        // Solo admin: los cambios de precio son del catalogo, no del vendedor.
+        if (!document.getElementById('card-precios')) return;
+
         let serie = datos.precios.serie;
         const p = datos.precios;
 
@@ -751,6 +781,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ---------- Tablas de detalle ----------
     function tablaCambiosPrecio() {
+        if (!document.getElementById('tabla-cambios-precio')) return;
+
         const top = datos.precios.top.slice(0, cuantosCambios);
         const precio = (n) => (n === null ? '—' : money(n));
 
@@ -801,6 +833,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function tablaVendedores() {
+        if (!document.getElementById('tabla-vendedores')) return;
+
         const lista = datos.vendedores;
         const maximo = lista.length ? lista[0].importe : 0;
 

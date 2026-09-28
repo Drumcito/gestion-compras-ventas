@@ -1,10 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const lista = document.getElementById('lista-clientes');
-    if (!lista) return;
+    // El vendedor entra a esta pantalla en modo "solo alta": puede dar de alta
+    // clientes pero no ve la lista ni el buscador (no puede gestionarlos). Por eso
+    // 'lista', 'buscador' y 'conteo' pueden faltar; lo unico imprescindible es el
+    // formulario de alta (modal + contenido + boton).
+    const contenido = document.getElementById('contenido-cliente');
+    if (!contenido) return;
 
+    const lista     = document.getElementById('lista-clientes');
     const aviso     = document.getElementById('aviso-clientes');
     const modal     = document.getElementById('modal-cliente');
-    const contenido = document.getElementById('contenido-cliente');
     const btnNuevo  = document.getElementById('btn-nuevo-cliente');
     const btnCerrar = document.getElementById('btn-cerrar-cliente');
     const buscador  = document.getElementById('buscar-cliente');
@@ -346,7 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (datos.ok) {
                 modal.hidden = true;
                 mostrarAviso(datos.mensaje, 'ok', 8);
-                cargar();
+                if (lista) cargar();   // en modo solo-alta no hay lista que refrescar
             } else {
                 avisoForm.textContent = datos.error || 'No se pudo guardar.';
                 avisoForm.className = 'aviso aviso-error';
@@ -386,8 +390,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ---------- Eventos ----------
-    btnNuevo.addEventListener('click', () => abrirFormulario(null));
-    btnCerrar.addEventListener('click', () => { modal.hidden = true; });
+    if (btnNuevo) btnNuevo.addEventListener('click', () => abrirFormulario(null));
+    if (btnCerrar) btnCerrar.addEventListener('click', () => { modal.hidden = true; });
 
     modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.hidden = true;
@@ -397,41 +401,46 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Escape') modal.hidden = true;
     });
 
-    lista.addEventListener('click', (e) => {
-        const editar = e.target.closest('.btn-editar-cliente');
-        if (editar) {
-            abrirFormulario(JSON.parse(editar.closest('.usuario-fila').dataset.cliente));
-            return;
-        }
+    // La lista y el buscador solo existen en la gestion (admin). En modo solo-alta
+    // no se cablean ni se carga nada.
+    if (lista) {
+        lista.addEventListener('click', (e) => {
+            const editar = e.target.closest('.btn-editar-cliente');
+            if (editar) {
+                abrirFormulario(JSON.parse(editar.closest('.usuario-fila').dataset.cliente));
+                return;
+            }
 
-        const borrar = e.target.closest('.btn-eliminar-cliente');
-        if (borrar) {
-            eliminar(borrar.dataset.id, borrar.dataset.nombre);
-            return;
-        }
+            const borrar = e.target.closest('.btn-eliminar-cliente');
+            if (borrar) {
+                eliminar(borrar.dataset.id, borrar.dataset.nombre);
+                return;
+            }
 
-        // Cualquier otra parte del renglón abre la ficha.
-        const fila = e.target.closest('.usuario-fila');
-        if (fila) abrirFicha(JSON.parse(fila.dataset.cliente));
-    });
+            // Cualquier otra parte del renglón abre la ficha.
+            const fila = e.target.closest('.usuario-fila');
+            if (fila) abrirFicha(JSON.parse(fila.dataset.cliente));
+        });
 
-    lista.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-        if (e.target.closest('button')) return;
+        lista.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            if (e.target.closest('button')) return;
 
-        const fila = e.target.closest('.usuario-fila');
-        if (fila) {
-            e.preventDefault();
-            abrirFicha(JSON.parse(fila.dataset.cliente));
-        }
-    });
+            const fila = e.target.closest('.usuario-fila');
+            if (fila) {
+                e.preventDefault();
+                abrirFicha(JSON.parse(fila.dataset.cliente));
+            }
+        });
+    }
 
-    let temporizadorBusqueda = null;
-
-    buscador.addEventListener('input', () => {
-        clearTimeout(temporizadorBusqueda);
-        temporizadorBusqueda = setTimeout(filtrar, 150);
-    });
+    if (buscador) {
+        let temporizadorBusqueda = null;
+        buscador.addEventListener('input', () => {
+            clearTimeout(temporizadorBusqueda);
+            temporizadorBusqueda = setTimeout(filtrar, 150);
+        });
+    }
 
     contenido.addEventListener('click', (e) => {
         if (e.target.id === 'btn-cancelar-cliente') modal.hidden = true;
@@ -444,5 +453,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    cargar();
+    if (lista) cargar();   // solo la gestion (admin) carga el listado
 });

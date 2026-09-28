@@ -11,6 +11,11 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/../../config/conexionBD.php';
 require_once __DIR__ . '/../helpers/casas.php';
 
+// El admin ve las estadisticas de todo el negocio; el vendedor, solo las de sus
+// propias ventas, y sin nada que revele las casas ni a los demas vendedores.
+$esAdmin   = ($_SESSION['user_role'] ?? '') === 'admin';
+$usuarioId = (int) $_SESSION['user_id'];
+
 /** Cuantos cambios de precio se detallan (los mas recientes del periodo). */
 const MAX_DETALLE_PRECIOS = 200;
 
@@ -160,8 +165,9 @@ try {
     unset($casaVisible);
 
     // Filtro opcional por casa: aplica a todo lo que sale del detalle de venta
-    // (importe, piezas, productos) y a los cambios de precio.
-    $codigoCasa = $_GET['casa'] ?? 'TODAS';
+    // (importe, piezas, productos) y a los cambios de precio. El vendedor no ve
+    // casas, asi que para el se ignora y siempre es "todas".
+    $codigoCasa = $esAdmin ? ($_GET['casa'] ?? 'TODAS') : 'TODAS';
     $casaId = null;
 
     if ($codigoCasa !== 'TODAS') {
@@ -180,10 +186,25 @@ try {
     $filtroCasaDetalle = $casaId !== null ? ' AND d.casa_id = :casa' : '';
     $filtroCasaPrecio  = $casaId !== null ? ' AND hp.casa_id = :casa' : '';
 
+    // El vendedor queda amarrado a sus propias ventas en todo lo que sale del
+    // detalle de venta. Los cambios de precio son del catalogo (no tienen dueño),
+    // por eso esa parte no se calcula para el vendedor mas abajo.
+    $filtroVendedor = $esAdmin ? '' : ' AND v.usuario_id = :vend';
+
     $parametros = function (string $ini, string $fin) use ($casaId): array {
         $p = ['inicio' => $ini, 'fin' => $fin];
         if ($casaId !== null) {
             $p['casa'] = $casaId;
+        }
+        return $p;
+    };
+
+    // Igual que $parametros pero para las consultas de ventas: agrega el vendedor
+    // cuando quien consulta no es admin.
+    $paramsVenta = function (string $ini, string $fin) use ($parametros, $esAdmin, $usuarioId): array {
+        $p = $parametros($ini, $fin);
+        if (!$esAdmin) {
+            $p['vend'] = $usuarioId;
         }
         return $p;
     };
@@ -200,24 +221,29 @@ try {
                 COUNT(DISTINCT CASE WHEN v.tipo_pago = 'credito' THEN v.id END) AS ventas_credito
            FROM ventas v
            JOIN detalle_venta d ON d.venta_id = v.id
-          WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}"
+          WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}{$filtroVendedor}"
     );
 
-    $stmtResumen->execute($parametros($inicio, $fin));
+    $stmtResumen->execute($paramsVenta($inicio, $fin));
     $resumen = $stmtResumen->fetch(PDO::FETCH_ASSOC);
 
-    $stmtResumen->execute($parametros($antInicio, $antFin));
+    $stmtResumen->execute($paramsVenta($antInicio, $antFin));
     $anterior = $stmtResumen->fetch(PDO::FETCH_ASSOC);
 
-    // Lo que falta por cobrar es de la venta completa, no de una casa.
+    // Lo que falta por cobrar es de la venta completa, no de una casa. Sale de la
+    // tabla de ventas (no de la vista) para poder acotarlo al vendedor en sesion.
     $stmt = $pdo->prepare(
-        "SELECT COALESCE(SUM(saldo_pendiente), 0) AS por_cobrar,
-                COUNT(CASE WHEN saldo_pendiente > 0 THEN 1 END) AS ventas_con_saldo
-           FROM vista_estado_ventas
-          WHERE tipo_pago = 'credito' AND eliminada_en IS NULL
-            AND fecha >= :inicio AND fecha < :fin"
+        "SELECT COALESCE(SUM(GREATEST(v.total - v.monto_cobrado - v.credito_aplicado, 0)), 0) AS por_cobrar,
+                COUNT(CASE WHEN (v.total - v.monto_cobrado - v.credito_aplicado) > 0 THEN 1 END) AS ventas_con_saldo
+           FROM ventas v
+          WHERE v.tipo_pago = 'credito' AND v.eliminada_en IS NULL
+            AND v.fecha >= :inicio AND v.fecha < :fin{$filtroVendedor}"
     );
-    $stmt->execute(['inicio' => $inicio, 'fin' => $fin]);
+    $cobranzaParams = ['inicio' => $inicio, 'fin' => $fin];
+    if (!$esAdmin) {
+        $cobranzaParams['vend'] = $usuarioId;
+    }
+    $stmt->execute($cobranzaParams);
     $cobranza = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // ---------- Ventas en el tiempo ----------
@@ -229,11 +255,11 @@ try {
                 SUM(d.cantidad) AS piezas
            FROM ventas v
            JOIN detalle_venta d ON d.venta_id = v.id
-          WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}
+          WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}{$filtroVendedor}
           GROUP BY clave
           ORDER BY clave"
     );
-    $stmt->execute($parametros($inicio, $fin));
+    $stmt->execute($paramsVenta($inicio, $fin));
     $porClave = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
         $porClave[$fila['clave']] = $fila;
@@ -259,43 +285,57 @@ try {
                       FROM detalle_venta d
                       JOIN ventas v ON v.id = d.venta_id
                       JOIN casas c ON c.id = d.casa_id
-                     WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}
+                     WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}{$filtroVendedor}
                      GROUP BY d.codigo_interno_producto, c.codigo_casa, c.nombre";
 
     $stmt = $pdo->prepare($consultaTop . ' ORDER BY piezas DESC, importe DESC LIMIT 10');
-    $stmt->execute($parametros($inicio, $fin));
+    $stmt->execute($paramsVenta($inicio, $fin));
     $topPiezas = $aNumero($stmt->fetchAll(PDO::FETCH_ASSOC), ['piezas', 'importe', 'ventas']);
 
     $stmt = $pdo->prepare($consultaTop . ' ORDER BY importe DESC, piezas DESC LIMIT 10');
-    $stmt->execute($parametros($inicio, $fin));
+    $stmt->execute($paramsVenta($inicio, $fin));
     $topImporte = $aNumero($stmt->fetchAll(PDO::FETCH_ASSOC), ['piezas', 'importe', 'ventas']);
 
     // ---------- Ventas por casa (siempre todas, para comparar) ----------
-    $stmt = $pdo->prepare(
-        "SELECT c.codigo_casa, c.nombre,
-                COALESCE(t.piezas, 0) AS piezas,
-                COALESCE(t.importe, 0) AS importe,
-                COALESCE(t.ventas, 0) AS ventas,
-                COALESCE(t.productos, 0) AS productos
-           FROM casas c
-           LEFT JOIN (
-                SELECT d.casa_id,
-                       SUM(d.cantidad) AS piezas,
-                       SUM(d.subtotal) AS importe,
-                       COUNT(DISTINCT d.venta_id) AS ventas,
-                       COUNT(DISTINCT d.codigo_interno_producto) AS productos
-                  FROM detalle_venta d
-                  JOIN ventas v ON v.id = d.venta_id
-                 WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL
-                 GROUP BY d.casa_id
-           ) t ON t.casa_id = c.id
-          WHERE c.activo = 1
-          ORDER BY c.codigo_casa"
-    );
-    $stmt->execute(['inicio' => $inicio, 'fin' => $fin]);
-    $porCasa = $aNumero($stmt->fetchAll(PDO::FETCH_ASSOC), ['piezas', 'importe', 'ventas', 'productos']);
+    // Solo para el admin: el vendedor no ve las casas.
+    $porCasa = [];
+
+    if ($esAdmin) {
+        $stmt = $pdo->prepare(
+            "SELECT c.codigo_casa, c.nombre,
+                    COALESCE(t.piezas, 0) AS piezas,
+                    COALESCE(t.importe, 0) AS importe,
+                    COALESCE(t.ventas, 0) AS ventas,
+                    COALESCE(t.productos, 0) AS productos
+               FROM casas c
+               LEFT JOIN (
+                    SELECT d.casa_id,
+                           SUM(d.cantidad) AS piezas,
+                           SUM(d.subtotal) AS importe,
+                           COUNT(DISTINCT d.venta_id) AS ventas,
+                           COUNT(DISTINCT d.codigo_interno_producto) AS productos
+                      FROM detalle_venta d
+                      JOIN ventas v ON v.id = d.venta_id
+                     WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL
+                     GROUP BY d.casa_id
+               ) t ON t.casa_id = c.id
+              WHERE c.activo = 1
+              ORDER BY c.codigo_casa"
+        );
+        $stmt->execute(['inicio' => $inicio, 'fin' => $fin]);
+        $porCasa = $aNumero($stmt->fetchAll(PDO::FETCH_ASSOC), ['piezas', 'importe', 'ventas', 'productos']);
+    }
 
     // ---------- Cambios de precio ----------
+    // Son del catalogo (acciones del admin), no de un vendedor: para el vendedor
+    // esta seccion va vacia y ni se calcula.
+    $resumenPrecios  = ['subidas' => 0, 'bajadas' => 0, 'productos' => 0];
+    $seriePrecios    = [];
+    $topPrecios      = [];
+    $detallePrecios  = [];
+    $detalleCompleto = true;
+
+    if ($esAdmin) {
     // Solo cuentan los cambios reales: de un precio a otro distinto. Cuando un
     // producto no tenia precio y se le pone uno, es "nuevo", no una subida.
     $cambioReal = 'hp.precio_anterior IS NOT NULL AND hp.precio_nuevo IS NOT NULL
@@ -444,6 +484,7 @@ try {
         }
         unset($fila);
     }
+    } // fin del bloque de cambios de precio (solo admin)
 
     // ---------- Mejores clientes ----------
     $stmt = $pdo->prepare(
@@ -454,31 +495,37 @@ try {
            FROM ventas v
            JOIN detalle_venta d ON d.venta_id = v.id
           WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL
-            AND v.cliente IS NOT NULL AND TRIM(v.cliente) <> ''{$filtroCasaDetalle}
+            AND v.cliente IS NOT NULL AND TRIM(v.cliente) <> ''{$filtroCasaDetalle}{$filtroVendedor}
           GROUP BY TRIM(v.cliente)
           ORDER BY importe DESC
           LIMIT 8"
     );
-    $stmt->execute($parametros($inicio, $fin));
+    $stmt->execute($paramsVenta($inicio, $fin));
     $clientes = $aNumero($stmt->fetchAll(PDO::FETCH_ASSOC), ['compras', 'importe', 'piezas']);
 
     // ---------- Vendedores ----------
-    $stmt = $pdo->prepare(
-        "SELECT u.id,
-                CONCAT(u.nombre, ' ', COALESCE(u.apellido, '')) AS nombre,
-                u.numero_empleado,
-                COUNT(DISTINCT v.id) AS ventas,
-                SUM(d.subtotal) AS importe,
-                SUM(d.cantidad) AS piezas
-           FROM ventas v
-           JOIN detalle_venta d ON d.venta_id = v.id
-           JOIN usuarios u ON u.id = v.usuario_id
-          WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}
-          GROUP BY u.id, u.nombre, u.apellido, u.numero_empleado
-          ORDER BY importe DESC"
-    );
-    $stmt->execute($parametros($inicio, $fin));
-    $vendedores = $aNumero($stmt->fetchAll(PDO::FETCH_ASSOC), ['ventas', 'importe', 'piezas']);
+    // La comparativa entre vendedores es solo para el admin; el vendedor no ve a
+    // los demas.
+    $vendedores = [];
+
+    if ($esAdmin) {
+        $stmt = $pdo->prepare(
+            "SELECT u.id,
+                    CONCAT(u.nombre, ' ', COALESCE(u.apellido, '')) AS nombre,
+                    u.numero_empleado,
+                    COUNT(DISTINCT v.id) AS ventas,
+                    SUM(d.subtotal) AS importe,
+                    SUM(d.cantidad) AS piezas
+               FROM ventas v
+               JOIN detalle_venta d ON d.venta_id = v.id
+               JOIN usuarios u ON u.id = v.usuario_id
+              WHERE v.fecha >= :inicio AND v.fecha < :fin AND v.eliminada_en IS NULL{$filtroCasaDetalle}
+              GROUP BY u.id, u.nombre, u.apellido, u.numero_empleado
+              ORDER BY importe DESC"
+        );
+        $stmt->execute($parametros($inicio, $fin));
+        $vendedores = $aNumero($stmt->fetchAll(PDO::FETCH_ASSOC), ['ventas', 'importe', 'piezas']);
+    }
 
     // Un solo punto donde la casa pasa a su etiqueta corta, para no repetirlo
     // en cada consulta.
@@ -514,9 +561,10 @@ try {
         'hasta'      => $fHasta->format('Y-m-d'),
         'agrupacion' => $agrupacion,
         'casa'       => $casaId !== null ? $codigoCasa : 'TODAS',
-        'casas'      => array_map(function ($c) {
+        // El vendedor no ve casas: ni el filtro ni las etiquetas.
+        'casas'      => $esAdmin ? array_map(function ($c) {
             return ['codigo_casa' => $c['codigo_casa'], 'nombre' => $c['nombre']];
-        }, $casas),
+        }, $casas) : [],
         'resumen' => [
             'total'            => (float) $resumen['total'],
             'ventas'           => (int) $resumen['ventas'],

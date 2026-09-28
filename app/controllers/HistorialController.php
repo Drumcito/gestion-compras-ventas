@@ -58,6 +58,14 @@ try {
             exit;
         }
 
+        // Un vendedor solo ve el detalle de sus propias ventas; el admin, el de
+        // todas. La barrera esta en el servidor: no basta con ocultar la fila.
+        if (!$esAdmin && (int) $venta['usuario_id'] !== $usuarioId) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Solo puedes ver las ventas que tu hiciste']);
+            exit;
+        }
+
         $stmt = $pdo->prepare(
             'SELECT c.nombre AS casa, c.codigo_casa, d.codigo_interno_producto, d.nombre_producto,
                     d.tipo_precio, d.precio_aplicado, d.cantidad, d.subtotal
@@ -140,8 +148,12 @@ try {
         [$desde, $hasta] = [$hasta, $desde];
     }
 
-    // Filtro opcional por vendedor: 0 o vacio = todos.
+    // Filtro por vendedor: el admin lo elige (0 o vacio = todos); el vendedor
+    // queda amarrado a sus propias ventas, sin importar lo que mande el navegador.
     $filtroUsuario = isset($_GET['usuario']) ? (int) $_GET['usuario'] : 0;
+    if (!$esAdmin) {
+        $filtroUsuario = $usuarioId;
+    }
     $condicionUsuario = $filtroUsuario > 0 ? ' AND v.usuario_id = :usuario' : '';
 
     // ---------- Resumen de productos vendidos en el periodo ----------
@@ -219,13 +231,16 @@ try {
         fn($r) => (int) $r['segundos_restantes'] > 0
     ));
 
-    // Lista de vendedores para llenar el selector del filtro.
-    $vendedores = $pdo->query(
-        'SELECT u.id, CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS nombre, u.numero_empleado
-           FROM usuarios u
-          WHERE EXISTS (SELECT 1 FROM ventas v WHERE v.usuario_id = u.id)
-          ORDER BY u.nombre'
-    )->fetchAll(PDO::FETCH_ASSOC);
+    // Lista de vendedores para llenar el selector del filtro. Solo el admin
+    // filtra por vendedor; al vendedor no se le manda (ve unicamente lo suyo).
+    $vendedores = $esAdmin
+        ? $pdo->query(
+            'SELECT u.id, CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS nombre, u.numero_empleado
+               FROM usuarios u
+              WHERE EXISTS (SELECT 1 FROM ventas v WHERE v.usuario_id = u.id)
+              ORDER BY u.nombre'
+          )->fetchAll(PDO::FETCH_ASSOC)
+        : [];
 
     echo json_encode([
         'ok'           => true,

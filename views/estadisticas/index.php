@@ -10,6 +10,10 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/../../config/conexionBD.php';
 require_once __DIR__ . '/../../app/helpers/casas.php';
 
+// El admin ve el tablero completo del negocio; el vendedor, solo sus propios
+// numeros y sin nada de casas ni de otros vendedores.
+$esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+
 $casas = Database::getConnection()
     ->query('SELECT codigo_casa, nombre FROM casas WHERE activo = 1')
     ->fetchAll(PDO::FETCH_ASSOC);
@@ -95,15 +99,20 @@ $toggleMetrica = function (string $grupo): string {
                     <label for="hasta">Hasta:</label>
                     <input type="date" id="hasta" class="form-control">
                 </div>
-                <div class="campo-fecha">
+                <!-- Filtro por casa: solo para el admin. Se deja presente pero
+                     oculto al vendedor para que el script siga leyendo su valor
+                     ("TODAS"). -->
+                <div class="campo-fecha"<?= $esAdmin ? '' : ' hidden' ?>>
                     <label for="filtro-casa">Casa:</label>
                     <select id="filtro-casa" class="form-control">
                         <option value="TODAS">Todas</option>
-                        <?php foreach ($casas as $casa): ?>
-                            <option value="<?= htmlspecialchars($casa['codigo_casa'], ENT_QUOTES, 'UTF-8') ?>">
-                                <?= htmlspecialchars($casa['etiqueta'], ENT_QUOTES, 'UTF-8') ?>
-                            </option>
-                        <?php endforeach; ?>
+                        <?php if ($esAdmin): ?>
+                            <?php foreach ($casas as $casa): ?>
+                                <option value="<?= htmlspecialchars($casa['codigo_casa'], ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars($casa['etiqueta'], ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </select>
                 </div>
                 <button type="button" class="btn-save btn-filtrar" id="btn-filtrar">Filtrar</button>
@@ -120,14 +129,19 @@ $toggleMetrica = function (string $grupo): string {
 
             <div class="dash-grid">
                 <?php tarjetaGrafica('ventas', 'Ventas en el tiempo', 'Importe vendido'); ?>
-                <?php tarjetaGrafica('casas', 'Ventas por casa', 'Piezas vendidas de cada casa', $toggleMetrica('casas')); ?>
+                <?php if ($esAdmin): ?>
+                    <?php tarjetaGrafica('casas', 'Ventas por casa', 'Piezas vendidas de cada casa', $toggleMetrica('casas')); ?>
+                <?php endif; ?>
                 <?php tarjetaGrafica('productos', 'Productos más vendidos', 'Top 10', $toggleMetrica('productos')); ?>
-                <?php tarjetaGrafica('precios', 'Cambios de precio',
-                    'Cambios del precio bruto. Abre la tabla para ver qué producto subió o bajó'); ?>
+                <?php if ($esAdmin): ?>
+                    <?php tarjetaGrafica('precios', 'Cambios de precio',
+                        'Cambios del precio bruto. Abre la tabla para ver qué producto subió o bajó'); ?>
+                <?php endif; ?>
             </div>
 
             <!-- Tablas de detalle -->
             <div class="dash-grid dash-grid-tablas">
+                <?php if ($esAdmin): ?>
                 <section class="dash-card dash-card-ancha">
                     <header class="dash-card-cabecera">
                         <div>
@@ -147,6 +161,7 @@ $toggleMetrica = function (string $grupo): string {
                     </header>
                     <div id="tabla-cambios-precio"></div>
                 </section>
+                <?php endif; ?>
 
                 <section class="dash-card">
                     <header class="dash-card-cabecera">
@@ -158,6 +173,7 @@ $toggleMetrica = function (string $grupo): string {
                     <div id="tabla-clientes"></div>
                 </section>
 
+                <?php if ($esAdmin): ?>
                 <section class="dash-card">
                     <header class="dash-card-cabecera">
                         <div>
@@ -167,11 +183,13 @@ $toggleMetrica = function (string $grupo): string {
                     </header>
                     <div id="tabla-vendedores"></div>
                 </section>
+                <?php endif; ?>
             </div>
         </div>
     </main>
 
 
+    <script>window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;</script>
     <script src="<?= recurso('js/estadisticas.js') ?>"></script>
 </body>
 </html>

@@ -17,7 +17,7 @@ $accion = $_GET['accion'] ?? 'preparar';
 function cargarVenta(PDO $pdo, int $ventaId): ?array
 {
     $stmt = $pdo->prepare(
-        'SELECT v.id, v.cliente, v.cliente_id, v.fecha, v.total, v.credito_aplicado, v.tipo_pago,
+        'SELECT v.id, v.usuario_id, v.cliente, v.cliente_id, v.fecha, v.total, v.credito_aplicado, v.tipo_pago,
                 CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
                 c.telefono AS cliente_telefono, c.email AS cliente_email,
                 c.nombre_comercio AS cliente_comercio,
@@ -33,6 +33,20 @@ function cargarVenta(PDO $pdo, int $ventaId): ?array
     return $venta ?: null;
 }
 
+/**
+ * Un vendedor solo puede enviar la nota de sus propias ventas; el admin, la de
+ * todas. Corta el paso en el servidor, no solo en el boton de la pantalla.
+ */
+function verificarPropietario(array $venta): void
+{
+    $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+    if (!$esAdmin && (int) $venta['usuario_id'] !== (int) $_SESSION['user_id']) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Solo puedes enviar las notas de tus ventas']);
+        exit;
+    }
+}
+
 try {
     $pdo = Database::getConnection();
 
@@ -46,6 +60,8 @@ try {
             echo json_encode(['ok' => false, 'error' => 'Venta no encontrada']);
             exit;
         }
+
+        verificarPropietario($venta);
 
         echo json_encode([
             'ok'         => true,
@@ -83,6 +99,8 @@ try {
             echo json_encode(['ok' => false, 'error' => 'Venta no encontrada']);
             exit;
         }
+
+        verificarPropietario($venta);
 
         $stmt = $pdo->prepare(
             'SELECT nombre_producto, precio_aplicado, cantidad, subtotal

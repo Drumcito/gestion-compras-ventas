@@ -8,6 +8,14 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// El inventario (catalogo, casas y precios) es solo del admin. La barrera va en
+// el servidor: ocultar el menu no impide llamar al controlador directo.
+if (($_SESSION['user_role'] ?? '') !== 'admin') {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Solo un administrador puede ver el inventario']);
+    exit;
+}
+
 require_once __DIR__ . '/../../config/conexionBD.php';
 require_once __DIR__ . '/../helpers/casas.php';
 

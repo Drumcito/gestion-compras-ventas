@@ -169,9 +169,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // casa-BNS01, casa-BNS02... le da a cada casa su color en el CSS.
             const claseCasa = 'casa-' + String(p.codigo_casa || '').replace(/[^A-Za-z0-9_-]/g, '');
 
+            // El vendedor no ve de que casa es la pieza: la etiqueta de casa solo
+            // se pinta para el admin.
+            const badgeCasa = window.ES_ADMIN
+                ? '<span class="res-casa ' + claseCasa + '">' + esc(p.nombre_casa) + '</span>'
+                : '';
+
             fila.innerHTML =
-                '<span class="res-nombre">' + esc(p.nombre) +
-                    '<span class="res-casa ' + claseCasa + '">' + esc(p.nombre_casa) + '</span></span>' +
+                '<span class="res-nombre">' + esc(p.nombre) + badgeCasa + '</span>' +
                 '<span class="res-meta">' +
                     '<span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
                     (p.marca ? ' · ' + esc(p.marca) : '') + '</span>' +
@@ -422,11 +427,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const fila = document.createElement('div');
             fila.className = 'venta-item';
 
-            // Un solo precio (el neto): ya no hay selector menudeo/mayoreo.
+            // Un solo precio (el neto): ya no hay selector menudeo/mayoreo. La casa
+            // del renglon solo se muestra al admin (el vendedor no la ve).
+            const metaCasa = window.ES_ADMIN ? esc(item.casa_nombre) + ' · ' : '';
+
             fila.innerHTML =
                 '<p class="item-nombre">' + esc(item.nombre) + '</p>' +
-                '<p class="item-meta">' + esc(item.casa_nombre) +
-                    ' · <span class="codigo-prod">' + esc(item.codigo_visible) + '</span>' +
+                '<p class="item-meta">' + metaCasa +
+                    '<span class="codigo-prod">' + esc(item.codigo_visible) + '</span>' +
                     // Solo el admin puede ajustar el % de un producto durante la venta.
                     (window.ES_ADMIN
                         ? ' · <button type="button" class="link-editar-pct" data-i="' + indice + '">Editar %</button>'

@@ -273,12 +273,17 @@ document.addEventListener('DOMContentLoaded', () => {
             ? fechaLegible(datos.desde)
             : fechaLegible(datos.desde) + ' al ' + fechaLegible(datos.hasta);
 
+        // La nota del vendedor es cosa del admin (es quien puede filtrar por
+        // vendedor); el vendedor solo ve lo suyo, sin ese texto.
+        const notaVendedor = !window.ES_ADMIN
+            ? ''
+            : (filtroUsuario.value > 0
+                ? ' · ' + esc(filtroUsuario.options[filtroUsuario.selectedIndex].text)
+                : ' · todos los vendedores');
+
         const encabezado =
             '<h2 class="detalle-titulo">Productos vendidos</h2>' +
-            '<p class="detalle-sub">' + rango +
-                (filtroUsuario.value > 0
-                    ? ' · ' + esc(filtroUsuario.options[filtroUsuario.selectedIndex].text)
-                    : ' · todos los vendedores') + '</p>';
+            '<p class="detalle-sub">' + rango + notaVendedor + '</p>';
 
         if (r.distintos === 0) {
             contenido.innerHTML = encabezado +
@@ -294,58 +299,85 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<div class="prod-dato prod-dato-importe"><span>' + money(r.importe) + '</span>importe total</div>' +
             '</div>';
 
-        // Los productos vienen ordenados de más a menos vendido; al agruparlos
-        // por casa cada bloque conserva ese orden.
-        const porCasa = {};
-        datos.productos.forEach((p) => {
-            (porCasa[p.codigo_casa] = porCasa[p.codigo_casa] || []).push(p);
-        });
+        // Una fila de producto, igual con o sin agrupar por casa.
+        const filaProducto = (p) =>
+            '<tr>' +
+                '<td>' + esc(p.nombre_producto) +
+                    '<span class="detalle-sub">' +
+                    '<span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
+                    ' · en ' + p.ventas + ' venta' + (Number(p.ventas) === 1 ? '' : 's') + '</span></td>' +
+                '<td class="num"><strong>' + Number(p.piezas).toLocaleString('es-MX') + '</strong></td>' +
+                '<td class="num">' + money(p.importe) + '</td>' +
+            '</tr>';
 
-        // Se recorre resumen.por_casa para respetar el orden de casas (la que
-        // más vendió primero) y tener sus totales a la mano.
-        const bloques = r.por_casa.map((c) => {
-            const filas = (porCasa[c.codigo_casa] || []).map((p) =>
-                '<tr>' +
-                    '<td>' + esc(p.nombre_producto) +
-                        '<span class="detalle-sub">' +
-                        '<span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
-                        ' · en ' + p.ventas + ' venta' + (Number(p.ventas) === 1 ? '' : 's') + '</span></td>' +
-                    '<td class="num"><strong>' + Number(p.piezas).toLocaleString('es-MX') + '</strong></td>' +
-                    '<td class="num">' + money(p.importe) + '</td>' +
-                '</tr>'
-            ).join('');
+        let bloques;
+        let acciones;
+        let pie;
 
-            return '<div class="prod-bloque">' +
-                '<div class="prod-bloque-titulo">' +
-                    '<span class="res-casa casa-' + esc(c.codigo_casa) + '">' + esc(c.casa) + '</span>' +
-                    '<span class="prod-casa-cifras">' +
-                        '<strong>' + Number(c.piezas).toLocaleString('es-MX') + '</strong> piezas · ' +
-                        c.productos + ' producto' + (c.productos === 1 ? '' : 's') + ' · ' +
-                        money(c.importe) +
-                    '</span>' +
-                '</div>' +
-                '<table class="tabla-detalle">' +
-                    '<thead><tr><th>Producto</th>' +
-                    '<th class="num">Piezas</th><th class="num">Importe</th></tr></thead>' +
-                    '<tbody>' + filas + '</tbody>' +
-                '</table>' +
-            '</div>';
-        }).join('');
+        if (window.ES_ADMIN) {
+            // Agrupado por casa: el admin sí ve de qué casa es cada producto.
+            const porCasa = {};
+            datos.productos.forEach((p) => {
+                (porCasa[p.codigo_casa] = porCasa[p.codigo_casa] || []).push(p);
+            });
 
-        // Misma información, en hoja carta vertical: el navegador la guarda como
-        // PDF desde su propio diálogo de impresión.
-        const acciones =
-            '<div class="detalle-acciones">' +
-                '<button type="button" class="chip" id="btn-productos-pdf">' +
-                    '<i class="ph ph-file-pdf" aria-hidden="true"></i> PDF de todo' +
-                '</button>' +
-                '<button type="button" class="chip" id="btn-productos-pdf-casa">' +
-                    '<i class="ph ph-files" aria-hidden="true"></i> PDF, una hoja por casa' +
-                '</button>' +
-            '</div>';
+            // Se recorre resumen.por_casa para respetar el orden de casas (la que
+            // más vendió primero) y tener sus totales a la mano.
+            bloques = r.por_casa.map((c) => {
+                const filas = (porCasa[c.codigo_casa] || []).map(filaProducto).join('');
 
-        contenido.innerHTML = encabezado + acciones + totales + bloques +
-            '<p class="detalle-sub">Casas y productos ordenados de más vendido a menos.</p>';
+                return '<div class="prod-bloque">' +
+                    '<div class="prod-bloque-titulo">' +
+                        '<span class="res-casa casa-' + esc(c.codigo_casa) + '">' + esc(c.casa) + '</span>' +
+                        '<span class="prod-casa-cifras">' +
+                            '<strong>' + Number(c.piezas).toLocaleString('es-MX') + '</strong> piezas · ' +
+                            c.productos + ' producto' + (c.productos === 1 ? '' : 's') + ' · ' +
+                            money(c.importe) +
+                        '</span>' +
+                    '</div>' +
+                    '<table class="tabla-detalle">' +
+                        '<thead><tr><th>Producto</th>' +
+                        '<th class="num">Piezas</th><th class="num">Importe</th></tr></thead>' +
+                        '<tbody>' + filas + '</tbody>' +
+                    '</table>' +
+                '</div>';
+            }).join('');
+
+            // Misma información, en hoja carta vertical: el navegador la guarda
+            // como PDF desde su propio diálogo de impresión.
+            acciones =
+                '<div class="detalle-acciones">' +
+                    '<button type="button" class="chip" id="btn-productos-pdf">' +
+                        '<i class="ph ph-file-pdf" aria-hidden="true"></i> PDF de todo' +
+                    '</button>' +
+                    '<button type="button" class="chip" id="btn-productos-pdf-casa">' +
+                        '<i class="ph ph-files" aria-hidden="true"></i> PDF, una hoja por casa' +
+                    '</button>' +
+                '</div>';
+
+            pie = '<p class="detalle-sub">Casas y productos ordenados de más vendido a menos.</p>';
+        } else {
+            // El vendedor no ve casas: una sola lista con todos sus productos.
+            bloques =
+                '<div class="prod-bloque">' +
+                    '<table class="tabla-detalle">' +
+                        '<thead><tr><th>Producto</th>' +
+                        '<th class="num">Piezas</th><th class="num">Importe</th></tr></thead>' +
+                        '<tbody>' + datos.productos.map(filaProducto).join('') + '</tbody>' +
+                    '</table>' +
+                '</div>';
+
+            acciones =
+                '<div class="detalle-acciones">' +
+                    '<button type="button" class="chip" id="btn-productos-pdf">' +
+                        '<i class="ph ph-file-pdf" aria-hidden="true"></i> PDF' +
+                    '</button>' +
+                '</div>';
+
+            pie = '<p class="detalle-sub">Productos ordenados de más vendido a menos.</p>';
+        }
+
+        contenido.innerHTML = encabezado + acciones + totales + bloques + pie;
     }
 
     /**
@@ -396,11 +428,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function pintarDetalle(v) {
+        // La casa solo se muestra al admin: el vendedor no ve de que casa es cada
+        // pieza, ni siquiera en el detalle de su propia venta.
+        const metaCasaDet = (i) => (window.ES_ADMIN ? esc(i.casa) + ' · ' : '');
+
         const filas = v.items.map((i) =>
             '<tr>' +
                 '<td>' + esc(i.nombre_producto) +
-                    '<span class="detalle-sub">' + esc(i.casa) +
-                    ' · <span class="codigo-prod">' + esc(codigoVisible(i)) + '</span></span></td>' +
+                    '<span class="detalle-sub">' + metaCasaDet(i) +
+                    '<span class="codigo-prod">' + esc(codigoVisible(i)) + '</span></span></td>' +
                 '<td>' + i.tipo_precio + '</td>' +
                 '<td class="num">' + money(i.precio_aplicado) + '</td>' +
                 '<td class="num">' + i.cantidad + '</td>' +
@@ -1091,9 +1127,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const precio = (p.precio_neto !== null && p.precio_neto !== undefined)
                 ? money(Number(p.precio_neto)) : 'Sin precio';
 
+            // El vendedor no ve la casa de la pieza (solo el admin).
+            const badgeCasa = window.ES_ADMIN
+                ? '<span class="res-casa ' + claseCasa + '">' + esc(p.nombre_casa) + '</span>'
+                : '';
+
             return '<div class="search-result-item edit-result-item" role="button" tabindex="0" data-idx="' + idx + '">' +
-                '<span class="res-nombre">' + esc(p.nombre) +
-                    '<span class="res-casa ' + claseCasa + '">' + esc(p.nombre_casa) + '</span></span>' +
+                '<span class="res-nombre">' + esc(p.nombre) + badgeCasa + '</span>' +
                 '<span class="res-meta"><span class="codigo-prod">' + esc(p.codigo_proveedor || p.codigo_interno) + '</span>' +
                     (p.marca ? ' · ' + esc(p.marca) : '') + '</span>' +
                 '<span class="res-precio">' + precio + '</span></div>';
@@ -1162,11 +1202,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function pintarEdicion() {
         const v = ventaEditando;
 
+        const metaCasaEdit = (i) => (window.ES_ADMIN ? esc(i.casa_nombre) + ' · ' : '');
+
         const filas = v.items.map((i, indice) =>
             '<tr>' +
                 '<td>' + esc(i.nombre) +
-                    '<span class="detalle-sub">' + esc(i.casa_nombre) +
-                    ' · <span class="codigo-prod">' + esc(codigoVisible(i)) + '</span></span></td>' +
+                    '<span class="detalle-sub">' + metaCasaEdit(i) +
+                    '<span class="codigo-prod">' + esc(codigoVisible(i)) + '</span></span></td>' +
                 '<td class="num">' + money(i.precio) + '</td>' +
                 '<td class="num">' +
                     '<input type="number" class="input-qty edit-cantidad" data-i="' + indice + '" ' +

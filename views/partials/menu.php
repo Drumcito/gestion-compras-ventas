@@ -6,8 +6,11 @@
  *
  *   $seccionActiva = 'venta' | 'dashboard' | 'historial' | 'usuarios' | 'inventario';
  *
- * La opción "Usuarios" solo se dibuja para el rol admin. El control real está
- * en UsuarioController y en la propia vista: esto es únicamente la interfaz.
+ * La sección "Usuarios/Clientes" la ven ambos roles, pero con distinto alcance:
+ * el admin gestiona usuarios y clientes; el vendedor solo puede dar de alta
+ * clientes (por eso a él el menú se la nombra "Clientes"). El control real está
+ * en UsuarioController / ClienteController y en la propia vista: esto es
+ * únicamente la interfaz. "Inventario" sigue siendo solo del admin.
  */
 
 $seccionActiva  = $seccionActiva ?? '';
@@ -19,8 +22,12 @@ $opciones = [
     ['clave' => 'venta',      'texto' => 'Venta',      'icono' => 'ph-currency-dollar-simple', 'url' => '../dashboard/index.php'],
     ['clave' => 'dashboard',  'texto' => 'Dashboard',  'icono' => 'ph-chart-line-up',          'url' => '../estadisticas/index.php'],
     ['clave' => 'historial',  'texto' => 'Historial',  'icono' => 'ph-clock-counter-clockwise','url' => '../historial/index.php'],
-    ['clave' => 'usuarios',   'texto' => 'Usuarios',   'icono' => 'ph-user-circle',            'url' => '../users/index.php', 'soloAdmin' => true],
-    ['clave' => 'inventario', 'texto' => 'Inventario', 'icono' => 'ph-package',               'url' => '../inventario/index.php'],
+    // Al vendedor la sección le sirve solo para dar de alta clientes; por eso ve
+    // "Clientes" en lugar de "Usuarios".
+    ['clave' => 'usuarios',   'texto' => $esAdministrador ? 'Usuarios' : 'Clientes',
+                              'icono' => $esAdministrador ? 'ph-user-circle' : 'ph-storefront',
+                              'url' => '../users/index.php'],
+    ['clave' => 'inventario', 'texto' => 'Inventario', 'icono' => 'ph-package', 'url' => '../inventario/index.php', 'soloAdmin' => true],
 ];
 
 $visibles = array_filter($opciones, function ($o) use ($esAdministrador) {

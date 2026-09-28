@@ -12,10 +12,11 @@ require_once __DIR__ . '/../../config/conexionBD.php';
 require_once __DIR__ . '/../helpers/clientes.php';
 
 /**
- * Cierra el paso a quien no es administrador. La GESTION de clientes (alta,
- * edicion, baja y el listado completo) vive en el modulo de Usuarios y es solo
- * de admin; la BUSQUEDA (accion=buscar) queda abierta a cualquier usuario con
- * sesion porque el vendedor la necesita para elegir cliente al hacer una venta.
+ * Cierra el paso a quien no es administrador. La GESTION de clientes (edicion,
+ * baja y el listado completo) vive en el modulo de Usuarios y es solo de admin;
+ * en cambio el ALTA (accion=crear) y la BUSQUEDA (accion=buscar) quedan abiertas
+ * a cualquier usuario con sesion: el vendedor puede dar de alta clientes y
+ * elegirlos al hacer una venta, pero no modificarlos ni borrarlos.
  * La barrera esta aqui y no solo en el menu: ocultar un boton no impide que
  * alguien llame al controlador directo.
  */
@@ -452,9 +453,10 @@ try {
     }
 
     // ---------- Alta ----------
+    // Abierta al vendedor: puede DAR DE ALTA clientes (desde el modulo de
+    // Usuarios o al hacer una venta), pero no gestionarlos. Editar, eliminar y
+    // ver el listado completo siguen siendo solo de admin (soloAdmin en cada uno).
     if ($accion === 'crear') {
-        soloAdmin();
-
         $cliente = leerCliente($datos);
 
         $stmt = $pdo->prepare(

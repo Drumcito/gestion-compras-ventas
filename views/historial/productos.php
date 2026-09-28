@@ -39,11 +39,17 @@ if ($desde > $hasta) {
     [$desde, $hasta] = [$hasta, $desde];
 }
 
+// El vendedor solo saca el reporte de sus propias ventas.
+$esAdmin       = ($_SESSION['user_role'] ?? '') === 'admin';
 $filtroUsuario = isset($_GET['usuario']) ? (int) $_GET['usuario'] : 0;
+if (!$esAdmin) {
+    $filtroUsuario = (int) $_SESSION['user_id'];
+}
 
 // porcasa=1: cada casa arranca en hoja nueva, para poder repartir el reporte
-// por proveedor. Sin el, todo va corrido como hasta ahora.
-$porCasa = ($_GET['porcasa'] ?? '') === '1';
+// por proveedor. Sin el, todo va corrido como hasta ahora. Al vendedor, que no
+// ve las casas, el reporte le sale siempre como una sola lista.
+$porCasa = $esAdmin && (($_GET['porcasa'] ?? '') === '1');
 
 try {
     $pdo = Database::getConnection();
@@ -181,6 +187,40 @@ function pintarBloqueCasa(array $casa, array $deLaCasa): void
                     <td class="col-importe"><?= dinero($casa['importe']) ?></td>
                 </tr>
             </tfoot>
+        </table>
+    </div>
+<?php }
+
+/**
+ * Lista plana de productos, sin separar por casa: es la que ve el vendedor, que
+ * no tiene por que saber de que casa es cada pieza.
+ */
+function pintarBloquePlano(array $productos): void
+{ ?>
+    <div class="bloque">
+        <table>
+            <thead>
+                <tr>
+                    <th>PRODUCTO</th>
+                    <th class="col-codigo">CÓDIGO</th>
+                    <th class="col-piezas">PIEZAS</th>
+                    <th class="col-ventas">VENTAS</th>
+                    <th class="col-importe">IMPORTE</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($productos as $p): ?>
+                    <tr>
+                        <td><?= e($p['nombre_producto']) ?></td>
+                        <td class="col-codigo">
+                            <?= e($p['codigo_proveedor'] ?: $p['codigo_interno_producto']) ?>
+                        </td>
+                        <td class="col-piezas"><?= entero($p['piezas']) ?></td>
+                        <td class="col-ventas"><?= entero($p['ventas']) ?></td>
+                        <td class="col-importe"><?= dinero($p['importe']) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
         </table>
     </div>
 <?php }
@@ -493,8 +533,10 @@ function pintarPie(): void
 <div class="barra no-imprimir">
     <span class="cuenta">
         <?= entero($resumen['distintos']) ?> producto<?= $resumen['distintos'] === 1 ? '' : 's' ?>
-        · <?= count($resumen['por_casa']) ?> casa<?= count($resumen['por_casa']) === 1 ? '' : 's' ?>
-        · <?= $porCasa ? 'una hoja por casa' : 'todo corrido' ?>
+        <?php if ($esAdmin): ?>
+            · <?= count($resumen['por_casa']) ?> casa<?= count($resumen['por_casa']) === 1 ? '' : 's' ?>
+            · <?= $porCasa ? 'una hoja por casa' : 'todo corrido' ?>
+        <?php endif; ?>
     </span>
     <button type="button" onclick="window.close()">Cerrar</button>
     <button type="button" class="principal" onclick="window.print()">Guardar en PDF</button>
@@ -533,9 +575,14 @@ function pintarPie(): void
         <?php pintarEncabezado($periodo, $vendedor); ?>
         <?php pintarTotalesPeriodo($resumen); ?>
 
-        <?php foreach ($resumen['por_casa'] as $casa): ?>
-            <?php pintarBloqueCasa($casa, productosDeCasa($productos, $casa['codigo_casa'])); ?>
-        <?php endforeach; ?>
+        <?php if ($esAdmin): ?>
+            <?php foreach ($resumen['por_casa'] as $casa): ?>
+                <?php pintarBloqueCasa($casa, productosDeCasa($productos, $casa['codigo_casa'])); ?>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <?php // El vendedor no ve casas: una sola lista con todos sus productos.
+                  pintarBloquePlano($productos); ?>
+        <?php endif; ?>
 
         <?php pintarGranTotal($resumen); ?>
         <?php pintarPie(); ?>

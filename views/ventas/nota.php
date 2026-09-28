@@ -72,6 +72,15 @@ try {
 
     $marcadores = implode(',', array_fill(0, count($ids), '?'));
 
+    // El vendedor solo imprime notas de sus propias ventas; el admin, de todas.
+    // Una nota ajena simplemente no aparece (queda fuera del resultado).
+    $esAdmin       = ($_SESSION['user_role'] ?? '') === 'admin';
+    $condDueno     = $esAdmin ? '' : ' AND v.usuario_id = ?';
+    $paramsVentas  = $ids;
+    if (!$esAdmin) {
+        $paramsVentas[] = (int) $_SESSION['user_id'];
+    }
+
     $stmt = $pdo->prepare(
         'SELECT v.id, v.cliente, v.fecha, v.total, v.credito_aplicado, v.tipo_pago,
                 CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
@@ -80,10 +89,10 @@ try {
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
            LEFT JOIN clientes c ON c.id = v.cliente_id
-          WHERE v.id IN (' . $marcadores . ')
+          WHERE v.id IN (' . $marcadores . ')' . $condDueno . '
           ORDER BY v.id'
     );
-    $stmt->execute($ids);
+    $stmt->execute($paramsVentas);
     $ventas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     if ($ventas === []) {

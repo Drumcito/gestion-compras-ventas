@@ -24,8 +24,13 @@ if ($desde > $hasta) {
     [$desde, $hasta] = [$hasta, $desde];
 }
 
-// Mismos filtros que la pantalla: rango de fechas y vendedor (0 = todos).
+// Mismos filtros que la pantalla: rango de fechas y vendedor (0 = todos). El
+// vendedor solo exporta sus propias ventas y sin la columna de casa (no la ve).
+$esAdmin       = ($_SESSION['user_role'] ?? '') === 'admin';
 $filtroUsuario = isset($_GET['usuario']) ? (int) $_GET['usuario'] : 0;
+if (!$esAdmin) {
+    $filtroUsuario = (int) $_SESSION['user_id'];
+}
 $condicion     = $filtroUsuario > 0 ? ' AND v.usuario_id = :usuario' : '';
 
 $parametros = ['desde' => $desde, 'hasta' => $hasta];
@@ -125,14 +130,21 @@ $sumaImporte = 0.0;
 foreach ($detalle as $d) {
     [$fecha, $hora] = $partirFecha($d['fecha']);
 
-    $filasDetalle[] = [
+    $fila = [
         (int) $d['venta_id'],
         $fecha,
         $hora,
         $d['cliente'] ?? 'Sin cliente',
         trim($d['vendedor']),
         $d['numero_empleado'],
-        etiquetaCasa($d['codigo_casa']),
+    ];
+
+    // La casa solo va en el export del admin; el vendedor no la ve.
+    if ($esAdmin) {
+        $fila[] = etiquetaCasa($d['codigo_casa']);
+    }
+
+    $filasDetalle[] = array_merge($fila, [
         $d['codigo_interno_producto'],
         $d['nombre_producto'],
         ucfirst($d['tipo_precio']),
@@ -140,14 +152,22 @@ foreach ($detalle as $d) {
         (int) $d['cantidad'],
         (float) $d['subtotal'],
         ucfirst($d['tipo_pago']),
-    ];
+    ]);
 
     $sumaPiezas  += (int) $d['cantidad'];
     $sumaImporte += (float) $d['subtotal'];
 }
 
-$filasDetalle[] = ['', '', '', '', '', '', '', '', 'TOTALES (' . count($detalle) . ' renglones)', '',
-                   '', $sumaPiezas, $sumaImporte, ''];
+// Fila de totales: el "Importe" cae en distinta columna segun haya o no columna
+// de casa, por eso se arma contando las columnas reales.
+$filaTotales = array_fill(0, $esAdmin ? 14 : 13, '');
+$colProducto = $esAdmin ? 8 : 7;   // donde se rotula "TOTALES"
+$colPiezas   = $esAdmin ? 11 : 10;
+$colImporte  = $esAdmin ? 12 : 11;
+$filaTotales[$colProducto] = 'TOTALES (' . count($detalle) . ' renglones)';
+$filaTotales[$colPiezas]   = $sumaPiezas;
+$filaTotales[$colImporte]  = $sumaImporte;
+$filasDetalle[] = $filaTotales;
 
 $excel = new ExcelSimple();
 
@@ -159,13 +179,18 @@ $excel->agregarHoja(
     [8, 12, 8, 28, 22, 14, 8, 14, 14, 13, 13, 15, 13, 12]
 );
 
-$excel->agregarHoja(
-    'Detalle de productos',
-    ['Folio', 'Fecha', 'Hora', 'Cliente', 'Vendedor', 'No. empleado', 'Casa',
-     'Código', 'Producto', 'Precio', 'P. unitario', 'Cantidad', 'Importe', 'Tipo de pago'],
-    $filasDetalle,
-    [8, 12, 8, 24, 22, 14, 18, 15, 46, 11, 13, 10, 13, 14]
+$encabezadoDetalle = array_merge(
+    ['Folio', 'Fecha', 'Hora', 'Cliente', 'Vendedor', 'No. empleado'],
+    $esAdmin ? ['Casa'] : [],
+    ['Código', 'Producto', 'Precio', 'P. unitario', 'Cantidad', 'Importe', 'Tipo de pago']
 );
+$anchosDetalle = array_merge(
+    [8, 12, 8, 24, 22, 14],
+    $esAdmin ? [18] : [],
+    [15, 46, 11, 13, 10, 13, 14]
+);
+
+$excel->agregarHoja('Detalle de productos', $encabezadoDetalle, $filasDetalle, $anchosDetalle);
 
 $nombre = $desde === $hasta
     ? "ventas_{$desde}.xlsx"

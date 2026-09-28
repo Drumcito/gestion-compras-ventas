@@ -7,18 +7,19 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Barrera real: un vendedor que teclee la URL a mano tampoco entra.
-if (($_SESSION['user_role'] ?? '') !== 'admin') {
-    header('Location: ../dashboard/index.php');
-    exit;
-}
+// Ambos roles entran, pero con distinto alcance:
+//   - admin: gestiona usuarios del sistema y clientes (alta, edicion, baja).
+//   - vendedor: solo puede DAR DE ALTA clientes; no ve el listado ni puede
+//     editarlos o borrarlos. El control real esta en los controladores; esto es
+//     solo la interfaz.
+$esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Usuarios - Comercializadora GA-BE</title>
+    <title><?= $esAdmin ? 'Usuarios' : 'Clientes' ?> - Comercializadora GA-BE</title>
 
     <link rel="stylesheet" href="<?= recurso('css/style.css') ?>">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -26,6 +27,8 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
 <body class="dashboard-body">
 
     <?php $seccionActiva = 'usuarios'; include __DIR__ . '/../partials/menu.php'; ?>
+
+    <?php if ($esAdmin): ?>
 
     <main class="main-content">
         <h1 class="page-title">Usuarios</h1>
@@ -88,7 +91,31 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
         </div>
     </div>
 
-    <!-- Alta / edición de cliente -->
+    <?php else: ?>
+
+    <!-- Vista del vendedor: solo dar de alta clientes (sin lista ni gestion). -->
+    <main class="main-content">
+        <h1 class="page-title">Clientes</h1>
+
+        <section class="card-form card-historial">
+            <div class="filtros">
+                <button type="button" class="btn-save" id="btn-nuevo-cliente">
+                    <i class="ph ph-plus"></i> Dar de alta cliente
+                </button>
+            </div>
+
+            <p class="detalle-sub">
+                Aquí puedes registrar clientes nuevos para elegirlos al hacer una venta.
+                La edición y el listado completo los lleva un administrador.
+            </p>
+
+            <div id="aviso-clientes" class="aviso" hidden></div>
+        </section>
+    </main>
+
+    <?php endif; ?>
+
+    <!-- Alta / edición de cliente (lo usan los dos roles) -->
     <div id="modal-cliente" class="modal" hidden>
         <div class="modal-caja">
             <button type="button" class="modal-cerrar" id="btn-cerrar-cliente" title="Cerrar">
@@ -98,8 +125,11 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
         </div>
     </div>
 
+    <?php if ($esAdmin): ?>
     <script src="<?= recurso('js/usuarios.js') ?>"></script>
+    <?php endif; ?>
     <script src="<?= recurso('js/clientes.js') ?>"></script>
+    <?php if ($esAdmin): ?>
     <script>
         // Cambio de pestaña Usuarios / Clientes. Simple: muestra un panel y
         // oculta el otro; cada panel carga sus datos por su cuenta.
@@ -120,5 +150,6 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
             });
         })();
     </script>
+    <?php endif; ?>
 </body>
 </html>
