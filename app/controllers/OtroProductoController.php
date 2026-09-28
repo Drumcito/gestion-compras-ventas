@@ -75,12 +75,17 @@ try {
     }
 
     // Si ya se habia capturado una pieza con el mismo nombre se reutiliza (con el
-    // precio nuevo) en lugar de llenar Otros de duplicados.
+    // precio nuevo) en lugar de llenar Otros de duplicados. Se trae su porcentaje
+    // propio (si un admin se lo puso) para que el precio mostrado sea el que de
+    // verdad se cobrara.
     $stmt = $pdo->prepare(
-        "SELECT codigo_interno, precio_mayoreo FROM `{$tabla}` WHERE nombre = :nombre ORDER BY id LIMIT 1"
+        "SELECT codigo_interno, precio_mayoreo, porcentaje_neto FROM `{$tabla}` WHERE nombre = :nombre ORDER BY id LIMIT 1"
     );
     $stmt->execute(['nombre' => $nombre]);
     $existente = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // El porcentaje del producto reutilizado, o el de la casa para uno nuevo.
+    $porcentaje = porcentajeProducto($existente['porcentaje_neto'] ?? null, $codigoCasa);
 
     $pdo->beginTransaction();
 
@@ -119,7 +124,7 @@ try {
             'codigo_proveedor' => '',
             'nombre'           => $nombre,
             'marca'            => null,
-            'precio_neto'      => netoDe($bruto, porcentajeCasa($codigoCasa)),
+            'precio_neto'      => netoDe($bruto, $porcentaje),
         ],
     ], JSON_UNESCAPED_UNICODE);
 

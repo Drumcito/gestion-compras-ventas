@@ -98,7 +98,7 @@ try {
     // sin emulacion no acepta marcadores en esa posicion.
     $stmt = $pdo->prepare(
         "SELECT codigo_interno, codigo_proveedor, nombre, marca, categoria,
-                precio_mayoreo
+                precio_mayoreo, porcentaje_neto
            FROM {$tabla}
           WHERE activo = 1{$filtro}
           ORDER BY {$orden}
@@ -106,11 +106,26 @@ try {
     );
     $stmt->execute($parametros + $paramOrden);
 
+    // Porcentaje efectivo y neto de cada producto: el suyo propio si lo tiene, o
+    // el de la casa si no. Así la lista muestra el precio de venta y marca cuáles
+    // llevan un porcentaje distinto al de la casa.
+    $porcCasa  = porcentajeCasa($casa);
+    $productos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($productos as &$p) {
+        $override             = $p['porcentaje_neto'];
+        $p['porcentaje_neto'] = porcentajeProducto($override, $casa);
+        $p['porcentaje_propio'] = $override !== null;   // true = distinto al de la casa
+        $p['precio_neto']     = netoDe($p['precio_mayoreo'], $p['porcentaje_neto']);
+    }
+    unset($p);
+
     echo json_encode([
-        'ok'          => true,
-        'casa'        => $casa,
-        'productos'   => $stmt->fetchAll(PDO::FETCH_ASSOC),
-        'total'       => $total,
+        'ok'             => true,
+        'casa'           => $casa,
+        'porcentaje_casa' => $porcCasa,
+        'productos'      => $productos,
+        'total'          => $total,
         'pagina'      => $pagina,
         'por_pagina'  => POR_PAGINA,
         'paginas'     => max(1, (int) ceil($total / POR_PAGINA)),

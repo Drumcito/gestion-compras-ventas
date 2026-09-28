@@ -21,6 +21,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const money = (n) => '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+    // Para el editor de porcentaje: precio con signo o "sin precio", y el mismo
+    // cálculo del neto que netoDe() en el servidor (bruto + %, a 2 decimales).
+    const dinero  = (n) => (n === null || n === '' ? 'sin precio' : money(n));
+    const pctTexto = (n) => Number(n).toLocaleString('es-MX', { maximumFractionDigits: 2 });
+    const netoJS  = (bruto, pct) => (bruto === null || bruto === '' || isNaN(parseFloat(bruto)))
+        ? null
+        : Math.round(parseFloat(bruto) * (1 + Number(pct) / 100) * 100) / 100;
+
     const iso = (fecha) => {
         const f = new Date(fecha.getTime() - fecha.getTimezoneOffset() * 60000);
         return f.toISOString().slice(0, 10);
@@ -397,12 +405,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<td class="num">' + money(i.precio_aplicado) + '</td>' +
                 '<td class="num">' + i.cantidad + '</td>' +
                 '<td class="num">' + money(i.subtotal) + '</td>' +
-                // Cambiar precios es solo del administrador.
+                // Cambiar precios o el porcentaje es solo del administrador.
                 (window.ES_ADMIN
-                    ? '<td><button type="button" class="chip btn-precio" ' +
-                        'data-codigo="' + i.codigo_interno_producto + '" ' +
-                        'data-venta="' + v.id + '" ' +
-                        'title="Cambiar el precio de este producto en el catálogo">Editar precio</button></td>'
+                    ? '<td class="detalle-acciones-celda">' +
+                        '<button type="button" class="chip btn-precio" ' +
+                            'data-codigo="' + i.codigo_interno_producto + '" ' +
+                            'data-venta="' + v.id + '" ' +
+                            'title="Cambiar el precio de este producto en el catálogo">Editar precio</button>' +
+                        '<button type="button" class="chip btn-porcentaje" ' +
+                            'data-codigo="' + i.codigo_interno_producto + '" ' +
+                            'data-venta="' + v.id + '" ' +
+                            'title="Cambiar solo el porcentaje de este producto">Editar %</button>' +
+                      '</td>'
                     : '<td></td>') +
             '</tr>'
         ).join('');
@@ -648,6 +662,142 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             boton.disabled = false;
             boton.textContent = 'Guardar precio';
+        }
+    }
+
+    // ---------- Porcentaje del catalogo ----------
+    // Cambia el porcentaje con el que se calcula el neto de ESTE producto, sin
+    // tocar a los demás de la casa. Vale para ventas futuras; esta venta conserva
+    // su total (por eso el detalle guarda una copia del precio cobrado).
+    let ventaDelPorcentaje = null;
+
+    async function abrirPorcentaje(codigo, ventaId) {
+        ventaDelPorcentaje = ventaId;
+        contenido.innerHTML = '<p class="venta-vacia">Cargando porcentaje actual...</p>';
+
+        try {
+            const respuesta = await fetch(
+                '../../app/controllers/PorcentajeProductoController.php?accion=consultar&codigo=' + encodeURIComponent(codigo)
+            );
+            const datos = await respuesta.json();
+
+            if (!datos.ok) {
+                contenido.innerHTML = '<p class="aviso aviso-error">' +
+                    esc(datos.error || 'No se pudo cargar el producto') + '</p>';
+                return;
+            }
+
+            pintarFormularioPorcentaje(datos.producto);
+
+        } catch (e) {
+            contenido.innerHTML = '<p class="aviso aviso-error">Error de conexión.</p>';
+        }
+    }
+
+    function pintarFormularioPorcentaje(p) {
+        const bruto    = p.precio_mayoreo;
+        const casaPct  = Number(p.porcentaje_casa);
+        const efectivo = Number(p.porcentaje_efectivo);
+
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Editar porcentaje</h2>' +
+            '<div class="detalle-cabecera">' +
+                '<p><strong>' + esc(p.nombre) + '</strong></p>' +
+                '<p class="detalle-sub"><span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
+                    (p.marca ? ' · ' + esc(p.marca) : '') + '</p>' +
+            '</div>' +
+            '<p class="aviso aviso-info">El precio de venta (neto) sale del bruto más un porcentaje. ' +
+                'Aquí lo cambias <strong>solo para este producto</strong>, para las ' +
+                '<strong>ventas futuras</strong>; los demás de ' + esc(p.etiqueta_casa) + ' no se tocan ' +
+                'y las ventas ya registradas conservan su precio.</p>' +
+            '<p class="detalle-sub">Precio bruto: <strong>' + dinero(bruto) + '</strong></p>' +
+            '<p class="pct-actual">Actualmente: <strong>' + pctTexto(efectivo) + '%</strong> → ' +
+                '<strong>' + dinero(netoJS(bruto, efectivo)) + '</strong> ' +
+                '<span class="detalle-sub">(' + (p.usa_casa
+                    ? 'porcentaje de la casa'
+                    : 'porcentaje propio; la casa usa ' + pctTexto(casaPct) + '%') + ')</span></p>' +
+            '<div class="form-group">' +
+                '<label for="pct-nuevo">Nuevo porcentaje (%)</label>' +
+                '<input type="number" id="pct-nuevo" class="form-control" min="0" max="999.99" step="0.01" ' +
+                       'value="' + Number(efectivo).toFixed(2) + '">' +
+            '</div>' +
+            '<p id="pct-nuevo-neto" class="detalle-sub"></p>' +
+            '<label class="pct-casilla">' +
+                '<input type="checkbox" id="pct-usar-casa"' + (p.usa_casa ? ' checked' : '') + '> ' +
+                'Usar el porcentaje de la casa (' + pctTexto(casaPct) + '%)' +
+            '</label>' +
+            '<div id="pct-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-cancelar-porcentaje">Cancelar</button>' +
+                '<button type="button" class="btn-save" id="btn-guardar-porcentaje" ' +
+                    'data-codigo="' + esc(p.codigo_interno) + '">Guardar %</button>' +
+            '</div>';
+
+        const inp   = document.getElementById('pct-nuevo');
+        const chk   = document.getElementById('pct-usar-casa');
+        const linea = document.getElementById('pct-nuevo-neto');
+
+        function refrescar() {
+            const pct = chk.checked ? casaPct : parseFloat(inp.value);
+            inp.disabled = chk.checked;
+            if (chk.checked) inp.value = Number(casaPct).toFixed(2);
+
+            linea.innerHTML = isNaN(pct)
+                ? 'Escribe un porcentaje para ver el precio nuevo.'
+                : 'Nuevo precio de venta: <strong>' + dinero(netoJS(bruto, pct)) + '</strong> ' +
+                  '(bruto + ' + pctTexto(pct) + '%)';
+        }
+
+        chk.addEventListener('change', refrescar);
+        inp.addEventListener('input', refrescar);
+        refrescar();
+    }
+
+    async function guardarPorcentaje(codigo) {
+        const avisoPct = document.getElementById('pct-aviso');
+        const boton    = document.getElementById('btn-guardar-porcentaje');
+        const usarCasa = document.getElementById('pct-usar-casa').checked;
+
+        boton.disabled = true;
+        boton.textContent = 'Guardando...';
+
+        try {
+            const respuesta = await fetch('../../app/controllers/PorcentajeProductoController.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    codigo:     codigo,
+                    porcentaje: usarCasa ? null : document.getElementById('pct-nuevo').value,
+                }),
+            });
+            const datos = await respuesta.json();
+
+            if (!datos.ok) {
+                avisoPct.textContent = datos.error || 'No se pudo guardar.';
+                avisoPct.className = 'aviso aviso-error';
+                avisoPct.hidden = false;
+                return;
+            }
+
+            if (datos.cambios === 0) {
+                mostrarAviso(datos.mensaje, 'ok');
+            } else if (datos.usa_casa) {
+                mostrarAviso(datos.nombre + ' vuelve a usar el ' +
+                    pctTexto(datos.porcentaje_casa) + '% de la casa.', 'ok');
+            } else {
+                mostrarAviso(datos.nombre + ' ahora usa ' + pctTexto(datos.porcentaje_efectivo) + '%' +
+                    (datos.neto !== null ? ' (neto ' + money(datos.neto) + ').' : '.'), 'ok');
+            }
+
+            verDetalle(ventaDelPorcentaje);
+
+        } catch (e) {
+            avisoPct.textContent = 'Error de conexión.';
+            avisoPct.className = 'aviso aviso-error';
+            avisoPct.hidden = false;
+        } finally {
+            boton.disabled = false;
+            boton.textContent = 'Guardar %';
         }
     }
 
@@ -1496,6 +1646,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (e.target.id === 'btn-guardar-precio') {
             guardarPrecio(e.target.dataset.codigo);
+            return;
+        }
+
+        const botonPorcentaje = e.target.closest('.btn-porcentaje');
+        if (botonPorcentaje) {
+            abrirPorcentaje(botonPorcentaje.dataset.codigo, botonPorcentaje.dataset.venta);
+            return;
+        }
+
+        if (e.target.id === 'btn-cancelar-porcentaje') {
+            verDetalle(ventaDelPorcentaje);
+            return;
+        }
+
+        if (e.target.id === 'btn-guardar-porcentaje') {
+            guardarPorcentaje(e.target.dataset.codigo);
             return;
         }
 

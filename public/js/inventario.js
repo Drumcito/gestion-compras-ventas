@@ -16,6 +16,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const RUTA_INV    = '../../app/controllers/InventarioController.php';
     const RUTA_EDITAR = '../../app/controllers/EditarProductoController.php';
+    const RUTA_PCT    = '../../app/controllers/PorcentajeProductoController.php';
+
+    // Mismo cálculo que netoDe() en el servidor: bruto + %, a 2 decimales.
+    const netoJS = (bruto, pct) => (bruto === null || bruto === '' || isNaN(parseFloat(bruto)))
+        ? null
+        : Math.round(parseFloat(bruto) * (1 + Number(pct) / 100) * 100) / 100;
+
+    const pctTexto = (n) => Number(n).toLocaleString('es-MX', { maximumFractionDigits: 2 });
 
     let casaActual   = null;
     let paginaActual = 1;
@@ -174,8 +182,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 fila.tabIndex = 0;
             }
 
+            // Bruto (lo que se captura) y neto (lo que se cobra) con su porcentaje.
+            // El porcentaje se resalta cuando es propio del producto, distinto al
+            // de la casa.
             const precios =
-                '<span class="precio-etiqueta">Bruto <strong>' + money(p.precio_mayoreo) + '</strong></span>';
+                '<span class="precio-etiqueta">Bruto <strong>' + money(p.precio_mayoreo) + '</strong></span>' +
+                '<span class="precio-etiqueta">Neto <strong>' + money(p.precio_neto) + '</strong> ' +
+                    '<span class="pct-etiqueta' + (p.porcentaje_propio ? ' pct-propio' : '') + '" ' +
+                        'title="' + (p.porcentaje_propio
+                            ? 'Porcentaje propio de este producto'
+                            : 'Porcentaje de la casa') + '">' +
+                        pctTexto(p.porcentaje_neto) + '%</span></span>';
 
             fila.innerHTML =
                 '<div class="venta-fila-datos">' +
@@ -189,6 +206,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<div class="precios-producto">' + precios + '</div>' +
                     (window.ES_ADMIN
                         ? '<div class="producto-acciones">' +
+                              '<span class="chip btn-editar-porcentaje" ' +
+                                  'data-codigo="' + esc(p.codigo_interno) + '" ' +
+                                  'title="Cambiar solo el porcentaje de este producto">Editar %</span>' +
                               '<span class="chip btn-editar-precio">Editar</span>' +
                               '<button type="button" class="btn-borrar-prod" ' +
                                   'title="Borrar producto" aria-label="Borrar producto" ' +
@@ -368,6 +388,137 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             boton.disabled = false;
             boton.textContent = 'Guardar';
+        }
+    }
+
+    // ---------- Editar solo el porcentaje de un producto (solo admin) ----------
+    // Cambia el porcentaje con el que se calcula el neto de ESTE producto, sin
+    // tocar a los demás de la casa. Vale para ventas futuras; las ya hechas
+    // conservan su precio.
+    async function abrirPorcentaje(codigo) {
+        contenido.innerHTML = '<p class="venta-vacia">Cargando...</p>';
+        modal.hidden = false;
+
+        try {
+            const datos = await (await fetch(
+                RUTA_PCT + '?accion=consultar&codigo=' + encodeURIComponent(codigo)
+            )).json();
+
+            if (!datos.ok) {
+                contenido.innerHTML = '<p class="aviso aviso-error">' +
+                    esc(datos.error || 'No se pudo cargar el producto') + '</p>';
+                return;
+            }
+
+            pintarPorcentaje(datos.producto);
+
+        } catch (e) {
+            contenido.innerHTML = '<p class="aviso aviso-error">Error de conexión.</p>';
+        }
+    }
+
+    function pintarPorcentaje(p) {
+        const bruto    = p.precio_mayoreo;
+        const casaPct  = Number(p.porcentaje_casa);
+        const efectivo = Number(p.porcentaje_efectivo);
+
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Editar porcentaje</h2>' +
+            '<div class="detalle-cabecera">' +
+                '<p><strong>' + esc(p.nombre) + '</strong></p>' +
+                '<p class="detalle-sub"><span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
+                    (p.marca ? ' · ' + esc(p.marca) : '') + '</p>' +
+            '</div>' +
+            '<p class="aviso aviso-info">El precio de venta (neto) sale del bruto más un porcentaje. ' +
+                'Aquí lo cambias <strong>solo para este producto</strong>; los demás de ' +
+                esc(p.etiqueta_casa) + ' no se tocan. Las ventas ya registradas conservan su precio.</p>' +
+            '<p class="detalle-sub">Precio bruto: <strong>' + money(bruto) + '</strong></p>' +
+            '<p class="pct-actual">Actualmente: <strong>' + pctTexto(efectivo) + '%</strong> → ' +
+                '<strong>' + money(netoJS(bruto, efectivo)) + '</strong> ' +
+                '<span class="detalle-sub">(' + (p.usa_casa
+                    ? 'porcentaje de la casa'
+                    : 'porcentaje propio; la casa usa ' + pctTexto(casaPct) + '%') + ')</span></p>' +
+            '<div class="form-group">' +
+                '<label for="pct-nuevo">Nuevo porcentaje (%)</label>' +
+                '<input type="number" id="pct-nuevo" class="form-control" min="0" max="999.99" step="0.01" ' +
+                       'value="' + Number(efectivo).toFixed(2) + '">' +
+            '</div>' +
+            '<p id="pct-nuevo-neto" class="detalle-sub"></p>' +
+            '<label class="pct-casilla">' +
+                '<input type="checkbox" id="pct-usar-casa"' + (p.usa_casa ? ' checked' : '') + '> ' +
+                'Usar el porcentaje de la casa (' + pctTexto(casaPct) + '%)' +
+            '</label>' +
+            '<div id="pct-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-cancelar-porcentaje">Cancelar</button>' +
+                '<button type="button" class="btn-save" id="btn-guardar-porcentaje" ' +
+                    'data-codigo="' + esc(p.codigo_interno) + '">Guardar %</button>' +
+            '</div>';
+
+        const inp   = document.getElementById('pct-nuevo');
+        const chk   = document.getElementById('pct-usar-casa');
+        const linea = document.getElementById('pct-nuevo-neto');
+
+        function refrescar() {
+            const pct = chk.checked ? casaPct : parseFloat(inp.value);
+            inp.disabled = chk.checked;
+            if (chk.checked) inp.value = Number(casaPct).toFixed(2);
+
+            linea.innerHTML = isNaN(pct)
+                ? 'Escribe un porcentaje para ver el precio nuevo.'
+                : 'Nuevo precio de venta: <strong>' + money(netoJS(bruto, pct)) + '</strong> ' +
+                  '(bruto + ' + pctTexto(pct) + '%)';
+        }
+
+        chk.addEventListener('change', refrescar);
+        inp.addEventListener('input', refrescar);
+        refrescar();
+
+        inp.focus();
+    }
+
+    async function guardarPorcentaje(codigo) {
+        const avisoForm = document.getElementById('pct-aviso');
+        const boton     = document.getElementById('btn-guardar-porcentaje');
+        const usarCasa  = document.getElementById('pct-usar-casa').checked;
+
+        boton.disabled = true;
+        boton.textContent = 'Guardando...';
+
+        try {
+            const datos = await (await fetch(RUTA_PCT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    codigo:     codigo,
+                    porcentaje: usarCasa ? null : document.getElementById('pct-nuevo').value,
+                }),
+            })).json();
+
+            if (!datos.ok) {
+                avisoForm.textContent = datos.error || 'No se pudo guardar.';
+                avisoForm.className = 'aviso aviso-error';
+                avisoForm.hidden = false;
+                return;
+            }
+
+            modal.hidden = true;
+
+            const detalle = datos.usa_casa
+                ? datos.nombre + ' vuelve a usar el ' + pctTexto(datos.porcentaje_casa) + '% de la casa.'
+                : datos.nombre + ' ahora usa ' + pctTexto(datos.porcentaje_efectivo) + '%' +
+                  (datos.neto !== null ? ' (neto ' + money(datos.neto) + ').' : '.');
+
+            mostrarAviso(datos.cambios === 0 ? datos.mensaje : detalle, 'ok');
+            cargarProductos();
+
+        } catch (e) {
+            avisoForm.textContent = 'Error de conexión.';
+            avisoForm.className = 'aviso aviso-error';
+            avisoForm.hidden = false;
+        } finally {
+            boton.disabled = false;
+            boton.textContent = 'Guardar %';
         }
     }
 
@@ -1134,6 +1285,15 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // "Editar %" abre solo el editor de porcentaje; sin esto, el clic caería
+        // en la fila y abriría el editor completo del producto.
+        const editarPct = e.target.closest('.btn-editar-porcentaje');
+        if (editarPct) {
+            e.stopPropagation();
+            abrirPorcentaje(editarPct.dataset.codigo);
+            return;
+        }
+
         const fila = e.target.closest('.producto-fila');
         if (fila) abrirEditor(fila.dataset.codigo);
     });
@@ -1152,6 +1312,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.id === 'btn-cancelar-editar') modal.hidden = true;
         const btnGuardar = e.target.closest('#btn-guardar-editar');
         if (btnGuardar) guardarProducto(btnGuardar.dataset.codigo);
+
+        if (e.target.id === 'btn-cancelar-porcentaje') modal.hidden = true;
+        const btnGuardarPct = e.target.closest('#btn-guardar-porcentaje');
+        if (btnGuardarPct) guardarPorcentaje(btnGuardarPct.dataset.codigo);
 
         if (e.target.id === 'btn-cancelar-borrado') modal.hidden = true;
         const btnBorrar = e.target.closest('#btn-confirmar-borrado');

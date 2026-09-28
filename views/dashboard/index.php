@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../app/helpers/casas.php';
 
 $nombreUsuario = $_SESSION['user_name'] ?? 'Usuario';
 $rolUsuario = ucfirst($_SESSION['user_role'] ?? 'Rol');
+$esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
 $casas = Database::getConnection()
     ->query('SELECT codigo_casa, nombre FROM casas WHERE activo = 1')
@@ -182,6 +183,17 @@ $casas = ordenarCasas($casas);
     </div>
 
 
+    <!-- Editar el porcentaje de un producto durante la venta (solo admin) -->
+    <div id="modal-porcentaje" class="modal" hidden>
+        <div class="modal-caja">
+            <button type="button" class="modal-cerrar" id="btn-cerrar-porcentaje" title="Cerrar">
+                <i class="ph ph-x"></i>
+            </button>
+            <div id="contenido-porcentaje"></div>
+        </div>
+    </div>
+
+    <script>window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;</script>
     <script src="<?= recurso('js/nota_datos.js') ?>"></script>
     <script src="<?= recurso('js/venta.js') ?>"></script>
 </body>

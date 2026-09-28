@@ -118,6 +118,22 @@ function porcentajeCasa(?string $codigoCasa): float
 }
 
 /**
+ * Porcentaje con el que se calcula el neto de UN producto. Cada producto puede
+ * traer el suyo propio (columna porcentaje_neto de su tabla): si lo trae se usa
+ * ese, y si viene vacío (NULL) se usa el de su casa. Así un solo producto puede
+ * llevar un porcentaje distinto sin tocar a los demás de la casa.
+ *
+ * @param mixed $override Valor de la columna porcentaje_neto del producto
+ *                        (número, string numérico o null/'').
+ */
+function porcentajeProducto($override, ?string $codigoCasa): float
+{
+    return ($override === null || $override === '')
+        ? porcentajeCasa($codigoCasa)
+        : (float) $override;
+}
+
+/**
  * Precio neto (el que se cobra) a partir del bruto y un porcentaje: bruto mas
  * ese %, redondeado a 2 decimales. Devuelve null si no hay bruto, para que la
  * pieza sin precio se trate igual que antes (no se puede vender).
@@ -259,6 +275,7 @@ function ddlTablaProductos(string $tabla, int $numero): string
       `categoria` VARCHAR(60) DEFAULT NULL,
       `codigo_sat` VARCHAR(20) DEFAULT NULL,
       `precio_mayoreo` DECIMAL(10,2) DEFAULT NULL,
+      `porcentaje_neto` DECIMAL(5,2) NULL DEFAULT NULL,
       `piezas_inner` INT DEFAULT NULL,
       `piezas_master` INT DEFAULT NULL,
       `fecha_precio_proveedor` DATE DEFAULT NULL,
@@ -470,7 +487,7 @@ function refrescarVistaCatalogo(PDO $pdo): void
         $partes[] = 'SELECT ' . $pdo->quote($codigo) . ' AS codigo_casa, '
                   . $pdo->quote($casa['nombre']) . ' AS nombre_casa, '
                   . 'codigo_interno, codigo_proveedor, nombre, marca, categoria, '
-                  . "precio_mayoreo, activo FROM {$tabla}";
+                  . "precio_mayoreo, porcentaje_neto, activo FROM {$tabla}";
     }
 
     $pdo->exec('CREATE OR REPLACE VIEW vista_catalogo AS ' . implode(' UNION ALL ', $partes));

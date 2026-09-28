@@ -139,7 +139,7 @@ try {
         }
 
         $stmt = $pdo->prepare(
-            "SELECT nombre, precio_mayoreo
+            "SELECT nombre, precio_mayoreo, porcentaje_neto
                FROM {$tablasCasa[$casa]}
               WHERE codigo_interno = :codigo AND activo = 1
               LIMIT 1"
@@ -151,8 +151,9 @@ try {
             throw new RuntimeException("El producto {$codigo} ya no esta disponible");
         }
 
-        // Precio neto: bruto (mayoreo) + porcentaje de la casa, a 2 decimales.
-        $precio = netoDe($producto['precio_mayoreo'], porcentajeCasa($casa));
+        // Precio neto: bruto (mayoreo) + porcentaje del producto (el suyo propio
+        // si lo tiene, o el de la casa si no), a 2 decimales.
+        $precio = netoDe($producto['precio_mayoreo'], porcentajeProducto($producto['porcentaje_neto'], $casa));
 
         if ($precio === null) {
             throw new RuntimeException("{$producto['nombre']} no tiene precio cargado");

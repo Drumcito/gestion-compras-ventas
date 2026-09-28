@@ -2335,10 +2335,74 @@ select.form-control {
     font-size: 1rem;
 }
 
-.btn-editar-precio {
+.btn-editar-precio,
+.btn-editar-porcentaje {
     font-size: 0.78rem;
     padding: 0.25rem 0.7rem;
     white-space: nowrap;
+}
+
+/* Porcentaje que se muestra junto al neto en la lista del inventario. Normal
+   cuando es el de la casa; resaltado cuando el producto trae uno propio. */
+.pct-etiqueta {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 10px;
+    background: #eeeeee;
+    color: #555555;
+}
+
+.pct-etiqueta.pct-propio {
+    background: #fff3cd;
+    color: #7a5b00;
+    font-weight: 600;
+}
+
+/* Línea "Actualmente: X% → $Y" del editor de porcentaje. */
+.pct-actual {
+    margin: 0.6rem 0;
+    font-size: 1rem;
+    color: #333333;
+}
+
+/* Casilla "Usar el porcentaje de la casa" del editor de porcentaje. */
+.pct-casilla {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.4rem 0 0.2rem;
+    font-size: 0.9rem;
+    color: #444444;
+    cursor: pointer;
+}
+
+.pct-casilla input[type="checkbox"] {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+/* "Editar %" dentro del renglón de un producto en la venta. */
+.link-editar-pct {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: 0.85rem;
+    color: #08660b;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.link-editar-pct:hover {
+    color: #05490a;
+}
+
+/* Celda con "Editar precio" + "Editar %" en el detalle de la venta. */
+.detalle-acciones-celda {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
 }
 
 /* Editar precio + la "x" de borrar, alineados en el pie de la fila. */
