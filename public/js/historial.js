@@ -353,6 +353,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<button type="button" class="chip" id="btn-productos-pdf-casa">' +
                         '<i class="ph ph-files" aria-hidden="true"></i> PDF, una hoja por casa' +
                     '</button>' +
+                    '<button type="button" class="btn-save" id="btn-confirmar-compra">' +
+                        '<i class="ph ph-clipboard-text" aria-hidden="true"></i> Confirmar compra' +
+                    '</button>' +
                 '</div>';
 
             pie = '<p class="detalle-sub">Casas y productos ordenados de más vendido a menos.</p>';
@@ -378,6 +381,426 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         contenido.innerHTML = encabezado + acciones + totales + bloques + pie;
+
+        // Se guarda para la confirmación de compra, que parte de esta misma lista.
+        compra.datos = datos;
+    }
+
+    // ---------- Confirmación de compra ----------
+    // Con el ticket del proveedor en la mano: se marcan los productos que NO
+    // hubo, se revisa a qué ventas les pega y se quitan de un golpe. Va en tres
+    // pasos, sin tocar nada hasta el último.
+
+    const RUTA_CONFIRMAR = '../../app/controllers/ConfirmarCompraController.php';
+
+    // Lo que se lleva entre pasos. `faltantes` es un mapa código -> cuántas
+    // piezas NO hubo: puede ser todo lo pedido o solo una parte (llegaron 20 de
+    // las 30 que se pidieron).
+    let compra = { datos: null, faltantes: new Map(), ventas: [] };
+
+    function abrirConfirmacion(datos) {
+        compra = { datos: datos, faltantes: new Map(), ventas: [] };
+        pintarPaso1();
+    }
+
+    /** Piezas pedidas de un producto en el periodo. */
+    function pedidasDe(codigo) {
+        const p = compra.datos.productos.find((x) => x.codigo_interno_producto === codigo);
+        return p ? Number(p.piezas) : 0;
+    }
+
+    /** Paso 1: marcar, sobre la lista de la compra, lo que no hubo. */
+    function pintarPaso1() {
+        const datos = compra.datos;
+
+        const fila = (p) => {
+            const codigo  = p.codigo_interno_producto;
+            const pedidas = Number(p.piezas);
+            const marcado = compra.faltantes.has(codigo);
+            const faltan  = marcado ? compra.faltantes.get(codigo) : pedidas;
+            const llegaron = pedidas - faltan;
+
+            return '<tr class="' + (marcado ? 'compra-fila-falta' : '') + '">' +
+                '<td class="compra-check">' +
+                    '<input type="checkbox" class="chk-falta" ' +
+                           'data-codigo="' + esc(codigo) + '"' +
+                           (marcado ? ' checked' : '') + '>' +
+                '</td>' +
+                '<td>' + esc(p.nombre_producto) +
+                    '<span class="detalle-sub">' +
+                    '<span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
+                    ' · en ' + p.ventas + ' venta' + (Number(p.ventas) === 1 ? '' : 's') + '</span></td>' +
+                '<td class="num"><strong>' + pedidas.toLocaleString('es-MX') + '</strong></td>' +
+                // Cuántas sí traías. Vacío = ninguna, que es el caso normal.
+                '<td class="num compra-llegaron">' +
+                    '<input type="number" class="input-qty num-llegaron" min="0" step="1" ' +
+                           'max="' + pedidas + '" data-codigo="' + esc(codigo) + '" ' +
+                           'value="' + (marcado && llegaron > 0 ? llegaron : '') + '" ' +
+                           'placeholder="0"' + (marcado ? '' : ' disabled') + '>' +
+                '</td>' +
+                '<td class="num">' + money(p.importe) + '</td>' +
+            '</tr>';
+        };
+
+        const porCasa = {};
+        datos.productos.forEach((p) => {
+            (porCasa[p.codigo_casa] = porCasa[p.codigo_casa] || []).push(p);
+        });
+
+        const bloques = datos.resumen.por_casa.map((c) =>
+            '<div class="prod-bloque">' +
+                '<div class="prod-bloque-titulo">' +
+                    '<span class="res-casa casa-' + esc(c.codigo_casa) + '">' + esc(c.casa) + '</span>' +
+                    '<span class="prod-casa-cifras">' +
+                        '<strong>' + Number(c.piezas).toLocaleString('es-MX') + '</strong> piezas · ' +
+                        money(c.importe) +
+                    '</span>' +
+                '</div>' +
+                '<table class="tabla-detalle tabla-compra">' +
+                    '<thead><tr><th class="compra-check">No hubo</th><th>Producto</th>' +
+                    '<th class="num">Pedidas</th><th class="num">Sí hubo</th>' +
+                    '<th class="num">Importe</th></tr></thead>' +
+                    '<tbody>' + (porCasa[c.codigo_casa] || []).map(fila).join('') + '</tbody>' +
+                '</table>' +
+            '</div>'
+        ).join('');
+
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Confirmar compra</h2>' +
+            '<p class="aviso aviso-info">Marca los productos que <strong>no hubo</strong> en la casa. ' +
+                'Si conseguiste solo una parte, escribe cuántas piezas sí traes en ' +
+                '<strong>Sí hubo</strong>. Después verás a qué ventas les pega, y hasta ' +
+                'entonces se toca algo.</p>' +
+            '<p class="detalle-sub" id="compra-conteo"></p>' +
+            bloques +
+            '<div id="compra-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones detalle-acciones-fija">' +
+                '<button type="button" class="chip" id="btn-compra-cancelar">Cancelar</button>' +
+                '<button type="button" class="btn-save" id="btn-compra-revisar" disabled>' +
+                    'Ver a qué ventas afecta</button>' +
+            '</div>';
+
+        actualizarConteoFaltantes();
+    }
+
+    function actualizarConteoFaltantes() {
+        const n = compra.faltantes.size;
+        let piezas = 0;
+        compra.faltantes.forEach((f) => { piezas += f; });
+
+        const conteo = document.getElementById('compra-conteo');
+        const boton  = document.getElementById('btn-compra-revisar');
+
+        if (conteo) {
+            conteo.textContent = n === 0
+                ? 'Ningún producto marcado todavía.'
+                : n + ' producto' + (n === 1 ? '' : 's') + ' con faltante · ' +
+                  piezas + ' pieza' + (piezas === 1 ? '' : 's') + ' por quitar de las ventas.';
+        }
+
+        // Con 0 piezas faltantes no hay nada que hacer, aunque haya marcas.
+        if (boton) boton.disabled = piezas === 0;
+    }
+
+    /** Paso 2: a qué ventas les pega. Aquí todavía no se toca nada. */
+    async function revisarVentas() {
+        const boton = document.getElementById('btn-compra-revisar');
+        boton.disabled = true;
+        boton.textContent = 'Buscando...';
+
+        try {
+            const datos = await (await fetch(RUTA_CONFIRMAR, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    accion:  'lineas',
+                    desde:   compra.datos.desde,
+                    hasta:   compra.datos.hasta,
+                    usuario: filtroUsuario.value || 0,
+                    codigos: [...compra.faltantes.keys()],
+                }),
+            })).json();
+
+            if (!datos.ok) {
+                avisoCompra(datos.error || 'No se pudo consultar.', 'error');
+                return;
+            }
+
+            compra.ventas = datos.ventas;
+            pintarPaso2();
+
+        } catch (e) {
+            avisoCompra('Error de conexión.', 'error');
+
+        } finally {
+            boton.disabled = false;
+            boton.textContent = 'Ver a qué ventas afecta';
+        }
+    }
+
+    /**
+     * Reparte las piezas que faltaron entre las ventas donde se pidió ese
+     * producto. Empieza por las más recientes: quien apartó primero se queda con
+     * lo que sí llegó. Es solo una propuesta, cada renglón se puede ajustar.
+     */
+    function repartirFaltantes() {
+        const pendiente = new Map(compra.faltantes);
+        const asignado  = new Map();   // "venta|codigo" -> piezas a quitar
+
+        // De la más reciente a la más vieja.
+        [...compra.ventas].reverse().forEach((v) => {
+            v.lineas.forEach((l) => {
+                const falta = pendiente.get(l.codigo) || 0;
+                if (falta <= 0) return;
+
+                const quita = Math.min(falta, l.cantidad);
+                asignado.set(v.venta_id + '|' + l.codigo, quita);
+                pendiente.set(l.codigo, falta - quita);
+            });
+        });
+
+        return asignado;
+    }
+
+    function pintarPaso2() {
+        const sugerido = repartirFaltantes();
+
+        const bloques = compra.ventas.map((v) => {
+            const lineas = v.lineas.map((l) => {
+                const quita = sugerido.get(v.venta_id + '|' + l.codigo) || 0;
+                const unitario = l.cantidad > 0 ? l.subtotal / l.cantidad : 0;
+
+                return '<tr>' +
+                    '<td class="compra-check">' +
+                        '<input type="number" class="input-qty num-quitar" min="0" step="1" ' +
+                               'max="' + l.cantidad + '" value="' + quita + '" ' +
+                               'data-venta="' + v.venta_id + '" ' +
+                               'data-codigo="' + esc(l.codigo) + '" ' +
+                               'data-cantidad="' + l.cantidad + '" ' +
+                               'data-unitario="' + unitario + '">' +
+                    '</td>' +
+                    '<td>' + esc(l.nombre) +
+                        '<span class="detalle-sub">' + esc(l.casa) + '</span></td>' +
+                    '<td class="num">' + l.cantidad + '</td>' +
+                    '<td class="num">' + money(l.subtotal) + '</td>' +
+                '</tr>';
+            }).join('');
+
+            return '<div class="prod-bloque compra-venta" data-venta="' + v.venta_id + '">' +
+                '<div class="prod-bloque-titulo">' +
+                    '<span><strong>#' + v.venta_id + '</strong> · ' +
+                        esc(v.cliente || 'Sin cliente') + '</span>' +
+                    '<span class="prod-casa-cifras">' +
+                        fechaLegible(v.fecha.slice(0, 10)) + ' · ' + esc(v.vendedor) +
+                        ' · total ' + money(v.total) +
+                        (v.entregada ? ' · <strong>ya entregada</strong>' : '') +
+                    '</span>' +
+                '</div>' +
+                '<table class="tabla-detalle tabla-compra">' +
+                    '<thead><tr><th class="compra-check">Quitar</th><th>Producto</th>' +
+                    '<th class="num">Pedidas</th><th class="num">Importe</th></tr></thead>' +
+                    '<tbody>' + lineas + '</tbody>' +
+                '</table>' +
+                '<p class="compra-resultado" data-venta="' + v.venta_id + '"></p>' +
+            '</div>';
+        }).join('');
+
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Confirmar compra · qué ventas se ajustan</h2>' +
+            (compra.ventas.length === 0
+                ? '<p class="venta-vacia">Esos productos no aparecen en ninguna venta del periodo.</p>'
+                : '<p class="aviso aviso-alerta">Escribe cuántas piezas se le quitan a cada ' +
+                  'venta. Viene repartido empezando por las más recientes, para que quien ' +
+                  'apartó primero se quede con lo que sí llegó; ajústalo como necesites.</p>' +
+                  '<div id="compra-reparto"></div>') +
+            bloques +
+            '<label class="guardar-cliente" id="compra-vacias" hidden>' +
+                '<input type="checkbox" id="chk-eliminar-vacias">' +
+                '<span>Eliminar las ventas que se queden sin ninguna pieza</span>' +
+            '</label>' +
+            '<div id="compra-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones detalle-acciones-fija">' +
+                '<button type="button" class="chip" id="btn-compra-atras">Atrás</button>' +
+                (compra.ventas.length > 0
+                    ? '<button type="button" class="btn-save" id="btn-compra-aplicar">' +
+                      'Quitar y actualizar las ventas</button>'
+                    : '') +
+            '</div>';
+
+        actualizarResultados();
+    }
+
+    /**
+     * Recalcula en pantalla cómo quedaría cada venta, para que la decisión se
+     * tome viendo el efecto y no a ciegas.
+     */
+    function actualizarResultados() {
+        let hayVacias = false;
+        const repartido = new Map();   // código -> piezas ya asignadas
+
+        compra.ventas.forEach((v) => {
+            const campos = [...document.querySelectorAll(
+                '.num-quitar[data-venta="' + v.venta_id + '"]')];
+
+            let quitado    = 0;   // importe
+            let piezas     = 0;
+            let renglonesVacios = 0;
+
+            campos.forEach((c) => {
+                const quita = Math.max(0, Math.min(Number(c.value) || 0, Number(c.dataset.cantidad)));
+
+                quitado += quita * Number(c.dataset.unitario);
+                piezas  += quita;
+
+                if (quita >= Number(c.dataset.cantidad)) renglonesVacios++;
+
+                repartido.set(c.dataset.codigo, (repartido.get(c.dataset.codigo) || 0) + quita);
+            });
+
+            const nuevo = Math.max(v.total - quitado, 0);
+            // La venta se queda sin nada si desaparecen todos sus renglones.
+            const vacia = piezas > 0 && renglonesVacios === v.lineas_venta;
+
+            if (vacia) hayVacias = true;
+
+            const p = document.querySelector('.compra-resultado[data-venta="' + v.venta_id + '"]');
+            if (!p) return;
+
+            if (piezas === 0) {
+                p.className = 'compra-resultado';
+                p.textContent = 'Esta venta queda igual.';
+                return;
+            }
+
+            if (vacia) {
+                p.className = 'compra-resultado compra-resultado-vacia';
+                p.textContent = 'Se queda sin ninguna pieza: habría que eliminar la venta.';
+                return;
+            }
+
+            // Lo pagado de más se le queda al cliente a favor, como en una devolución.
+            const pagado     = v.cobrado + v.credito;
+            const devolucion = Math.max(pagado - nuevo, 0);
+
+            p.className = 'compra-resultado';
+            p.innerHTML = 'Se quitan <strong>' + piezas + '</strong> pieza' + (piezas === 1 ? '' : 's') +
+                ' · nuevo total: <strong>' + money(nuevo) + '</strong>' +
+                (devolucion > 0
+                    ? ' · quedan <strong>' + money(devolucion) + '</strong> a favor del cliente'
+                    : '');
+        });
+
+        const bloque = document.getElementById('compra-vacias');
+        if (bloque) bloque.hidden = !hayVacias;
+
+        pintarReparto(repartido);
+    }
+
+    /**
+     * Cuadre por producto: cuántas piezas faltaron y cuántas se llevan
+     * repartidas. Mientras no cuadre, se dice qué falta (o qué sobra).
+     */
+    function pintarReparto(repartido) {
+        const caja = document.getElementById('compra-reparto');
+        if (!caja) return;
+
+        const filas = [];
+
+        compra.faltantes.forEach((faltan, codigo) => {
+            const puesto = repartido.get(codigo) || 0;
+            const resto  = faltan - puesto;
+
+            const nombre = (compra.datos.productos.find(
+                (x) => x.codigo_interno_producto === codigo) || {}).nombre_producto || codigo;
+
+            filas.push(
+                '<li class="' + (resto === 0 ? 'reparto-ok' : 'reparto-pendiente') + '">' +
+                    esc(nombre) + ': faltaron <strong>' + faltan + '</strong>, repartidas <strong>' +
+                    puesto + '</strong>' +
+                    (resto > 0 ? ' · quedan ' + resto + ' por repartir'
+                               : (resto < 0 ? ' · te pasaste por ' + Math.abs(resto) : ' ✓')) +
+                '</li>'
+            );
+        });
+
+        caja.innerHTML = '<ul class="compra-reparto">' + filas.join('') + '</ul>';
+    }
+
+    async function aplicarCompra() {
+        const marcadas = [...document.querySelectorAll('.num-quitar')]
+            .map((c) => ({
+                venta_id: Number(c.dataset.venta),
+                codigo:   c.dataset.codigo,
+                cantidad: Math.max(0, Math.min(Number(c.value) || 0, Number(c.dataset.cantidad))),
+            }))
+            .filter((x) => x.cantidad > 0);
+
+        if (marcadas.length === 0) {
+            avisoCompra('No pusiste ninguna pieza para quitar.', 'error');
+            return;
+        }
+
+        const boton = document.getElementById('btn-compra-aplicar');
+        boton.disabled = true;
+        boton.textContent = 'Aplicando...';
+
+        try {
+            const respuesta = await fetch(RUTA_CONFIRMAR, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    accion: 'aplicar',
+                    quitar: marcadas,
+                    eliminar_vacias: document.getElementById('chk-eliminar-vacias')?.checked || false,
+                }),
+            });
+
+            const datos = await respuesta.json();
+
+            if (!datos.ok) {
+                avisoCompra(
+                    datos.sin_piezas
+                        ? datos.error + ' Marca la casilla de abajo para eliminarlas, o desmarca alguna pieza.'
+                        : (datos.error || 'No se pudo aplicar.'),
+                    'error'
+                );
+                return;
+            }
+
+            modal.hidden = true;
+
+            // La recarga va primero: al arrancar oculta el aviso, así que si el
+            // mensaje se pusiera antes se perdería.
+            await cargar(inputDesde.value, inputHasta.value || inputDesde.value);
+
+            const r = datos.resumen;
+            mostrarAviso(
+                'Compra confirmada: se quitaron ' + r.piezas + ' pieza' + (r.piezas === 1 ? '' : 's') +
+                ' (' + money(r.importe) + ') de ' + r.ventas + ' venta' + (r.ventas === 1 ? '' : 's') +
+                (r.eliminadas > 0
+                    ? '. ' + r.eliminadas + ' venta' + (r.eliminadas === 1 ? ' quedó eliminada' : 's quedaron eliminadas') +
+                      ' por quedarse sin piezas.'
+                    : '.'),
+                'ok', 12
+            );
+
+        } catch (e) {
+            avisoCompra('Error de conexión.', 'error');
+
+        } finally {
+            boton.disabled = false;
+            boton.textContent = 'Quitar y actualizar las ventas';
+        }
+    }
+
+    function avisoCompra(texto, tipo) {
+        const caja = document.getElementById('compra-aviso');
+        if (!caja) return;
+
+        caja.textContent = texto;
+        caja.className = 'aviso aviso-' + tipo;
+        caja.hidden = false;
+        caja.scrollIntoView({ block: 'nearest' });
     }
 
     /**
@@ -1609,6 +2032,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     contenido.addEventListener('click', async (e) => {
         // closest: el click puede caer en el icono de adentro del boton.
+        // ---- Confirmación de compra ----
+        if (e.target.closest('#btn-confirmar-compra')) {
+            abrirConfirmacion(compra.datos);
+            return;
+        }
+
+        if (e.target.closest('#btn-compra-cancelar')) {
+            verProductos();
+            return;
+        }
+
+        if (e.target.closest('#btn-compra-revisar')) {
+            revisarVentas();
+            return;
+        }
+
+        if (e.target.closest('#btn-compra-atras')) {
+            pintarPaso1();
+            return;
+        }
+
+        if (e.target.closest('#btn-compra-aplicar')) {
+            aplicarCompra();
+            return;
+        }
+
         if (e.target.closest('#btn-productos-pdf')) {
             abrirResumenPdf(false);
             return;
@@ -1784,6 +2233,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     contenido.addEventListener('input', (e) => {
+        // Los campos de la confirmación se recalculan al teclear, no hasta salir
+        // del campo: así el cuadre por producto va al día.
+        if (e.target.classList.contains('num-llegaron') ||
+            e.target.classList.contains('num-quitar')) {
+            e.target.dispatchEvent(new Event('change', { bubbles: true }));
+            return;
+        }
+
         // El nombre se guarda en el estado a cada tecla: pintarEdicion() se
         // vuelve a ejecutar al cambiar una cantidad y si no, se perderia.
         if (e.target.id === 'edit-cliente' && ventaEditando) {
@@ -1829,6 +2286,49 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     contenido.addEventListener('change', (e) => {
+        // Paso 1: marcar un producto como no disponible.
+        if (e.target.classList.contains('chk-falta')) {
+            const codigo = e.target.dataset.codigo;
+            const fila   = e.target.closest('tr');
+            const campo  = fila.querySelector('.num-llegaron');
+
+            if (e.target.checked) {
+                // Por omisión no llegó ninguna: faltan todas las pedidas.
+                compra.faltantes.set(codigo, pedidasDe(codigo));
+                campo.disabled = false;
+                campo.value = '';
+            } else {
+                compra.faltantes.delete(codigo);
+                campo.disabled = true;
+                campo.value = '';
+            }
+
+            fila.classList.toggle('compra-fila-falta', e.target.checked);
+            actualizarConteoFaltantes();
+            return;
+        }
+
+        // Paso 1: cuántas piezas sí llegaron de ese producto.
+        if (e.target.classList.contains('num-llegaron')) {
+            const codigo  = e.target.dataset.codigo;
+            const pedidas = pedidasDe(codigo);
+
+            let llegaron = Math.max(0, Math.min(Number(e.target.value) || 0, pedidas));
+            e.target.value = llegaron > 0 ? llegaron : '';
+
+            compra.faltantes.set(codigo, pedidas - llegaron);
+            actualizarConteoFaltantes();
+            return;
+        }
+
+        // Paso 2: cuántas piezas se le quitan a cada venta.
+        if (e.target.classList.contains('num-quitar')) {
+            const tope = Number(e.target.dataset.cantidad);
+            e.target.value = Math.max(0, Math.min(Number(e.target.value) || 0, tope));
+            actualizarResultados();
+            return;
+        }
+
         if (e.target.classList.contains('edit-cantidad')) {
             const cantidad = parseInt(e.target.value, 10);
             ventaEditando.items[e.target.dataset.i].cantidad =

@@ -3416,3 +3416,97 @@ select.form-control {
         justify-content: center;
     }
 }
+
+/* ===== CONFIRMACIÓN DE COMPRA ===== */
+
+/* Tablas con casilla al frente: la columna se mantiene angosta. */
+.tabla-compra .compra-check {
+    width: 3.5rem;
+    text-align: center;
+}
+
+.tabla-compra .compra-check input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    accent-color: #08660b;
+    cursor: pointer;
+    transform: scale(1.2);
+}
+
+/* Producto marcado como no disponible: se atenúa para ver de un vistazo lo que
+   queda por revisar. */
+.compra-fila-falta {
+    background: #fdf3e2;
+}
+
+.compra-fila-falta td:nth-child(2) {
+    text-decoration: line-through;
+    text-decoration-color: #b98a2e;
+    color: #7a6229;
+}
+
+/* Cómo queda cada venta si se aplica: se calcula en pantalla antes de tocar nada. */
+.compra-resultado {
+    margin: 0.2rem 0 0.4rem;
+    font-size: 0.88rem;
+    color: #444444;
+}
+
+.compra-resultado strong {
+    color: var(--ga-carbon);
+}
+
+.compra-resultado-vacia {
+    color: #b71c1c;
+    font-weight: 600;
+}
+
+.compra-venta .prod-bloque-titulo {
+    align-items: baseline;
+}
+
+/* Los botones del flujo quedan a la vista aunque la lista sea larga. */
+.detalle-acciones-fija {
+    position: sticky;
+    bottom: 0;
+    background: #ffffff;
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* Campos de cantidad de la confirmación de compra. */
+.tabla-compra .compra-check .input-qty,
+.tabla-compra .compra-llegaron .input-qty {
+    width: 4.2rem;
+    margin: 0;
+    padding: 0.3rem 0.4rem;
+    text-align: center;
+}
+
+.tabla-compra .compra-llegaron {
+    width: 5.5rem;
+}
+
+.tabla-compra .input-qty:disabled {
+    background: #f0f0f0;
+    color: #aaaaaa;
+}
+
+/* Cuadre por producto: cuántas faltaron contra cuántas se llevan repartidas. */
+.compra-reparto {
+    margin: 0.6rem 0 0;
+    padding-left: 1.2rem;
+    font-size: 0.88rem;
+    line-height: 1.6;
+}
+
+.compra-reparto .reparto-ok {
+    color: #08660b;
+}
+
+.compra-reparto .reparto-pendiente {
+    color: #8a5a10;
+    font-weight: 600;
+}
