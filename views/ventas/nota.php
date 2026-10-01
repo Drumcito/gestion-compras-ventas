@@ -456,17 +456,6 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
             page-break-after: auto;
         }
 
-        /* Guia de corte por el centro de la hoja horizontal: separa las dos
-           copias. */
-        .par::after {
-            content: '';
-            position: absolute;
-            top: 0.2in;
-            bottom: 0.2in;
-            left: 50%;
-            border-left: 1px dashed #999999;
-        }
-
         .nota {
             overflow: hidden;
             display: flex;
