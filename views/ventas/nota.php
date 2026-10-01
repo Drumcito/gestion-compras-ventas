@@ -266,7 +266,8 @@ function numeroEnLetra($monto): string
  * recortar.
  */
 function renderNota(array $venta, array $items, bool $unaSola, string $direccion,
-                    string $cp, string $telefono, string $clienteManual): void
+                    string $cp, string $telefono, string $clienteManual,
+                    string $etiquetaCopia = ''): void
 {
     $fecha = (new DateTime($venta['fecha']))->format('d/m/Y');
 
@@ -302,6 +303,9 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
             <div class="folio">
                 <?= e($fecha) ?><br>
                 <strong>No. VENTA <?= (int) $venta['id'] ?></strong>
+                <?php if ($etiquetaCopia !== ''): ?>
+                    <div class="sello-copia"><?= e($etiquetaCopia) ?></div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -529,6 +533,22 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
 
         .folio strong { font-size: 8.5pt; }
 
+        /* Sello ORIGINAL / COPIA: recuadro negro con letra blanca debajo del
+           numero de venta, pequeño, para distinguir las dos impresiones. */
+        .sello-copia {
+            display: inline-block;
+            margin-top: 3pt;
+            background: #000000;
+            color: #ffffff;
+            font-size: 7pt;
+            font-weight: bold;
+            letter-spacing: 1pt;
+            padding: 1.5pt 6pt;
+            text-decoration: underline;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
         /* ---------- Datos del cliente ---------- */
         .cliente {
             margin-top: 0.1in;
@@ -743,14 +763,14 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
         <?php /* Muchos productos: una copia por hoja carta vertical, dos hojas. */ ?>
         <?php for ($copia = 0; $copia < 2; $copia++): ?>
             <div class="pagina-vertical">
-                <?php renderNota($r['venta'], $r['items'], $unaSola, $direccion, $cp, $telefono, $clienteManual); ?>
+                <?php renderNota($r['venta'], $r['items'], $unaSola, $direccion, $cp, $telefono, $clienteManual, $copia === 0 ? 'ORIGINAL' : 'COPIA'); ?>
             </div>
         <?php endfor; ?>
     <?php else: ?>
         <?php /* Nota normal: la misma nota dos veces, una por mitad de la hoja horizontal. */ ?>
         <div class="par">
-            <?php renderNota($r['venta'], $r['items'], $unaSola, $direccion, $cp, $telefono, $clienteManual); ?>
-            <?php renderNota($r['venta'], $r['items'], $unaSola, $direccion, $cp, $telefono, $clienteManual); ?>
+            <?php renderNota($r['venta'], $r['items'], $unaSola, $direccion, $cp, $telefono, $clienteManual, 'ORIGINAL'); ?>
+            <?php renderNota($r['venta'], $r['items'], $unaSola, $direccion, $cp, $telefono, $clienteManual, 'COPIA'); ?>
         </div>
     <?php endif; ?>
 <?php endforeach; ?>
