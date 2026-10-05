@@ -115,6 +115,232 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ---------- Borrador de la venta ----------
+    // Capturar una venta toma su tiempo y a media captura hay que ir al
+    // historial, o se recarga la página sin querer. Lo que se lleva se guarda en
+    // el navegador y vuelve al regresar, para no tener que escarbar otra vez
+    // todos los productos.
+
+    const BORRADOR = 'gabe:venta:' + (window.USUARIO_ID || 0);
+
+    // Pasado este tiempo el borrador ya no es "la venta que estaba haciendo":
+    // se descarta solo para no revivir algo de ayer.
+    const HORAS_BORRADOR = 12;
+
+    function guardarBorrador() {
+        // Sin piezas no hay nada que recordar; además así se limpia solo cuando
+        // se vacía el ticket a mano.
+        if (items.length === 0) {
+            borrarBorrador();
+            return;
+        }
+
+        try {
+            localStorage.setItem(BORRADOR, JSON.stringify({
+                guardado_en: Date.now(),
+                items:       items,
+                cliente:     inputCliente.value,
+                cliente_sel: clienteSel,
+                aplicar_saldo: aplicarSaldo,
+                guardar_cliente: chkGuardarCliente ? chkGuardarCliente.checked : false,
+                tipo_pago:   tipoPago.value,
+                pago_inicial: pagoInicial.value,
+                vencimiento: fechaVenc.value,
+            }));
+        } catch (e) {
+            // Sin espacio o con el almacenamiento bloqueado: la venta sigue,
+            // simplemente no se recuerda.
+        }
+    }
+
+    function borrarBorrador() {
+        try {
+            localStorage.removeItem(BORRADOR);
+        } catch (e) { /* nada que hacer */ }
+    }
+
+    function leerBorrador() {
+        try {
+            const crudo = localStorage.getItem(BORRADOR);
+            if (!crudo) return null;
+
+            const b = JSON.parse(crudo);
+
+            if (!b || !Array.isArray(b.items) || b.items.length === 0) {
+                borrarBorrador();
+                return null;
+            }
+
+            const horas = (Date.now() - Number(b.guardado_en || 0)) / 3600000;
+
+            if (horas > HORAS_BORRADOR) {
+                borrarBorrador();
+                return null;
+            }
+
+            return b;
+
+        } catch (e) {
+            borrarBorrador();
+            return null;
+        }
+    }
+
+    /**
+     * Vuelve a preguntar el precio de lo que está en el ticket. El servidor
+     * cobra siempre lo que dice el catálogo, así que si alguien movió un precio
+     * mientras la venta estaba a medias, hay que enterarse ANTES de cobrar y no
+     * después.
+     *
+     * @return array Los productos que cambiaron, para poder avisarlo.
+     */
+    async function revalidarPrecios() {
+        if (items.length === 0) return [];
+
+        const codigos = items.map((i) => i.codigo_interno).join(',');
+
+        let productos;
+
+        try {
+            const datos = await (await fetch(
+                '../../app/controllers/ProductoController.php?accion=precios&codigos=' +
+                encodeURIComponent(codigos)
+            )).json();
+
+            if (!datos.ok) return [];
+            productos = datos.productos;
+
+        } catch (e) {
+            // Sin conexión se deja lo que hay: el servidor igual cobrará bien.
+            return [];
+        }
+
+        const porCodigo = {};
+        productos.forEach((p) => { porCodigo[p.codigo_interno] = p; });
+
+        const cambios = [];
+
+        items = items.filter((item) => {
+            const actual = porCodigo[item.codigo_interno];
+
+            // Lo que se dio de baja del catálogo ya no se puede vender.
+            if (!actual || !actual.activo || actual.precio_neto === null) {
+                cambios.push({ nombre: item.nombre, fuera: true });
+                return false;
+            }
+
+            const nuevo = Number(actual.precio_neto);
+
+            if (nuevo !== Number(item.precio)) {
+                cambios.push({ nombre: item.nombre, antes: Number(item.precio), ahora: nuevo });
+                item.precio = nuevo;
+            }
+
+            return true;
+        });
+
+        return cambios;
+    }
+
+    function restaurarBorrador() {
+        const b = leerBorrador();
+        if (!b) return;
+
+        items = b.items;
+
+        inputCliente.value = b.cliente || '';
+        clienteSel = b.cliente_sel || { id: null, nombre: '', saldo: 0 };
+        aplicarSaldo = b.aplicar_saldo !== false;
+
+        if (chkGuardarCliente) chkGuardarCliente.checked = !!b.guardar_cliente;
+
+        tipoPago.value = b.tipo_pago || 'contado';
+        camposCredito.hidden = tipoPago.value !== 'credito';
+        pagoInicial.value = b.pago_inicial || '';
+        fechaVenc.value = b.vencimiento || '';
+
+        pintarItems();
+        actualizarGuardarCliente();
+
+        // Se avisa con la opción de tirarlo: el vendedor tiene que poder empezar
+        // de cero sin ir quitando pieza por pieza.
+        const piezas = items.reduce((s, i) => s + i.cantidad, 0);
+
+        clearTimeout(temporizadorAviso);
+        aviso.className = 'aviso aviso-info aviso-con-accion';
+        aviso.hidden = false;
+        aviso.innerHTML = '';
+
+        const texto = document.createElement('span');
+        texto.textContent = 'Se recuperó la venta que tenías a medias: ' +
+            items.length + ' producto' + (items.length === 1 ? '' : 's') +
+            ' (' + piezas + ' pieza' + (piezas === 1 ? '' : 's') + ').';
+        aviso.appendChild(texto);
+
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.className = 'chip';
+        boton.innerHTML = '<i class="ph ph-trash"></i> Empezar de cero';
+        boton.addEventListener('click', vaciarVenta);
+        aviso.appendChild(boton);
+
+        avisarPreciosCambiados(texto);
+    }
+
+    /**
+     * Revalida los precios y, si algo se movió mientras la venta estaba
+     * guardada, lo cuenta DENTRO del mismo aviso de recuperación: así no se
+     * pierde el botón de empezar de cero, que es lo que se querría hacer si los
+     * precios ya no son los de antes.
+     */
+    async function avisarPreciosCambiados(texto) {
+        const cambios = await revalidarPrecios();
+
+        if (cambios.length === 0) return;
+
+        pintarItems();   // el ticket ya trae los precios nuevos
+
+        const fuera   = cambios.filter((c) => c.fuera);
+        const movidos = cambios.filter((c) => !c.fuera);
+
+        const partes = [];
+
+        if (movidos.length > 0) {
+            partes.push('Cambió el precio de ' + movidos.map((c) =>
+                c.nombre + ' (' + money(c.antes) + ' → ' + money(c.ahora) + ')').join('; ') + '.');
+        }
+
+        if (fuera.length > 0) {
+            partes.push('Se quitaron por no estar ya en el catálogo: ' +
+                fuera.map((c) => c.nombre).join(', ') + '.');
+        }
+
+        // Si se vació el ticket no hay nada que recuperar.
+        if (items.length === 0) {
+            mostrarAviso(partes.join(' ') + ' No quedó nada en la venta.', 'alerta', 0);
+            borrarBorrador();
+            return;
+        }
+
+        aviso.className = 'aviso aviso-alerta aviso-con-accion';
+        texto.textContent += ' ' + partes.join(' ');
+    }
+
+    /** Deja la pantalla como recién abierta, sin borrador. */
+    function vaciarVenta() {
+        items = [];
+        clienteSel = { id: null, nombre: '', saldo: 0 };
+        aplicarSaldo = true;
+
+        form.reset();
+        camposCredito.hidden = true;
+
+        borrarBorrador();
+        pintarItems();
+        actualizarGuardarCliente();
+        ocultarAviso();
+    }
+
     // ---------- Busqueda de productos ----------
     let temporizador = null;
 
@@ -336,6 +562,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 : '<span class="saldo-linea saldo-guardado">El saldo se queda a favor del cliente para otra compra.</span>');
     }
 
+    // Cliente, tipo de pago, anticipo y vencimiento: cambian fuera del ticket,
+    // así que se guardan por su cuenta.
+    ['input', 'change'].forEach((evento) => {
+        form.addEventListener(evento, (e) => {
+            if (e.target.closest('#lista-items')) return;   // ya lo cubre pintarItems
+            guardarBorrador();
+        });
+    });
+
     bloqueSaldo.addEventListener('change', (e) => {
         if (e.target.id !== 'usar-saldo') return;
 
@@ -410,6 +645,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function pintarItems() {
         listaItems.innerHTML = '';
+
+        // Todos los cambios del ticket pasan por aquí, así que es el lugar para
+        // dejar guardado el borrador.
+        guardarBorrador();
 
         if (items.length === 0) {
             listaItems.innerHTML = '<p class="venta-vacia">Aún no has agregado piezas a esta venta.</p>';
@@ -913,6 +1152,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 aplicarSaldo = true;
                 form.reset();
                 actualizarGuardarCliente();
+
+                // La venta ya quedó registrada: el borrador perdió sentido.
+                borrarBorrador();
                 camposCredito.hidden = true;
                 pintarItems();
             } else {
@@ -925,6 +1167,9 @@ document.addEventListener('DOMContentLoaded', () => {
             btnGuardar.textContent = 'Guardar';
         }
     });
+
+    // Si quedó una venta a medias (se cambió de pantalla, se recargó), vuelve.
+    restaurarBorrador();
 
     pintarItems();
 });

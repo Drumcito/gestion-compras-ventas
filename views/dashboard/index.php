@@ -90,7 +90,7 @@ $casas = ordenarCasas($casas);
                     <label for="piezas">Piezas:</label>
                     <div class="search-container">
                         <input type="text" id="piezas" class="form-control"
-                               placeholder="Buscar por nombre o código..." autocomplete="off">
+                               placeholder="Buscar por código, nombre o marca..." autocomplete="off">
                         <i class="ph ph-magnifying-glass search-icon" aria-hidden="true"></i>
                     </div>
                     <div id="resultados" class="search-results" hidden></div>
@@ -198,7 +198,12 @@ $casas = ordenarCasas($casas);
         </div>
     </div>
 
-    <script>window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;</script>
+    <script>
+        window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;
+        // El borrador de la venta se guarda por usuario: en una computadora
+        // compartida nadie debe heredar lo que otro dejó a medias.
+        window.USUARIO_ID = <?php echo (int) ($_SESSION['user_id'] ?? 0); ?>;
+    </script>
     <script src="<?= recurso('js/nota_datos.js') ?>"></script>
     <script src="<?= recurso('js/venta.js') ?>"></script>
 </body>

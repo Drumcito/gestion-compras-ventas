@@ -73,13 +73,15 @@ try {
     $paramOrden = [];
 
     if (mb_strlen($termino) >= 2) {
-        $filtro = ' AND (nombre LIKE :q1 OR codigo_proveedor LIKE :q2 OR codigo_interno LIKE :q3)';
+        $filtro = ' AND (nombre LIKE :q1 OR codigo_proveedor LIKE :q2 OR codigo_interno LIKE :q3
+                         OR marca LIKE :q4)';
         $like = '%' . $termino . '%';
-        $parametros = ['q1' => $like, 'q2' => $like, 'q3' => $like];
+        $parametros = ['q1' => $like, 'q2' => $like, 'q3' => $like, 'q4' => $like];
 
-        // Igual que en la busqueda de la venta: si lo escrito es un codigo, esos
-        // resultados van primero y manda el codigo de la casa. Cada marcador
-        // lleva nombre propio porque PDO sin emulacion no deja repetirlos.
+        // Mismo orden que la busqueda de la venta: primero el codigo (que es lo
+        // mas preciso y entre ellos manda el de la casa), luego el nombre y al
+        // final la marca, que es lo mas amplio. Cada marcador lleva nombre
+        // propio porque PDO sin emulacion no deja repetirlos.
         $orden = 'CASE
                       WHEN codigo_proveedor = :ex1     THEN 0
                       WHEN codigo_interno   = :ex2     THEN 1
@@ -87,13 +89,15 @@ try {
                       WHEN codigo_interno   LIKE :ini2 THEN 3
                       WHEN codigo_proveedor LIKE :med1 THEN 4
                       WHEN codigo_interno   LIKE :med2 THEN 5
-                      ELSE 6
+                      WHEN nombre           LIKE :nom  THEN 6
+                      ELSE 7
                   END, nombre';
 
         $paramOrden = [
             'ex1' => $termino,        'ex2' => $termino,
             'ini1' => $termino . '%', 'ini2' => $termino . '%',
             'med1' => $like,          'med2' => $like,
+            'nom'  => $like,
         ];
     }
 
