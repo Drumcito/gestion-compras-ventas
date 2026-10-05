@@ -437,7 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<span class="codigo-prod">' + esc(item.codigo_visible) + '</span>' +
                     // Solo el admin puede ajustar el % de un producto durante la venta.
                     (window.ES_ADMIN
-                        ? ' · <button type="button" class="link-editar-pct" data-i="' + indice + '">Editar %</button>'
+                        ? ' · <button type="button" class="link-editar-pct" data-i="' + indice + '">Editar precio</button>'
                         : '') +
                     '</p>' +
                 '<span class="item-precio">' + money(item.precio) + ' c/u</span>' +
@@ -547,16 +547,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const efectivo = Number(p.porcentaje_efectivo);
 
         contenidoPorcentaje.innerHTML =
-            '<h2 class="detalle-titulo">Editar porcentaje</h2>' +
+            '<h2 class="detalle-titulo">Editar precio</h2>' +
             '<div class="detalle-cabecera">' +
                 '<p><strong>' + esc(p.nombre) + '</strong></p>' +
                 '<p class="detalle-sub"><span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
                     (p.marca ? ' · ' + esc(p.marca) : '') + '</p>' +
             '</div>' +
             '<p class="aviso aviso-info">El precio de venta (neto) sale del bruto más un porcentaje. ' +
-                'Aquí lo cambias <strong>solo para este producto</strong>; los demás de ' +
-                esc(p.etiqueta_casa) + ' no se tocan. El cambio queda guardado para las ventas futuras.</p>' +
-            '<p class="detalle-sub">Precio bruto: <strong>' + dinero(bruto) + '</strong></p>' +
+                'Puedes cambiar los dos <strong>solo para este producto</strong>; los demás de ' +
+                esc(p.etiqueta_casa) + ' no se tocan. Lo que guardes queda para las ventas futuras.</p>' +
+            '<div class="form-group">' +
+                '<label for="pct-bruto">Precio bruto</label>' +
+                '<input type="number" id="pct-bruto" class="form-control" min="0" step="0.01" ' +
+                       'value="' + (bruto === null || bruto === '' ? '' : Number(bruto).toFixed(2)) + '">' +
+            '</div>' +
             '<p class="pct-actual">Actualmente: <strong>' + pctTexto(efectivo) + '%</strong> → ' +
                 '<strong>' + dinero(netoJS(bruto, efectivo)) + '</strong> ' +
                 '<span class="detalle-sub">(' + (p.usa_casa
@@ -576,26 +580,32 @@ document.addEventListener('DOMContentLoaded', () => {
             '<div class="detalle-acciones">' +
                 '<button type="button" class="chip" id="btn-cancelar-porcentaje">Cancelar</button>' +
                 '<button type="button" class="btn-save" id="btn-guardar-porcentaje" ' +
-                    'data-codigo="' + esc(p.codigo_interno) + '">Guardar %</button>' +
+                    'data-codigo="' + esc(p.codigo_interno) + '">Guardar</button>' +
             '</div>';
 
-        const inp   = document.getElementById('pct-nuevo');
-        const chk   = document.getElementById('pct-usar-casa');
-        const linea = document.getElementById('pct-nuevo-neto');
+        const inp     = document.getElementById('pct-nuevo');
+        const chk     = document.getElementById('pct-usar-casa');
+        const linea   = document.getElementById('pct-nuevo-neto');
+        const campoBr = document.getElementById('pct-bruto');
 
         function refrescar() {
             const pct = chk.checked ? casaPct : parseFloat(inp.value);
             inp.disabled = chk.checked;
             if (chk.checked) inp.value = Number(casaPct).toFixed(2);
 
-            linea.innerHTML = isNaN(pct)
-                ? 'Escribe un porcentaje para ver el precio nuevo.'
-                : 'Nuevo precio de venta: <strong>' + dinero(netoJS(bruto, pct)) + '</strong> ' +
-                  '(bruto + ' + pctTexto(pct) + '%)';
+            // El neto se calcula con lo que hay escrito en los dos campos, para
+            // ver el precio final antes de guardar.
+            const brutoEscrito = campoBr.value;
+
+            linea.innerHTML = (isNaN(pct) || brutoEscrito === '')
+                ? 'Escribe el precio bruto y el porcentaje para ver el precio de venta.'
+                : 'Nuevo precio de venta: <strong>' + dinero(netoJS(brutoEscrito, pct)) + '</strong> ' +
+                  '(' + dinero(brutoEscrito) + ' + ' + pctTexto(pct) + '%)';
         }
 
         chk.addEventListener('change', refrescar);
         inp.addEventListener('input', refrescar);
+        campoBr.addEventListener('input', refrescar);
         refrescar();
     }
 
@@ -612,8 +622,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    codigo:     codigo,
-                    porcentaje: usarCasa ? null : document.getElementById('pct-nuevo').value,
+                    codigo:         codigo,
+                    porcentaje:     usarCasa ? null : document.getElementById('pct-nuevo').value,
+                    precio_mayoreo: document.getElementById('pct-bruto').value,
                 }),
             })).json();
 
@@ -635,12 +646,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (datos.cambios === 0) {
                 mostrarAviso(datos.mensaje, 'ok', 5);
-            } else if (datos.usa_casa) {
-                mostrarAviso(datos.nombre + ' vuelve a usar el ' +
-                    pctTexto(datos.porcentaje_casa) + '% de la casa.', 'ok', 5);
             } else {
-                mostrarAviso(datos.nombre + ' ahora usa ' + pctTexto(datos.porcentaje_efectivo) + '%' +
-                    (datos.neto !== null ? ' (neto ' + money(Number(datos.neto)) + ').' : '.'), 'ok', 5);
+                // Se dice exactamente qué se movió: el precio, el porcentaje o
+                // los dos, y en cuánto quedó el precio de venta.
+                const partes = [];
+
+                if (datos.cambio_precio) {
+                    partes.push('bruto ' + dinero(datos.precio_anterior) +
+                                ' → ' + dinero(datos.precio_mayoreo));
+                }
+
+                if (datos.cambio_porcentaje) {
+                    partes.push(datos.usa_casa
+                        ? 'vuelve al ' + pctTexto(datos.porcentaje_casa) + '% de la casa'
+                        : pctTexto(datos.porcentaje_anterior) + '% → ' +
+                          pctTexto(datos.porcentaje_efectivo) + '%');
+                }
+
+                mostrarAviso(datos.nombre + ': ' + partes.join(' · ') +
+                    (datos.neto !== null ? '. Precio de venta ' + money(Number(datos.neto)) + '.' : '.'),
+                    'ok', 6);
             }
 
         } catch (e) {
@@ -649,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
             avisoPct.hidden = false;
         } finally {
             boton.disabled = false;
-            boton.textContent = 'Guardar %';
+            boton.textContent = 'Guardar';
         }
     }
 
