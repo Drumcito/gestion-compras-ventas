@@ -17,9 +17,12 @@
  *   GET  ?accion=consultar&codigo=BNS03-01270
  *        -> datos para armar el formulario (bruto, % de la casa, % del producto,
  *           % efectivo y neto actual).
- *   POST {codigo, porcentaje}
+ *   POST {codigo, porcentaje, precio_mayoreo?}
  *        -> guarda el porcentaje del producto. porcentaje null / "" / "casa"
- *           vuelve a usar el de la casa.
+ *           vuelve a usar el de la casa. Si ademas viene precio_mayoreo, se
+ *           guarda el bruto nuevo: los dos cambios van juntos, en una sola
+ *           transaccion, porque entre ambos sale el precio que se cobra.
+ *           El cambio de bruto queda en historial_precios como cualquier otro.
  */
 session_start();
 header('Content-Type: application/json; charset=utf-8');
@@ -101,6 +104,37 @@ function aPorcentajeProducto($valor): ?float
     return $numero;
 }
 
+/**
+ * Lee el precio bruto escrito a mano. Null o vacio = no se toca el precio.
+ *
+ * @return float|null null = dejar el bruto como esta.
+ */
+function aPrecioBruto($valor): ?float
+{
+    if ($valor === null || $valor === '') {
+        return null;
+    }
+
+    if (is_string($valor)) {
+        $valor = str_replace(['$', ' ', ','], ['', '', '.'], $valor);
+    }
+
+    if (!is_numeric($valor)) {
+        throw new RuntimeException('El precio debe ser un numero');
+    }
+
+    $numero = round((float) $valor, 2);
+
+    if ($numero < 0) {
+        throw new RuntimeException('El precio no puede ser negativo');
+    }
+    if ($numero > 99999999.99) {
+        throw new RuntimeException('El precio es demasiado alto');
+    }
+
+    return $numero;
+}
+
 try {
     $pdo = Database::getConnection();
 
@@ -168,6 +202,9 @@ try {
     // vacío" (vacío = volver al % de la casa).
     $nuevo = aPorcentajeProducto(array_key_exists('porcentaje', $datos) ? $datos['porcentaje'] : null);
 
+    // El bruto es opcional: si no viene, el precio del producto no se toca.
+    $brutoNuevo = aPrecioBruto(array_key_exists('precio_mayoreo', $datos) ? $datos['precio_mayoreo'] : null);
+
     $stmt = $pdo->prepare(
         "SELECT nombre, precio_mayoreo, porcentaje_neto FROM `{$tabla}`
           WHERE codigo_interno = :codigo AND activo = 1 LIMIT 1"
@@ -182,43 +219,74 @@ try {
     }
 
     $override_antes = $antes['porcentaje_neto'] === null ? null : (float) $antes['porcentaje_neto'];
+    $brutoAntes     = $antes['precio_mayoreo'] === null ? null : (float) $antes['precio_mayoreo'];
 
-    // Nada que guardar si quedó igual (mismo número, o los dos en "usar casa").
-    if ($override_antes === $nuevo) {
-        $porcEfectivo = porcentajeProducto($nuevo, $casa);
+    $cambiaPorcentaje = $override_antes !== $nuevo;
+    $cambiaPrecio     = $brutoNuevo !== null && $brutoNuevo !== $brutoAntes;
 
+    $porcCasa     = porcentajeCasa($casa);
+    $porcEfectivo = porcentajeProducto($nuevo, $casa);
+    $brutoFinal   = $cambiaPrecio ? $brutoNuevo : $brutoAntes;
+
+    // Nada que guardar: ni el precio ni el porcentaje se movieron.
+    if (!$cambiaPorcentaje && !$cambiaPrecio) {
         echo json_encode([
             'ok'                  => true,
             'cambios'             => 0,
             'nombre'              => $antes['nombre'],
-            'porcentaje_casa'     => porcentajeCasa($casa),
+            'porcentaje_casa'     => $porcCasa,
             'porcentaje_override' => $nuevo,
             'porcentaje_efectivo' => $porcEfectivo,
             'usa_casa'            => $nuevo === null,
-            'neto'                => netoDe($antes['precio_mayoreo'], $porcEfectivo),
-            'mensaje'             => 'El porcentaje quedo igual, no hubo nada que guardar',
+            'precio_mayoreo'      => $brutoAntes,
+            'neto'                => netoDe($brutoAntes, $porcEfectivo),
+            'mensaje'             => 'El precio y el porcentaje quedaron igual, no hubo nada que guardar',
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    $stmt = $pdo->prepare(
-        "UPDATE `{$tabla}` SET porcentaje_neto = :porcentaje WHERE codigo_interno = :codigo"
-    );
-    $stmt->execute(['porcentaje' => $nuevo, 'codigo' => $codigo]);
+    // Los dos van juntos: el precio que se cobra sale de ambos, así que no se
+    // puede quedar a medias uno sin el otro.
+    $pdo->beginTransaction();
 
-    $porcCasa     = porcentajeCasa($casa);
-    $porcEfectivo = porcentajeProducto($nuevo, $casa);
+    try {
+        if ($cambiaPrecio) {
+            // El trigger de la tabla escribe el renglon en historial_precios;
+            // esta variable de sesion es la que le dice quien hizo el cambio.
+            $pdo->prepare('SET @usuario_actual = :id')->execute(['id' => $usuarioId]);
+
+            $pdo->prepare(
+                "UPDATE `{$tabla}` SET precio_mayoreo = :bruto WHERE codigo_interno = :codigo"
+            )->execute(['bruto' => $brutoNuevo, 'codigo' => $codigo]);
+        }
+
+        if ($cambiaPorcentaje) {
+            $pdo->prepare(
+                "UPDATE `{$tabla}` SET porcentaje_neto = :porcentaje WHERE codigo_interno = :codigo"
+            )->execute(['porcentaje' => $nuevo, 'codigo' => $codigo]);
+        }
+
+        $pdo->commit();
+
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
 
     echo json_encode([
         'ok'                  => true,
         'cambios'             => 1,
+        'cambio_precio'       => $cambiaPrecio,
+        'cambio_porcentaje'   => $cambiaPorcentaje,
         'nombre'              => $antes['nombre'],
         'porcentaje_casa'     => $porcCasa,
         'porcentaje_anterior' => $override_antes === null ? $porcCasa : $override_antes,
         'porcentaje_override' => $nuevo,
         'porcentaje_efectivo' => $porcEfectivo,
         'usa_casa'            => $nuevo === null,
-        'neto'                => netoDe($antes['precio_mayoreo'], $porcEfectivo),
+        'precio_anterior'     => $brutoAntes,
+        'precio_mayoreo'      => $brutoFinal,
+        'neto'                => netoDe($brutoFinal, $porcEfectivo),
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (RuntimeException $e) {

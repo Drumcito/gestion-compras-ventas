@@ -55,7 +55,7 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
                 <div class="filtros-rango">
                     <div class="search-container inventario-buscador">
                         <input type="text" id="buscar-producto" class="form-control"
-                               placeholder="Buscar por nombre o código..." autocomplete="off">
+                               placeholder="Buscar por código, nombre o marca..." autocomplete="off">
                         <i class="ph ph-magnifying-glass search-icon"></i>
                     </div>
 

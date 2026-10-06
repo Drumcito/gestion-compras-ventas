@@ -1684,7 +1684,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<label for="edit-buscar-producto">Agregar producto:</label>' +
                 '<div class="search-container">' +
                     '<input type="text" id="edit-buscar-producto" class="form-control" ' +
-                           'placeholder="Buscar por nombre o código..." autocomplete="off">' +
+                           'placeholder="Buscar por código, nombre o marca..." autocomplete="off">' +
                     '<i class="ph ph-magnifying-glass search-icon" aria-hidden="true"></i>' +
                 '</div>' +
                 '<div id="edit-resultados" class="search-results" hidden></div>' +
