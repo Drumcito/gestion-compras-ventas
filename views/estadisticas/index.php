@@ -185,11 +185,54 @@ $toggleMetrica = function (string $grupo): string {
                 </section>
                 <?php endif; ?>
             </div>
+
+            <!-- ===== Ganancias (seccion nueva, solo admin) =====
+                 Cuanto se gana de verdad: cada producto se vende a su neto
+                 (bruto + %) y la ganancia es ese porcentaje. Se pinta aparte,
+                 con su propio controlador y script, sin tocar lo de arriba. -->
+            <?php if ($esAdmin): ?>
+            <section class="ganancias-seccion" id="ganancias-seccion" aria-labelledby="ganancias-titulo">
+                <div class="ganancias-encabezado">
+                    <h2 class="ganancias-titulo" id="ganancias-titulo">
+                        <i class="ph ph-trend-up"></i> Ganancias
+                    </h2>
+                </div>
+
+                <div class="kpis kpis-ganancias" id="kpis-ganancias"></div>
+
+                <div class="dash-grid">
+                    <?php tarjetaGrafica('ganancias', 'Ganancia en el tiempo', 'Ganancia por periodo'); ?>
+
+                    <section class="dash-card">
+                        <header class="dash-card-cabecera">
+                            <div>
+                                <h2 class="dash-card-titulo">Ganancia por casa</h2>
+                                <p class="dash-card-sub">Margen y ganancia de cada casa</p>
+                            </div>
+                        </header>
+                        <div id="tabla-ganancia-casas"></div>
+                    </section>
+                </div>
+
+                <div class="dash-grid dash-grid-tablas">
+                    <section class="dash-card dash-card-ancha">
+                        <header class="dash-card-cabecera">
+                            <div>
+                                <h2 class="dash-card-titulo">Ganancia por producto</h2>
+                                <p class="dash-card-sub">Los que más ganancia dejaron en el periodo</p>
+                            </div>
+                        </header>
+                        <div id="tabla-ganancia-productos"></div>
+                    </section>
+                </div>
+            </section>
+            <?php endif; ?>
         </div>
     </main>
 
 
     <script>window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;</script>
     <script src="<?= recurso('js/estadisticas.js') ?>"></script>
+    <script src="<?= recurso('js/ganancias.js') ?>"></script>
 </body>
 </html>
