@@ -10,8 +10,13 @@
  *    copias iguales en una sola hoja.
  *
  *  - Nota con demasiados productos: no cabe en media hoja, asi que se imprime en
- *    carta VERTICAL (8.5 x 11) a hoja completa. Como tambien va doble, salen dos
- *    hojas verticales, una copia por hoja.
+ *    carta VERTICAL (8.5 x 11) a hoja completa, con la letra mas grande (la nota
+ *    es la unica en el papel, no hay por que apretarla). Como tambien va doble,
+ *    salen dos hojas, una copia por hoja.
+ *
+ *  - Nota que no cabe ni en la hoja vertical: se continua en las hojas de abajo
+ *    y cada una dice "HOJA 1 DE 2". El total y el importe con letra van solo en
+ *    la ultima; las anteriores dicen en que hoja sigue.
  *
  * Acepta una venta (?id=13) o varias (?ids=13,14,15). Con una sola venta se
  * pueden pasar ademas los datos del cliente que no viven en la base
@@ -40,9 +45,16 @@ const MAX_NOTAS = 100;
 const MAX_PIEZAS_NOTA = 32;
 
 // Si la venta pasa de MAX_PIEZAS_NOTA, la nota se imprime en carta vertical
-// (8.5 x 11) a hoja completa, donde cabe mucho mas. Este es el tope de esa hoja
-// vertical: lo que sobre se resume en un renglon para no desbordar la pagina.
-const MAX_PIEZAS_VERTICAL = 44;
+// (8.5 x 11) a hoja completa y con la letra mas grande. Lo que no quepa NO se
+// recorta: sigue en la hoja de abajo.
+//
+// Este es el tope de renglones por hoja vertical. Medido en la hoja mas
+// apretada, que es la ULTIMA (es la que carga el total, y con saldo a favor son
+// tres renglones de total mas el importe con letra): a 9.5pt el renglon mide
+// 16.3pt y caben 28. Se dejan 26 para que sobren dos renglones de aire, que es
+// lo que se come un importe en letra que se vaya a dos lineas. Las hojas
+// intermedias no llevan total, asi que les sobran ocho renglones.
+const PIEZAS_HOJA_VERTICAL = 26;
 
 // ---------- Que ventas se van a imprimir ----------
 $ids = [];
@@ -130,17 +142,43 @@ $cp        = $unaSola ? trim($_GET['cp'] ?? '') : '';
 $telefono  = $unaSola ? substr(preg_replace('/\D/', '', $_GET['telefono'] ?? ''), 0, 10) : '';
 $clienteManual = $unaSola ? trim($_GET['cliente'] ?? '') : '';
 
+/**
+ * Parte las piezas de una venta en las hojas que hagan falta.
+ *
+ * El reparto es parejo a proposito: 33 piezas con tope de 26 salen 17 y 16, no
+ * 26 y 7. Son las mismas dos hojas, pero ninguna queda casi vacia.
+ *
+ * @return array lista de hojas; cada hoja es la lista de piezas que le toca.
+ */
+function repartirEnHojas(array $items, int $porHoja): array
+{
+    if ($items === []) {
+        return [[]];
+    }
+
+    $hojas = (int) ceil(count($items) / $porHoja);
+
+    return array_chunk($items, (int) ceil(count($items) / $hojas));
+}
+
 // Cada nota decide su formato segun cuantas piezas trae: normal (media hoja
-// horizontal) o vertical (hoja completa). El conteo de hojas depende de eso:
-// una nota normal ocupa 1 hoja (dos copias, una por mitad) y una vertical
-// ocupa 2 (una copia por hoja).
+// horizontal, una sola hoja con las dos copias) o vertical (hoja completa, una
+// copia por hoja, y tantas hojas por copia como pidan las piezas).
 $notasRender = [];
 $hojas       = 0;
 foreach ($ventas as $venta) {
     $items    = $itemsPorVenta[$venta['id']] ?? [];
     $vertical = count($items) > MAX_PIEZAS_NOTA;
-    $notasRender[] = ['venta' => $venta, 'items' => $items, 'vertical' => $vertical];
-    $hojas += $vertical ? 2 : 1;
+    $paginas  = $vertical ? repartirEnHojas($items, PIEZAS_HOJA_VERTICAL) : [$items];
+
+    $notasRender[] = [
+        'venta'    => $venta,
+        'paginas'  => $paginas,
+        'vertical' => $vertical,
+    ];
+
+    // Vertical: dos copias, cada una con sus hojas. Normal: una hoja y ya.
+    $hojas += $vertical ? 2 * count($paginas) : 1;
 }
 
 /**
@@ -261,13 +299,16 @@ function numeroEnLetra($monto): string
 }
 
 /**
- * Dibuja una nota completa (encabezado, cliente, tabla, total). Se llama dos
- * veces por venta para dejar dos copias. En vertical caben mas piezas antes de
- * recortar.
+ * Dibuja UNA hoja de la nota (encabezado, cliente, tabla y, si es la ultima,
+ * el total). Se llama una vez por hoja y por copia.
+ *
+ * @param array $items piezas de ESTA hoja, no de toda la venta.
+ * @param int   $hoja  numero de hoja de la copia, empezando en 1.
+ * @param int   $hojas hojas que tiene la copia completa.
  */
 function renderNota(array $venta, array $items, bool $unaSola, string $direccion,
                     string $cp, string $telefono, string $clienteManual,
-                    string $etiquetaCopia = ''): void
+                    string $etiquetaCopia = '', int $hoja = 1, int $hojas = 1): void
 {
     $fecha = (new DateTime($venta['fecha']))->format('d/m/Y');
 
@@ -281,10 +322,9 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
     $notaCp        = datoCliente($cp,        $venta, 'cliente_cp');
     $notaTelefono  = datoCliente($telefono,  $venta, 'cliente_telefono');
 
-    // El tope de piezas depende del tamaño de la hoja donde va la nota.
-    $cap      = count($items) > MAX_PIEZAS_NOTA ? MAX_PIEZAS_VERTICAL : MAX_PIEZAS_NOTA;
-    $visibles = array_slice($items, 0, $cap);
-    $ocultas  = count($items) - count($visibles);
+    // El total va solo en la ultima hoja de la copia; las de antes dicen donde
+    // sigue la nota.
+    $ultima = $hoja >= $hojas;
 
     $saldoAplicado = (float) ($venta['credito_aplicado'] ?? 0);
     $totalFinal    = $saldoAplicado > 0
@@ -305,6 +345,9 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
                 <strong>No. VENTA <?= (int) $venta['id'] ?></strong>
                 <?php if ($etiquetaCopia !== ''): ?>
                     <div class="sello-copia"><?= e($etiquetaCopia) ?></div>
+                <?php endif; ?>
+                <?php if ($hojas > 1): ?>
+                    <div class="hoja-num">HOJA <?= $hoja ?> DE <?= $hojas ?></div>
                 <?php endif; ?>
             </div>
         </div>
@@ -340,7 +383,7 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($visibles as $i): ?>
+                <?php foreach ($items as $i): ?>
                     <tr>
                         <td class="col-cant"><?= (int) $i['cantidad'] ?></td>
                         <td class="col-desc"><?= e($i['nombre_producto']) ?></td>
@@ -348,16 +391,12 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
                         <td class="col-importe"><span class="signo">$</span><?= dinero($i['subtotal']) ?></td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if ($ocultas > 0): ?>
-                    <tr>
-                        <td colspan="4" class="mas-piezas">
-                            y <?= $ocultas ?> pieza<?= $ocultas === 1 ? '' : 's' ?> más — ver detalle de la venta
-                        </td>
-                    </tr>
-                <?php endif; ?>
             </tbody>
         </table>
 
+        <?php if (!$ultima): ?>
+            <div class="continua">CONTINÚA EN LA HOJA <?= $hoja + 1 ?> DE <?= $hojas ?></div>
+        <?php else: ?>
         <div class="totales">
             <table>
                 <?php if ($saldoAplicado > 0): ?>
@@ -388,6 +427,7 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
             <span>Atendió: <?= e(trim($venta['vendedor'])) ?></span>
             <span><?= ucfirst(e($venta['tipo_pago'])) ?></span>
         </div>
+        <?php endif; ?>
     </div>
     <?php
 }
@@ -476,9 +516,50 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
             padding: 0.5in 0.55in;
         }
 
-        /* Si una venta trae mas piezas de las que caben, el sobrante se recorta
-           (overflow) en lugar de apretar los bloques y descuadrar la nota. */
+        /* Los bloques no se encogen: si algo no cabe, se recorta (overflow) en
+           lugar de apretarse y descuadrar la nota. Con el reparto por hojas no
+           deberia pasar; queda como red por si una descripcion larguisima
+           empuja un renglon. */
         .nota > * { flex-shrink: 0; }
+
+        /* ---------- Letra de la hoja vertical ----------
+           En media hoja la letra va chica porque la nota comparte el papel. La
+           hoja vertical lleva una sola nota, asi que todo crece ~35% y queda
+           legible a un brazo de distancia. Caben menos renglones por hoja (de
+           ahi PIEZAS_HOJA_VERTICAL en el PHP), y lo que no entra sigue abajo. */
+        .pagina-vertical .marca img    { width: 0.72in; height: 0.72in; }
+        .pagina-vertical .marca h1     { font-size: 15pt; }
+        .pagina-vertical .marca p      { font-size: 9pt; }
+        .pagina-vertical .folio        { font-size: 10pt; }
+        .pagina-vertical .folio strong { font-size: 12pt; }
+        .pagina-vertical .sello-copia  { font-size: 9.5pt; padding: 2.5pt 9pt; }
+        .pagina-vertical .hoja-num     { font-size: 9.5pt; }
+
+        .pagina-vertical .cliente           { font-size: 9.5pt; margin-top: 0.14in; }
+        .pagina-vertical .cliente .etiqueta { width: 0.85in; }
+        .pagina-vertical .cliente .dato     { min-height: 14pt; }
+
+        .pagina-vertical table { font-size: 9.5pt; margin-top: 0.16in; }
+        .pagina-vertical th    { font-size: 9pt; padding: 3.5pt 4pt; }
+
+        /* El relleno del renglon va justo (no la letra, que es lo que se lee):
+           cada punto que se le quita son 26 puntos de aire al pie de la hoja,
+           que es donde hace falta cuando la nota lleva saldo a favor. */
+        .pagina-vertical td    { padding: 2.5pt 4pt; }
+
+        /* Las columnas de numeros crecen con la letra; la descripcion se queda
+           con el resto del ancho, que en 8.5in sigue siendo mas que suficiente. */
+        .pagina-vertical .col-cant    { width: 0.5in; }
+        .pagina-vertical .col-precio  { width: 1in; }
+        .pagina-vertical .col-importe { width: 1.1in; }
+
+        .pagina-vertical .continua { font-size: 10pt; }
+
+        .pagina-vertical .totales table          { width: 3.6in; font-size: 11.5pt; }
+        .pagina-vertical .totales .monto         { width: 1.3in; }
+        .pagina-vertical .totales .gran-total td { font-size: 16pt; padding: 5pt 6pt; }
+        .pagina-vertical .total-letra            { font-size: 9.5pt; }
+        .pagina-vertical .pie                    { font-size: 9pt; margin-top: 0.12in; }
 
         /* ---------- Encabezado ---------- */
         .encabezado {
@@ -536,6 +617,15 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
             text-decoration: underline;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+        }
+
+        /* "HOJA 1 DE 2": solo sale cuando la nota no cupo en una hoja, debajo
+           del sello de ORIGINAL / COPIA. */
+        .hoja-num {
+            margin-top: 3pt;
+            font-size: 7pt;
+            font-weight: bold;
+            letter-spacing: 0.5pt;
         }
 
         /* ---------- Datos del cliente ---------- */
@@ -620,11 +710,16 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
             font-weight: normal;
         }
 
-        /* Cuando la venta trae mas piezas de las que caben en media hoja. */
-        .mas-piezas {
-            font-size: 6.5pt;
+        /* Las hojas que no son la ultima no llevan total: en su lugar dicen
+           donde sigue la nota. Va pegado al pie, igual que el total, para que
+           las hojas se vean parejas. */
+        .continua {
+            margin-top: auto;
+            padding-top: 0.12in;
+            text-align: right;
+            font-weight: bold;
             font-style: italic;
-            padding: 2pt 4pt;
+            letter-spacing: 0.3pt;
         }
 
         /* ---------- Total ---------- */
@@ -636,8 +731,12 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
             padding-top: 0.1in;
         }
 
+        /* A diferencia de la tabla de productos, esta NO lleva ancho fijo: el
+           recuadro del total crece lo que haga falta. Con ancho fijo, un total
+           de seis cifras se partia en dos renglones dentro del recuadro negro. */
         .totales table {
             width: 2.3in;
+            table-layout: auto;
             margin-top: 0;
             font-size: 8.5pt;
         }
@@ -647,8 +746,10 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
             padding: 2pt 4pt;
         }
 
-        .totales .rotulo { text-align: right; font-weight: bold; }
-        .totales .monto  { text-align: right; width: 0.95in; }
+        /* El rotulo va en un solo renglon: partido ("TOTAL A / PAGAR") el
+           recuadro negro crece al doble y se come el aire del pie. */
+        .totales .rotulo { text-align: right; font-weight: bold; white-space: nowrap; }
+        .totales .monto  { text-align: right; width: 0.95in; white-space: nowrap; }
 
         /* Total resaltado: fondo negro, letra blanca y un poco mas grande, para
            que salte a la vista sobre la nota. */
@@ -749,17 +850,22 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
 <div class="hoja">
 <?php foreach ($notasRender as $r): ?>
     <?php if ($r['vertical']): ?>
-        <?php /* Muchos productos: una copia por hoja carta vertical, dos hojas. */ ?>
-        <?php for ($copia = 0; $copia < 2; $copia++): ?>
-            <div class="pagina-vertical">
-                <?php renderNota($r['venta'], $r['items'], $unaSola, $direccion, $cp, $telefono, $clienteManual, $copia === 0 ? 'ORIGINAL' : 'COPIA'); ?>
-            </div>
-        <?php endfor; ?>
+        <?php /* Muchos productos: una copia por hoja carta vertical. Primero salen
+                 todas las hojas del ORIGINAL y luego todas las de la COPIA, para
+                 que cada juego quede completo y en orden al recogerlo. */ ?>
+        <?php $totalHojas = count($r['paginas']); ?>
+        <?php foreach (['ORIGINAL', 'COPIA'] as $etiqueta): ?>
+            <?php foreach ($r['paginas'] as $indice => $piezas): ?>
+                <div class="pagina-vertical">
+                    <?php renderNota($r['venta'], $piezas, $unaSola, $direccion, $cp, $telefono, $clienteManual, $etiqueta, $indice + 1, $totalHojas); ?>
+                </div>
+            <?php endforeach; ?>
+        <?php endforeach; ?>
     <?php else: ?>
         <?php /* Nota normal: la misma nota dos veces, una por mitad de la hoja horizontal. */ ?>
         <div class="par">
-            <?php renderNota($r['venta'], $r['items'], $unaSola, $direccion, $cp, $telefono, $clienteManual, 'ORIGINAL'); ?>
-            <?php renderNota($r['venta'], $r['items'], $unaSola, $direccion, $cp, $telefono, $clienteManual, 'COPIA'); ?>
+            <?php renderNota($r['venta'], $r['paginas'][0], $unaSola, $direccion, $cp, $telefono, $clienteManual, 'ORIGINAL'); ?>
+            <?php renderNota($r['venta'], $r['paginas'][0], $unaSola, $direccion, $cp, $telefono, $clienteManual, 'COPIA'); ?>
         </div>
     <?php endif; ?>
 <?php endforeach; ?>
