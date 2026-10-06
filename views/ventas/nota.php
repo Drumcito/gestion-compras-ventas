@@ -34,7 +34,7 @@ require_once __DIR__ . '/../../config/conexionBD.php';
 
 // Datos del negocio que salen impresos en el encabezado.
 const NEGOCIO_NOMBRE   = 'COMERCIALIZADORA GA-BE';
-const NEGOCIO_TELEFONO = '49728197';
+const NEGOCIO_TELEFONO = '55 2804 8722';
 
 // Tope para que una seleccion enorme no tumbe la pagina.
 const MAX_NOTAS = 100;
