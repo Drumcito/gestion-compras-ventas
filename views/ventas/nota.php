@@ -48,13 +48,25 @@ const MAX_PIEZAS_NOTA = 32;
 // (8.5 x 11) a hoja completa y con la letra mas grande. Lo que no quepa NO se
 // recorta: sigue en la hoja de abajo.
 //
-// Este es el tope de renglones por hoja vertical. Medido en la hoja mas
-// apretada, que es la ULTIMA (es la que carga el total, y con saldo a favor son
-// tres renglones de total mas el importe con letra): a 9.5pt el renglon mide
-// 16.3pt y caben 28. Se dejan 26 para que sobren dos renglones de aire, que es
-// lo que se come un importe en letra que se vaya a dos lineas. Las hojas
-// intermedias no llevan total, asi que les sobran ocho renglones.
-const PIEZAS_HOJA_VERTICAL = 26;
+// Topes de renglones por hoja vertical. Son dos porque las hojas no aguantan
+// lo mismo: la ULTIMA carga el total (con saldo a favor son tres renglones mas
+// el importe con letra) y las anteriores no.
+//
+// Renglones por hoja vertical: los que se imprimen de la venta y, si sobran,
+// los que se dibujan vacios para que la tabla llegue hasta abajo.
+//
+// Medido a 11pt, donde el renglon mide 18.3pt: en una hoja intermedia caben 31
+// y en la ultima 28 (ya contando el total mas alto, el que lleva saldo a favor:
+// tres renglones mas el importe con letra). De ahi se descuentan dos:
+//
+//   - uno porque la direccion del cliente se parte en dos renglones cuando pasa
+//     de 73 caracteres, y eso le quita uno a la hoja (5 de los 165 clientes);
+//   - otro de holgura, porque esto se midio en Chromium y se imprime en
+//     Firefox, que no mide exactamente igual.
+//
+// La descripcion no cuenta: va recortada a un renglon con puntos suspensivos.
+const PIEZAS_HOJA_VERTICAL  = 29;
+const PIEZAS_HOJA_CON_TOTAL = 26;
 
 // ---------- Que ventas se van a imprimir ----------
 $ids = [];
@@ -145,20 +157,52 @@ $clienteManual = $unaSola ? trim($_GET['cliente'] ?? '') : '';
 /**
  * Parte las piezas de una venta en las hojas que hagan falta.
  *
- * El reparto es parejo a proposito: 33 piezas con tope de 26 salen 17 y 16, no
- * 26 y 7. Son las mismas dos hojas, pero ninguna queda casi vacia.
+ * Primero saca el MINIMO de hojas en que caben (usando que la ultima aguanta
+ * menos, porque lleva el total) y luego reparte parejo entre ellas: 33 piezas
+ * salen 17 y 16, no 32 y 1. Son las mismas dos hojas, pero ninguna queda casi
+ * vacia, y el aire que sobre lo absorben los renglones (ver el CSS: la tabla
+ * se estira hasta el total).
  *
  * @return array lista de hojas; cada hoja es la lista de piezas que le toca.
  */
-function repartirEnHojas(array $items, int $porHoja): array
+function repartirEnHojas(array $items, int $porHoja, int $porHojaConTotal): array
 {
     if ($items === []) {
         return [[]];
     }
 
-    $hojas = (int) ceil(count($items) / $porHoja);
+    $n = count($items);
 
-    return array_chunk($items, (int) ceil(count($items) / $hojas));
+    // Hojas minimas: las primeras admiten $porHoja y la ultima $porHojaConTotal.
+    $hojas = 1;
+    while ($porHoja * ($hojas - 1) + $porHojaConTotal < $n) {
+        $hojas++;
+    }
+
+    if ($hojas === 1) {
+        return [$items];
+    }
+
+    // Reparto parejo. Si de ese reparto la ultima hoja se pasa de su tope, se
+    // le deja justo su tope y lo demas se reacomoda en las de antes, que
+    // aguantan mas por no llevar total.
+    $porPagina = (int) ceil($n / $hojas);
+
+    if ($n - $porPagina * ($hojas - 1) > $porHojaConTotal) {
+        $porPagina = (int) ceil(($n - $porHojaConTotal) / ($hojas - 1));
+    }
+
+    $paginas   = [];
+    $restantes = $items;
+
+    for ($i = 1; $i < $hojas; $i++) {
+        // Siempre se le deja al menos una pieza a la ultima hoja.
+        $paginas[] = array_splice($restantes, 0, min($porPagina, count($restantes) - 1));
+    }
+
+    $paginas[] = $restantes;
+
+    return $paginas;
 }
 
 // Cada nota decide su formato segun cuantas piezas trae: normal (media hoja
@@ -169,7 +213,9 @@ $hojas       = 0;
 foreach ($ventas as $venta) {
     $items    = $itemsPorVenta[$venta['id']] ?? [];
     $vertical = count($items) > MAX_PIEZAS_NOTA;
-    $paginas  = $vertical ? repartirEnHojas($items, PIEZAS_HOJA_VERTICAL) : [$items];
+    $paginas  = $vertical
+        ? repartirEnHojas($items, PIEZAS_HOJA_VERTICAL, PIEZAS_HOJA_CON_TOTAL)
+        : [$items];
 
     $notasRender[] = [
         'venta'    => $venta,
@@ -302,13 +348,15 @@ function numeroEnLetra($monto): string
  * Dibuja UNA hoja de la nota (encabezado, cliente, tabla y, si es la ultima,
  * el total). Se llama una vez por hoja y por copia.
  *
- * @param array $items piezas de ESTA hoja, no de toda la venta.
- * @param int   $hoja  numero de hoja de la copia, empezando en 1.
- * @param int   $hojas hojas que tiene la copia completa.
+ * @param array $items   piezas de ESTA hoja, no de toda la venta.
+ * @param int   $hoja    numero de hoja de la copia, empezando en 1.
+ * @param int   $hojas   hojas que tiene la copia completa.
+ * @param int   $blancos renglones vacios para llenar la hoja hasta abajo.
  */
 function renderNota(array $venta, array $items, bool $unaSola, string $direccion,
                     string $cp, string $telefono, string $clienteManual,
-                    string $etiquetaCopia = '', int $hoja = 1, int $hojas = 1): void
+                    string $etiquetaCopia = '', int $hoja = 1, int $hojas = 1,
+                    int $blancos = 0): void
 {
     $fecha = (new DateTime($venta['fecha']))->format('d/m/Y');
 
@@ -391,6 +439,15 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
                         <td class="col-importe"><span class="signo">$</span><?= dinero($i['subtotal']) ?></td>
                     </tr>
                 <?php endforeach; ?>
+                <?php /* Renglones vacios: la tabla llega hasta el total. */ ?>
+                <?php for ($b = 0; $b < $blancos; $b++): ?>
+                    <tr class="renglon-blanco">
+                        <td class="col-cant">.</td>
+                        <td class="col-desc"></td>
+                        <td class="col-precio"></td>
+                        <td class="col-importe"></td>
+                    </tr>
+                <?php endfor; ?>
             </tbody>
         </table>
 
@@ -513,7 +570,10 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
         .pagina-vertical .nota {
             width: 8.5in;
             height: 11in;
-            padding: 0.5in 0.55in;
+            /* Margen chico: la tabla gana 0.3in de ancho y 0.2in de alto. No se
+               baja de 0.4in porque casi ninguna impresora de inyeccion imprime
+               mas cerca de la orilla. */
+            padding: 0.4in;
         }
 
         /* Los bloques no se encogen: si algo no cabe, se recorta (overflow) en
@@ -527,20 +587,22 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
            hoja vertical lleva una sola nota, asi que todo crece ~35% y queda
            legible a un brazo de distancia. Caben menos renglones por hoja (de
            ahi PIEZAS_HOJA_VERTICAL en el PHP), y lo que no entra sigue abajo. */
-        .pagina-vertical .marca img    { width: 0.72in; height: 0.72in; }
-        .pagina-vertical .marca h1     { font-size: 15pt; }
-        .pagina-vertical .marca p      { font-size: 9pt; }
-        .pagina-vertical .folio        { font-size: 10pt; }
-        .pagina-vertical .folio strong { font-size: 12pt; }
-        .pagina-vertical .sello-copia  { font-size: 9.5pt; padding: 2.5pt 9pt; }
-        .pagina-vertical .hoja-num     { font-size: 9.5pt; }
+        .pagina-vertical .marca img    { width: 0.8in; height: 0.8in; }
+        .pagina-vertical .marca h1     { font-size: 17pt; }
+        .pagina-vertical .marca p      { font-size: 10pt; }
+        .pagina-vertical .folio        { font-size: 11pt; }
+        .pagina-vertical .folio strong { font-size: 13pt; }
+        .pagina-vertical .sello-copia  { font-size: 10.5pt; padding: 2.5pt 10pt; }
+        .pagina-vertical .hoja-num     { font-size: 10.5pt; }
 
-        .pagina-vertical .cliente           { font-size: 9.5pt; margin-top: 0.14in; }
-        .pagina-vertical .cliente .etiqueta { width: 0.85in; }
-        .pagina-vertical .cliente .dato     { min-height: 14pt; }
+        .pagina-vertical .cliente           { font-size: 11pt; margin-top: 0.14in; }
+        .pagina-vertical .cliente .etiqueta { width: 0.95in; }
+        .pagina-vertical .cliente .dato     { min-height: 15pt; }
 
-        .pagina-vertical table { font-size: 9.5pt; margin-top: 0.16in; }
-        .pagina-vertical th    { font-size: 9pt; padding: 3.5pt 4pt; }
+        .pagina-vertical table { font-size: 11pt; margin-top: 0.16in; }
+        /* El titulo de la columna va en un renglon: "P. UNITARIO" partido en
+           dos engorda el encabezado y come un renglon de productos. */
+        .pagina-vertical th    { font-size: 9.5pt; padding: 3.5pt 4pt; white-space: nowrap; }
 
         /* El relleno del renglon va justo (no la letra, que es lo que se lee):
            cada punto que se le quita son 26 puntos de aire al pie de la hoja,
@@ -549,17 +611,30 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
 
         /* Las columnas de numeros crecen con la letra; la descripcion se queda
            con el resto del ancho, que en 8.5in sigue siendo mas que suficiente. */
+        /* Las columnas de numeros se quedan con lo justo (una cifra de seis
+           digitos mide 0.9in a 11pt) y el resto del ancho es para la
+           descripcion, que es lo que se recorta cuando falta espacio. */
         .pagina-vertical .col-cant    { width: 0.5in; }
         .pagina-vertical .col-precio  { width: 1in; }
         .pagina-vertical .col-importe { width: 1.1in; }
 
-        .pagina-vertical .continua { font-size: 10pt; }
+        .pagina-vertical .continua { font-size: 11pt; }
 
-        .pagina-vertical .totales table          { width: 3.6in; font-size: 11.5pt; }
-        .pagina-vertical .totales .monto         { width: 1.3in; }
-        .pagina-vertical .totales .gran-total td { font-size: 16pt; padding: 5pt 6pt; }
-        .pagina-vertical .total-letra            { font-size: 9.5pt; }
-        .pagina-vertical .pie                    { font-size: 9pt; margin-top: 0.12in; }
+        /* La hoja se llena con renglones en blanco hasta el tope (ver
+           PIEZAS_HOJA_* en el PHP), como una nota de papel rayada: la tabla
+           llega hasta el total en lugar de terminar a media pagina.
+
+           Se hace con renglones de verdad y no estirando la tabla, porque el
+           alto sobrante que el navegador reparte entre las filas en pantalla NO
+           se reparte al imprimir: la vista previa salia llena y el PDF salia a
+           medias. Un renglon vacio ocupa lo mismo en los dos lados. */
+        .pagina-vertical .renglon-blanco td { color: transparent; }
+
+        .pagina-vertical .totales table          { width: 4in; font-size: 13pt; }
+        .pagina-vertical .totales .monto         { width: 1.5in; }
+        .pagina-vertical .totales .gran-total td { font-size: 18pt; padding: 5pt 7pt; }
+        .pagina-vertical .total-letra            { font-size: 10.5pt; }
+        .pagina-vertical .pie                    { font-size: 10pt; margin-top: 0.12in; }
 
         /* ---------- Encabezado ---------- */
         .encabezado {
@@ -856,8 +931,14 @@ function renderNota(array $venta, array $items, bool $unaSola, string $direccion
         <?php $totalHojas = count($r['paginas']); ?>
         <?php foreach (['ORIGINAL', 'COPIA'] as $etiqueta): ?>
             <?php foreach ($r['paginas'] as $indice => $piezas): ?>
+                <?php
+                    // La ultima hoja carga el total, asi que admite menos
+                    // renglones; lo que le falte para su tope va en blanco.
+                    $tope    = ($indice + 1 === $totalHojas) ? PIEZAS_HOJA_CON_TOTAL : PIEZAS_HOJA_VERTICAL;
+                    $blancos = max(0, $tope - count($piezas));
+                ?>
                 <div class="pagina-vertical">
-                    <?php renderNota($r['venta'], $piezas, $unaSola, $direccion, $cp, $telefono, $clienteManual, $etiqueta, $indice + 1, $totalHojas); ?>
+                    <?php renderNota($r['venta'], $piezas, $unaSola, $direccion, $cp, $telefono, $clienteManual, $etiqueta, $indice + 1, $totalHojas, $blancos); ?>
                 </div>
             <?php endforeach; ?>
         <?php endforeach; ?>
