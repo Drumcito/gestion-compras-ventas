@@ -26,6 +26,12 @@ const MAX_FILAS = 5000;
 /** Cuantas filas van por INSERT. */
 const FILAS_POR_LOTE = 500;
 
+/**
+ * Minutos para deshacer el borrado de un producto. Mismo plazo que el de las
+ * ventas (VentaAccionController), para no tener dos reglas distintas.
+ */
+const MINUTOS_RECUPERACION = 10;
+
 $usuarioId = (int) $_SESSION['user_id'];
 
 // ---------------------------------------------------------------- utilidades
@@ -160,6 +166,44 @@ try {
             'etiqueta_sugerida'  => 'C' . (count($casas) + 1) . '-',
             'porcentaje_sugerido' => CASAS_PORCENTAJE_DEFECTO,
             'max_filas'          => MAX_FILAS,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ---------- Productos recien borrados, todavia recuperables ----------
+    // Van de TODAS las casas, no solo de la que se esta viendo: si borras algo y
+    // cambias de pestana, el aviso te sigue y no pierdes el plazo sin enterarte.
+    if ($accion === 'recuperables') {
+        $pendientes = [];
+
+        foreach (tablasCasa() as $codigoCasa => $tabla) {
+            $stmt = $pdo->query(
+                "SELECT codigo_interno, nombre, codigo_proveedor,
+                        TIMESTAMPDIFF(SECOND, NOW(),
+                            eliminado_en + INTERVAL " . MINUTOS_RECUPERACION . " MINUTE) AS segundos_restantes
+                   FROM `{$tabla}`
+                  WHERE activo = 0 AND eliminado_en IS NOT NULL
+                  ORDER BY eliminado_en DESC"
+            );
+
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+                // El sello se queda puesto para siempre (un producto no se borra
+                // de verdad), asi que aqui se filtran los que ya vencieron.
+                if ((int) $fila['segundos_restantes'] <= 0) {
+                    continue;
+                }
+
+                $fila['casa'] = etiquetaCasa($codigoCasa);
+                $pendientes[] = $fila;
+            }
+        }
+
+        // Lo mas reciente primero, sin importar de que casa sea.
+        usort($pendientes, fn($a, $b) => $b['segundos_restantes'] <=> $a['segundos_restantes']);
+
+        echo json_encode([
+            'ok'            => true,
+            'recuperables'  => $pendientes,
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -396,6 +440,11 @@ try {
     // y el historial de precios depende de la fila. Con activo = 0 el producto
     // desaparece del inventario y del buscador (todo filtra activo = 1), pero lo
     // que ya se vendio queda intacto.
+    //
+    // Ademas se sella con la fecha y el usuario, que es lo que deja recuperarlo
+    // durante MINUTOS_RECUPERACION (ver accion=recuperar). Pasado el plazo la
+    // fila se queda tal cual: a diferencia de una venta, un producto nunca se
+    // borra de verdad, solo deja de poder recuperarse desde la pantalla.
     if ($accion === 'eliminar') {
         $codigo = (string) ($datos['codigo'] ?? '');
         $tabla  = tablaDeProducto($codigo);
@@ -420,13 +469,79 @@ try {
             exit;
         }
 
-        $pdo->prepare("UPDATE `{$tabla}` SET activo = 0 WHERE codigo_interno = :codigo")
-            ->execute(['codigo' => $codigo]);
+        $pdo->prepare(
+            "UPDATE `{$tabla}`
+                SET activo = 0, eliminado_en = NOW(), eliminado_por = :usuario
+              WHERE codigo_interno = :codigo"
+        )->execute(['usuario' => $usuarioId, 'codigo' => $codigo]);
 
         echo json_encode([
-            'ok'     => true,
-            'nombre' => $nombre,
-            'casa'   => etiquetaCasa(substr($codigo, 0, (int) strpos($codigo, '-'))),
+            'ok'       => true,
+            'nombre'   => $nombre,
+            'codigo'   => $codigo,
+            'casa'     => etiquetaCasa(substr($codigo, 0, (int) strpos($codigo, '-'))),
+            'segundos' => MINUTOS_RECUPERACION * 60,
+            'mensaje'  => 'Se borró "' . $nombre . '". Tienes ' . MINUTOS_RECUPERACION
+                        . ' minutos para recuperarlo.',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ---------- Recuperar un producto recien borrado ----------
+    // Deshace la baja siempre que todavia este dentro del plazo. El sello
+    // (eliminado_en) se limpia: el producto vuelve a estar como si nada.
+    if ($accion === 'recuperar') {
+        $codigo = (string) ($datos['codigo'] ?? '');
+        $tabla  = tablaDeProducto($codigo);
+
+        if ($tabla === null) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Codigo de producto no valido']);
+            exit;
+        }
+
+        // Solo se recupera lo que se borro DESDE LA PANTALLA (eliminado_en con
+        // fecha). Un producto que quedo inactivo por haberse movido de casa no
+        // entra aqui: regresarlo dejaria el mismo producto en las dos casas.
+        $stmt = $pdo->prepare(
+            "SELECT nombre,
+                    TIMESTAMPDIFF(SECOND, NOW(),
+                        eliminado_en + INTERVAL " . MINUTOS_RECUPERACION . " MINUTE) AS segundos_restantes
+               FROM `{$tabla}`
+              WHERE codigo_interno = :codigo AND activo = 0 AND eliminado_en IS NOT NULL
+              LIMIT 1"
+        );
+        $stmt->execute(['codigo' => $codigo]);
+        $fila = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$fila) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Ese producto no esta borrado']);
+            exit;
+        }
+
+        if ((int) $fila['segundos_restantes'] <= 0) {
+            http_response_code(410);
+            echo json_encode([
+                'ok'    => false,
+                'error' => 'Ya pasaron los ' . MINUTOS_RECUPERACION
+                         . ' minutos para recuperarlo. Se puede volver a dar de alta.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $pdo->prepare(
+            "UPDATE `{$tabla}`
+                SET activo = 1, eliminado_en = NULL, eliminado_por = NULL
+              WHERE codigo_interno = :codigo"
+        )->execute(['codigo' => $codigo]);
+
+        echo json_encode([
+            'ok'      => true,
+            'nombre'  => $fila['nombre'],
+            'codigo'  => $codigo,
+            'casa'    => etiquetaCasa(substr($codigo, 0, (int) strpos($codigo, '-'))),
+            'mensaje' => 'Se recuperó "' . $fila['nombre'] . '".',
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }

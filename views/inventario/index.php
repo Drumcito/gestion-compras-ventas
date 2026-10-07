@@ -67,6 +67,9 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
                 </div>
             </div>
 
+            <!-- Productos recien borrados: recuperables por 10 minutos -->
+            <div id="recuperables-productos" class="recuperables" hidden></div>
+
             <div id="casa-neto-info" class="casa-neto-info" hidden></div>
             <div id="resumen-inventario" class="resumen-periodo"></div>
             <div id="aviso-inventario" class="aviso" hidden></div>

@@ -280,13 +280,16 @@ function ddlTablaProductos(string $tabla, int $numero): string
       `piezas_master` INT DEFAULT NULL,
       `fecha_precio_proveedor` DATE DEFAULT NULL,
       `activo` TINYINT(1) NOT NULL DEFAULT 1,
+      `eliminado_en` DATETIME NULL DEFAULT NULL,
+      `eliminado_por` INT NULL DEFAULT NULL,
       `fecha_creacion` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       `fecha_actualizacion` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       PRIMARY KEY (`id`),
       UNIQUE KEY `codigo_interno` (`codigo_interno`),
       KEY `idx_p{$numero}_codigo_proveedor` (`codigo_proveedor`),
       KEY `idx_p{$numero}_nombre` (`nombre`),
-      KEY `idx_p{$numero}_marca` (`marca`)
+      KEY `idx_p{$numero}_marca` (`marca`),
+      KEY `idx_p{$numero}_eliminado_en` (`eliminado_en`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 }
 

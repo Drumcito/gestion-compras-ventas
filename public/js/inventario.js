@@ -536,7 +536,8 @@ document.addEventListener('DOMContentLoaded', () => {
             '<p class="aviso aviso-error">¿Seguro que deseas borrar <strong>"' + esc(nombre) +
                 '"</strong> de la casa ' + esc(etiquetaActual()) + '?</p>' +
             '<p class="detalle-sub">El producto deja de aparecer en el inventario y en el ' +
-                'buscador de ventas. Las ventas ya registradas no se modifican.</p>' +
+                'buscador de ventas. Las ventas ya registradas no se modifican, y tendr\u00e1s ' +
+                '<strong>10 minutos para recuperarlo</strong>.</p>' +
             '<div id="inv-aviso" class="aviso" hidden></div>' +
             '<div class="detalle-acciones">' +
                 '<button type="button" class="chip" id="btn-cancelar-borrado">Cancelar</button>' +
@@ -575,14 +576,122 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             modal.hidden = true;
-            mostrarAviso('Se borró "' + datos.nombre + '" de ' + etiquetaActual() + '.', 'ok');
+            mostrarAviso(datos.mensaje || ('Se borró "' + datos.nombre + '".'), 'ok');
 
             // El conteo de la casa cambió: recargar las casas refresca las pestañas
             // y vuelve a pintar la lista sin el producto.
             cargarCasas(casaActual);
 
+            // El panel de recuperación se vuelve a leer del servidor en vez de
+            // agregar la fila a mano: así el reloj sale de la misma cuenta que
+            // usa el servidor para decidir si todavía se puede deshacer.
+            cargarRecuperables();
+
         } catch (e) {
             fallar('Error de conexión.');
+        }
+    }
+
+    // ---------- Productos recién borrados (10 minutos para deshacer) ----------
+    // Mismo trato que las ventas eliminadas en Historial: el servidor dice
+    // cuántos segundos le quedan a cada uno, aquí se guarda el instante en que
+    // vence y un temporizador redibuja el reloj cada segundo.
+    //
+    // Pasado el plazo el producto NO se borra de verdad (las ventas guardan su
+    // código y el historial de precios depende de la fila): lo único que se
+    // acaba es poder regresarlo desde aquí.
+    const cajaRecuperables = document.getElementById('recuperables-productos');
+
+    let recuperables          = [];
+    let temporizadorRecuperar = null;
+
+    async function cargarRecuperables() {
+        try {
+            const datos = await (await fetch(RUTA_CASA + '?accion=recuperables')).json();
+
+            if (!datos.ok) return;
+
+            const ahora = Date.now();
+            recuperables = (datos.recuperables || []).map((r) => ({
+                codigo:  r.codigo_interno,
+                nombre:  r.nombre,
+                casa:    r.casa,
+                fin:     ahora + Number(r.segundos_restantes) * 1000,
+            }));
+
+            dibujarRecuperables();
+
+        } catch (e) {
+            // Sin conexión no se pinta nada: es un extra, no debe tumbar la pantalla.
+        }
+    }
+
+    function dibujarRecuperables() {
+        clearTimeout(temporizadorRecuperar);
+
+        const ahora = Date.now();
+        recuperables = recuperables.filter((r) => r.fin - ahora > 0);
+
+        if (recuperables.length === 0) {
+            cajaRecuperables.hidden = true;
+            cajaRecuperables.innerHTML = '';
+            return;
+        }
+
+        const filas = recuperables.map((r) => {
+            const seg = Math.max(0, Math.round((r.fin - ahora) / 1000));
+            const mm  = String(Math.floor(seg / 60)).padStart(2, '0');
+            const ss  = String(seg % 60).padStart(2, '0');
+
+            return '<div class="recuperable-fila">' +
+                '<div class="recuperable-datos">' +
+                    '<span class="recuperable-cliente">' + esc(r.nombre) + '</span>' +
+                    '<span class="recuperable-meta">' + esc(r.casa) + ' · ' + esc(r.codigo) +
+                        ' · ya no se puede recuperar en ' +
+                        '<strong class="recuperable-reloj">' + mm + ':' + ss + '</strong></span>' +
+                '</div>' +
+                '<button type="button" class="btn-save btn-recuperar-prod" data-codigo="' +
+                    esc(r.codigo) + '">' +
+                    '<i class="ph ph-arrow-counter-clockwise"></i> Recuperar</button>' +
+            '</div>';
+        }).join('');
+
+        cajaRecuperables.innerHTML =
+            '<div class="recuperables-titulo">' +
+                '<i class="ph ph-trash"></i> Borrados hace poco · recupéralos antes de que venza el plazo</div>' +
+            filas;
+        cajaRecuperables.hidden = false;
+
+        temporizadorRecuperar = setTimeout(dibujarRecuperables, 1000);
+    }
+
+    async function recuperarProducto(codigo, boton) {
+        boton.disabled = true;
+
+        try {
+            const datos = await (await fetch(RUTA_CASA + '?accion=recuperar', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ codigo: codigo }),
+            })).json();
+
+            if (!datos.ok) {
+                mostrarAviso(datos.error || 'No se pudo recuperar el producto.', 'error');
+                // Puede haber vencido justo ahora: se relee para que la fila
+                // desaparezca en lugar de quedarse con un botón que ya no sirve.
+                cargarRecuperables();
+                return;
+            }
+
+            mostrarAviso(datos.mensaje || ('Se recuperó "' + datos.nombre + '".'), 'ok');
+
+            // Vuelve al inventario de su casa (el conteo cambió) y se repinta el panel.
+            cargarCasas(casaActual);
+            cargarRecuperables();
+
+        } catch (e) {
+            mostrarAviso('Error de conexión.', 'error');
+            boton.disabled = false;
         }
     }
 
@@ -1322,6 +1431,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnBorrar) borrarProducto(btnBorrar.dataset.codigo);
     });
 
+    cajaRecuperables.addEventListener('click', (e) => {
+        const boton = e.target.closest('.btn-recuperar-prod');
+        if (boton) recuperarProducto(boton.dataset.codigo, boton);
+    });
+
     btnCerrar.addEventListener('click', () => { modal.hidden = true; });
 
     modal.addEventListener('click', (e) => {
@@ -1336,4 +1450,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     cargarCasas();
+
+    // Si se borró algo y se recargó la página, el plazo sigue corriendo: el panel
+    // tiene que aparecer solo, sin depender de que el borrado haya sido en esta
+    // misma visita.
+    cargarRecuperables();
 });

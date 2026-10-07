@@ -94,8 +94,15 @@ try {
 
         // El trigger de historial registra el cambio de precio con este usuario.
         $pdo->prepare('SET @usuario_actual = :id')->execute(['id' => (int) $_SESSION['user_id']]);
+        // Si ese producto se habia borrado desde Inventario, al volver a darlo de
+        // alta aqui se limpia el sello del borrado: ya no tiene nada que
+        // recuperar, y de otro modo seguiria contando en la lista de
+        // recuperables aun estando activo.
         $pdo->prepare(
-            "UPDATE `{$tabla}` SET precio_mayoreo = :bruto, activo = 1 WHERE codigo_interno = :codigo"
+            "UPDATE `{$tabla}`
+                SET precio_mayoreo = :bruto, activo = 1,
+                    eliminado_en = NULL, eliminado_por = NULL
+              WHERE codigo_interno = :codigo"
         )->execute(['bruto' => $bruto, 'codigo' => $codigoInterno]);
 
     } else {
