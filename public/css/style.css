@@ -1210,6 +1210,43 @@ select.form-control {
     font-size: 1rem;
 }
 
+/* Busqueda por cliente: va arriba de los filtros de fecha. */
+.filtros-busqueda {
+    margin-bottom: 1rem;
+}
+
+.filtros-busqueda .search-container {
+    max-width: 420px;
+}
+
+/* El boton de limpiar ocupa el lugar de la lupa; cuando aparece (hay texto),
+   la lupa se oculta para que no se encimen. */
+.buscar-cliente-limpiar {
+    position: absolute;
+    right: 0.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #e4e4e4;
+    color: #333333;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.15s ease;
+}
+
+.buscar-cliente-limpiar:hover {
+    background: #d2d2d2;
+}
+
+.search-container:has(.buscar-cliente-limpiar:not([hidden])) i.search-icon {
+    opacity: 0;
+}
+
 .resumen-periodo {
     display: flex;
     justify-content: space-between;

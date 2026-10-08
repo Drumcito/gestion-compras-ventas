@@ -172,6 +172,30 @@ try {
         exit;
     }
 
+    // Busqueda por cliente: cuando llega un termino, el rango de fechas se
+    // ignora y se traen TODAS las ventas de ese cliente (lo que la gente espera
+    // de "buscar un cliente"). Casa contra v.cliente, que guarda el nombre
+    // mostrado tanto de los clientes del catalogo como de los escritos a mano.
+    $cliente = trim($_GET['cliente'] ?? '');
+
+    $parametros = [];
+
+    if ($cliente !== '') {
+        // Se escapan los comodines de LIKE (\, %, _) para que, si el usuario los
+        // teclea, se busquen como texto y no como comodin. MySQL usa \ como
+        // caracter de escape por omision.
+        $condicionFecha = ' AND v.cliente LIKE :cliente';
+        $parametros['cliente'] = '%' . strtr($cliente, ['\\' => '\\\\', '%' => '\\%', '_' => '\\_']) . '%';
+    } else {
+        $condicionFecha = ' AND DATE(v.fecha) BETWEEN :desde AND :hasta';
+        $parametros['desde'] = $desde;
+        $parametros['hasta'] = $hasta;
+    }
+
+    if ($filtroUsuario > 0) {
+        $parametros['usuario'] = $filtroUsuario;
+    }
+
     $stmt = $pdo->prepare(
         'SELECT v.id, v.cliente, v.fecha, v.total, v.monto_cobrado, v.credito_aplicado, v.tipo_pago,
                 v.estado_pago, v.entregada_en, v.usuario_id,
@@ -181,15 +205,9 @@ try {
                 (SELECT COUNT(*) FROM detalle_venta d WHERE d.venta_id = v.id) AS piezas
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
-          WHERE v.eliminada_en IS NULL
-            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicionUsuario . '
+          WHERE v.eliminada_en IS NULL' . $condicionFecha . $condicionUsuario . '
           ORDER BY v.fecha DESC, v.id DESC'
     );
-
-    $parametros = ['desde' => $desde, 'hasta' => $hasta];
-    if ($filtroUsuario > 0) {
-        $parametros['usuario'] = $filtroUsuario;
-    }
 
     $stmt->execute($parametros);
     $ventas = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -246,6 +264,7 @@ try {
         'ok'           => true,
         'desde'        => $desde,
         'hasta'        => $hasta,
+        'cliente'      => $cliente,
         'usuario'      => $filtroUsuario,
         'vendedores'   => $vendedores,
         'total'        => number_format($totalPeriodo, 2, '.', ''),

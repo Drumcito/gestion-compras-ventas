@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnExportar  = document.getElementById('btn-exportar');
     const btnProductos = document.getElementById('btn-productos');
     const filtroUsuario = document.getElementById('filtro-usuario');
+    const inputCliente = document.getElementById('buscar-cliente');
+    const btnLimpiarCliente = document.getElementById('btn-limpiar-cliente');
     // Solo los chips de rango: hay otros elementos con la clase .chip (como el
     // boton de descargar) que no deben comportarse como filtro de fechas.
     const chips        = document.querySelectorAll('.chip[data-rango]');
@@ -106,9 +108,13 @@ document.addEventListener('DOMContentLoaded', () => {
         aviso.hidden = true;
 
         try {
+            // Con un cliente escrito, el servidor ignora el rango de fechas y
+            // trae todas sus ventas; sin cliente, filtra por el periodo.
+            const termino = (inputCliente.value || '').trim();
             const url = '../../app/controllers/HistorialController.php'
                 + '?accion=listar&desde=' + desde + '&hasta=' + hasta
-                + '&usuario=' + (filtroUsuario.value || 0);
+                + '&usuario=' + (filtroUsuario.value || 0)
+                + (termino ? '&cliente=' + encodeURIComponent(termino) : '');
             const respuesta = await fetch(url);
 
             if (respuesta.status === 401) {
@@ -149,9 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
         llenarVendedores(datos.vendedores || [], datos.usuario);
         pintarRecuperables(datos.recuperables || []);
 
-        const rango = datos.desde === datos.hasta
-            ? fechaLegible(datos.desde)
-            : fechaLegible(datos.desde) + ' al ' + fechaLegible(datos.hasta);
+        // Buscando por cliente el periodo no aplica: se muestra a quién se buscó.
+        const contexto = datos.cliente
+            ? 'cliente «' + esc(datos.cliente) + '»'
+            : (datos.desde === datos.hasta
+                ? fechaLegible(datos.desde)
+                : fechaLegible(datos.desde) + ' al ' + fechaLegible(datos.hasta));
 
         const devoluciones = Number(datos.devoluciones || 0) > 0
             ? '<span class="resumen-devolucion">Devoluciones: ' + money(datos.devoluciones) + '</span>'
@@ -159,12 +168,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         resumen.innerHTML =
             '<span>' + datos.ventas.length + ' venta' + (datos.ventas.length === 1 ? '' : 's') +
-            ' · ' + rango + '</span>' +
+            ' · ' + contexto + '</span>' +
             devoluciones +
             '<strong>Total: ' + money(datos.total) + '</strong>';
 
         if (datos.ventas.length === 0) {
-            lista.innerHTML = '<p class="venta-vacia">No hay ventas en este periodo.</p>';
+            lista.innerHTML = '<p class="venta-vacia">' +
+                (datos.cliente ? 'No hay ventas de ese cliente.' : 'No hay ventas en este periodo.') +
+                '</p>';
             return;
         }
 
@@ -1928,6 +1939,9 @@ document.addEventListener('DOMContentLoaded', () => {
             chips.forEach((c) => c.classList.remove('chip-activo'));
             chip.classList.add('chip-activo');
 
+            // Filtrar por fecha deja sin efecto la busqueda por cliente.
+            limpiarBusquedaCliente();
+
             const [desde, hasta] = rangoDe(chip.dataset.rango);
             inputDesde.value = desde;
             inputHasta.value = hasta;
@@ -1945,7 +1959,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         chips.forEach((c) => c.classList.remove('chip-activo'));
+        // Filtrar por fecha deja sin efecto la busqueda por cliente.
+        limpiarBusquedaCliente();
         cargar(desde, hasta);
+    });
+
+    // ---------- Busqueda por cliente ----------
+    // Trae todas las ventas de un cliente, sin importar el rango de fechas. Es
+    // un filtro aparte del de periodo: al escribir aqui se apaga el chip activo,
+    // y al volver a filtrar por fecha se limpia este campo.
+    let temporizadorBuscarCliente = null;
+
+    function actualizarBotonLimpiarCliente() {
+        btnLimpiarCliente.hidden = (inputCliente.value || '').trim() === '';
+    }
+
+    function limpiarBusquedaCliente() {
+        inputCliente.value = '';
+        actualizarBotonLimpiarCliente();
+    }
+
+    inputCliente.addEventListener('input', () => {
+        clearTimeout(temporizadorBuscarCliente);
+        // Mientras se busca por cliente el periodo no aplica: se apaga el chip.
+        chips.forEach((c) => c.classList.remove('chip-activo'));
+        actualizarBotonLimpiarCliente();
+        temporizadorBuscarCliente = setTimeout(() => {
+            cargar(inputDesde.value, inputHasta.value || inputDesde.value);
+        }, 300);
+    });
+
+    inputCliente.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            clearTimeout(temporizadorBuscarCliente);
+            cargar(inputDesde.value, inputHasta.value || inputDesde.value);
+        }
+    });
+
+    btnLimpiarCliente.addEventListener('click', () => {
+        clearTimeout(temporizadorBuscarCliente);
+        limpiarBusquedaCliente();
+        inputCliente.focus();
+        cargar(inputDesde.value, inputHasta.value || inputDesde.value);
     });
 
     // La descarga es una navegacion normal: el navegador la resuelve como

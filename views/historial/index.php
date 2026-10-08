@@ -33,6 +33,21 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
         <div class="card-form card-historial">
             <!-- Filtros -->
             <div class="filtros">
+                <!-- Busqueda por cliente: trae TODAS las ventas de ese cliente,
+                     sin importar el rango de fechas. -->
+                <div class="filtros-busqueda">
+                    <div class="search-container">
+                        <input type="text" id="buscar-cliente" class="form-control"
+                               maxlength="150" autocomplete="off"
+                               placeholder="Buscar todas las ventas de un cliente…">
+                        <i class="ph ph-magnifying-glass search-icon" aria-hidden="true"></i>
+                        <button type="button" id="btn-limpiar-cliente" class="buscar-cliente-limpiar"
+                                title="Quitar la búsqueda por cliente" aria-label="Quitar búsqueda" hidden>
+                            <i class="ph ph-x"></i>
+                        </button>
+                    </div>
+                </div>
+
                 <div class="filtros-rapidos">
                     <button type="button" class="chip chip-activo" data-rango="hoy">Hoy</button>
                     <button type="button" class="chip" data-rango="ayer">Ayer</button>
