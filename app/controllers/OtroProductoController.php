@@ -24,14 +24,35 @@ require_once __DIR__ . '/../helpers/casas.php';
 try {
     $pdo = Database::getConnection();
 
-    // ---------- Porcentaje para mostrar el precio final en el modal ----------
+    // ---------- Casas y porcentajes para el modal ----------
+    // Devuelve el desplegable de casas (activas) con su porcentaje por defecto y
+    // cual es la casa "Otros", que queda seleccionada de entrada.
     if (($_GET['accion'] ?? '') === 'info') {
-        $codigo = codigoCasaOtros();
+        // Se asegura de que "Otros" exista para poder ofrecerla por defecto
+        // (se crea sola la primera vez).
+        $codigoOtros = asegurarCasaOtros($pdo);
+
+        $casas = [];
+        foreach (casasRegistradas() as $codigo => $casa) {
+            if ($casa['activo']) {
+                $casas[] = [
+                    'codigo_casa' => $codigo,
+                    'etiqueta'    => $casa['etiqueta'],
+                    'orden'       => $casa['orden'],
+                    'porcentaje'  => $casa['porcentaje_neto'],
+                ];
+            }
+        }
+
+        // Mismo orden que en las demas pantallas.
+        usort($casas, fn($a, $b) => $a['orden'] <=> $b['orden']);
 
         echo json_encode([
             'ok'         => true,
-            'porcentaje' => $codigo !== null ? porcentajeCasa($codigo) : CASAS_PORCENTAJE_DEFECTO,
-        ]);
+            'casas'      => $casas,
+            'otros'      => $codigoOtros,
+            'porcentaje' => porcentajeCasa($codigoOtros),
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -67,25 +88,57 @@ try {
         throw new RuntimeException('El precio debe ser mayor a 0');
     }
 
-    $codigoCasa = asegurarCasaOtros($pdo);
-    $tabla      = tablaDeCasa($codigoCasa);
+    // Casa destino: por defecto "Otros", pero el usuario puede elegir otra del
+    // desplegable. Se valida que sea una casa activa y con tabla; cualquier otra
+    // cosa cae en Otros, para no dejar la pieza sin casa.
+    $casas        = casasRegistradas();
+    $codigoPedido = strtoupper(trim((string) ($datos['codigo_casa'] ?? '')));
 
-    if ($tabla === null) {
-        throw new RuntimeException('No se pudo preparar la casa Otros');
+    if ($codigoPedido !== ''
+        && isset($casas[$codigoPedido])
+        && $casas[$codigoPedido]['activo']
+        && tablaDeCasa($codigoPedido) !== null) {
+        $codigoCasa = $codigoPedido;
+    } else {
+        $codigoCasa = asegurarCasaOtros($pdo);
     }
 
-    // Si ya se habia capturado una pieza con el mismo nombre se reutiliza (con el
-    // precio nuevo) en lugar de llenar Otros de duplicados. Se trae su porcentaje
-    // propio (si un admin se lo puso) para que el precio mostrado sea el que de
-    // verdad se cobrara.
+    $tabla = tablaDeCasa($codigoCasa);
+
+    if ($tabla === null) {
+        throw new RuntimeException('No se pudo preparar la casa destino');
+    }
+
+    // Porcentaje elegido. Vacio = el de la casa. Si coincide con el de la casa se
+    // deja atado a ella (NULL); si es distinto, se guarda como porcentaje propio
+    // del producto (columna porcentaje_neto), igual que el editor de %.
+    $pctCasa  = porcentajeCasa($codigoCasa);
+    $crudoPct = str_replace(['%', ' '], '', (string) ($datos['porcentaje'] ?? ''));
+
+    if ($crudoPct === '') {
+        $porcentajeGuardar = null;
+    } elseif (!is_numeric($crudoPct)) {
+        throw new RuntimeException('El porcentaje no es un numero valido');
+    } else {
+        $pct = round((float) $crudoPct, 2);
+
+        if ($pct < 0 || $pct > 999.99) {
+            throw new RuntimeException('El porcentaje debe estar entre 0 y 999.99');
+        }
+
+        $porcentajeGuardar = abs($pct - $pctCasa) < 0.005 ? null : $pct;
+    }
+
+    // Si ya se habia capturado una pieza con el mismo nombre en esta casa se
+    // reutiliza (con el precio y porcentaje nuevos) en lugar de duplicarla.
     $stmt = $pdo->prepare(
-        "SELECT codigo_interno, precio_mayoreo, porcentaje_neto FROM `{$tabla}` WHERE nombre = :nombre ORDER BY id LIMIT 1"
+        "SELECT codigo_interno FROM `{$tabla}` WHERE nombre = :nombre ORDER BY id LIMIT 1"
     );
     $stmt->execute(['nombre' => $nombre]);
     $existente = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // El porcentaje del producto reutilizado, o el de la casa para uno nuevo.
-    $porcentaje = porcentajeProducto($existente['porcentaje_neto'] ?? null, $codigoCasa);
+    // Porcentaje efectivo con el que se calcula el precio mostrado y cobrado.
+    $porcentaje = porcentajeProducto($porcentajeGuardar, $codigoCasa);
 
     $pdo->beginTransaction();
 
@@ -100,15 +153,16 @@ try {
         // recuperables aun estando activo.
         $pdo->prepare(
             "UPDATE `{$tabla}`
-                SET precio_mayoreo = :bruto, activo = 1,
+                SET precio_mayoreo = :bruto, porcentaje_neto = :pct, activo = 1,
                     eliminado_en = NULL, eliminado_por = NULL
               WHERE codigo_interno = :codigo"
-        )->execute(['bruto' => $bruto, 'codigo' => $codigoInterno]);
+        )->execute(['bruto' => $bruto, 'pct' => $porcentajeGuardar, 'codigo' => $codigoInterno]);
 
     } else {
         $pdo->prepare(
-            "INSERT INTO `{$tabla}` (codigo_proveedor, nombre, precio_mayoreo) VALUES ('', :nombre, :bruto)"
-        )->execute(['nombre' => $nombre, 'bruto' => $bruto]);
+            "INSERT INTO `{$tabla}` (codigo_proveedor, nombre, precio_mayoreo, porcentaje_neto)
+             VALUES ('', :nombre, :bruto, :pct)"
+        )->execute(['nombre' => $nombre, 'bruto' => $bruto, 'pct' => $porcentajeGuardar]);
 
         // Mismo formato de codigo que el resto del catalogo (BNS05-00001).
         $id            = (int) $pdo->lastInsertId();

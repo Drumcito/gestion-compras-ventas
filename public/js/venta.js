@@ -998,39 +998,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalOtro      = document.getElementById('modal-otro');
     const formOtro       = document.getElementById('form-otro');
     const otroNombre     = document.getElementById('otro-nombre');
+    const otroCasa       = document.getElementById('otro-casa');
     const otroBruto      = document.getElementById('otro-bruto');
     const otroFinal      = document.getElementById('otro-final');
     const otroPorcentaje = document.getElementById('otro-porcentaje');
     const otroAviso      = document.getElementById('otro-aviso');
     const btnGuardarOtro = document.getElementById('btn-guardar-otro');
 
-    let porcentajeOtros = 13;
+    // Casas disponibles con su porcentaje por defecto; se llenan al abrir el
+    // modal. La casa "Otros" es la que queda seleccionada de entrada.
+    let casasOtro = [];
 
     // Mismo calculo que netoDe() en el servidor: bruto + %, a 2 decimales.
     function actualizarFinalOtro() {
         const bruto = parseFloat(otroBruto.value);
-        const neto  = isNaN(bruto) ? 0 : Math.round(bruto * (1 + porcentajeOtros / 100) * 100) / 100;
+        const pct   = parseFloat(otroPorcentaje.value);
+        const neto  = (isNaN(bruto) || isNaN(pct)) ? 0 : Math.round(bruto * (1 + pct / 100) * 100) / 100;
         otroFinal.textContent = money(neto);
+    }
+
+    function llenarCasasOtro(codigoOtros) {
+        otroCasa.innerHTML = casasOtro.map((c) =>
+            '<option value="' + esc(c.codigo_casa) + '"' +
+            (c.codigo_casa === codigoOtros ? ' selected' : '') + '>' +
+            esc(c.etiqueta) + '</option>'
+        ).join('');
+    }
+
+    // Al elegir una casa se pone su porcentaje por defecto; el usuario lo puede
+    // cambiar despues (queda como porcentaje propio del producto).
+    function aplicarPorcentajeDeCasa() {
+        const casa = casasOtro.find((c) => c.codigo_casa === otroCasa.value);
+        if (casa) {
+            otroPorcentaje.value = Number(casa.porcentaje).toFixed(2);
+        }
+        actualizarFinalOtro();
     }
 
     async function abrirModalOtro() {
         formOtro.reset();
         otroAviso.hidden = true;
-        actualizarFinalOtro();
         modalOtro.hidden = false;
         otroNombre.focus();
 
-        // El porcentaje es el de la casa Otros (el admin lo puede cambiar).
+        // Fallback por si la lista no llega: el servidor igual usa Otros al 13%.
+        otroPorcentaje.value = '13';
+
         try {
             const d = await (await fetch(RUTA_OTRO + '?accion=info')).json();
-            if (d.ok) {
-                porcentajeOtros = Number(d.porcentaje);
-                otroPorcentaje.textContent = porcentajeOtros.toLocaleString('es-MX');
-                actualizarFinalOtro();
+            if (d.ok && Array.isArray(d.casas)) {
+                casasOtro = d.casas;
+                llenarCasasOtro(d.otros);
+                aplicarPorcentajeDeCasa();
             }
         } catch (e) {
-            // Se queda con el 13% de siempre; el servidor calcula el precio real.
+            // Se queda con el fallback; el servidor calcula el precio real.
         }
+        actualizarFinalOtro();
     }
 
     function cerrarModalOtro() {
@@ -1047,6 +1071,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Escape' && !modalOtro.hidden) cerrarModalOtro();
     });
     otroBruto.addEventListener('input', actualizarFinalOtro);
+    otroPorcentaje.addEventListener('input', actualizarFinalOtro);
+    otroCasa.addEventListener('change', aplicarPorcentajeDeCasa);
 
     formOtro.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1062,6 +1088,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     nombre:       otroNombre.value.trim(),
                     precio_bruto: otroBruto.value,
+                    codigo_casa:  otroCasa.value || '',
+                    porcentaje:   otroPorcentaje.value,
                 }),
             });
             const datos = await respuesta.json();

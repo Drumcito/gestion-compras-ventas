@@ -163,15 +163,26 @@ $casas = ordenarCasas($casas);
             </button>
             <form id="form-otro" autocomplete="off">
                 <h2 class="detalle-titulo">Nuevo producto</h2>
-                <p class="detalle-sub">Se guarda en la casa <strong>Otros</strong> y se agrega a esta venta.</p>
+                <p class="detalle-sub">Por defecto se guarda en la casa <strong>Otros</strong>; puedes elegir otra casa y ajustar el porcentaje antes de agregarlo a la venta.</p>
 
                 <div class="form-group">
                     <label for="otro-nombre">Nombre o descripción del producto:</label>
                     <input type="text" id="otro-nombre" class="form-control" maxlength="150" required>
                 </div>
 
+                <div class="otro-fila">
+                    <div class="form-group">
+                        <label for="otro-casa">Casa:</label>
+                        <select id="otro-casa" class="form-control"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="otro-porcentaje">Porcentaje (%):</label>
+                        <input type="number" id="otro-porcentaje" class="form-control" min="0" max="999.99" step="0.01" required>
+                    </div>
+                </div>
+
                 <div class="form-group">
-                    <label for="otro-bruto">Precio antes del <span id="otro-porcentaje">13</span>%:</label>
+                    <label for="otro-bruto">Precio antes del porcentaje:</label>
                     <input type="number" id="otro-bruto" class="form-control" min="0.01" step="0.01" required>
                 </div>
 

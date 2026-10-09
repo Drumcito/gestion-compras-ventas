@@ -964,6 +964,17 @@ select.form-control {
 }
 
 /* Precio final (bruto + %) que se ve mientras se teclea el precio. */
+/* Casa y porcentaje del nuevo producto, lado a lado (se apilan si no caben). */
+.otro-fila {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.otro-fila .form-group {
+    flex: 1 1 140px;
+}
+
 .otro-final {
     font-size: 1.1rem;
     margin: 0 0 1rem;
