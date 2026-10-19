@@ -2424,6 +2424,10 @@ select.form-control {
     white-space: nowrap;
 }
 
+/* Flechita de subio / bajo junto al precio anterior. */
+.precio-sube { color: #b3261e; }
+.precio-baja { color: #1b7f3b; }
+
 .precio-etiqueta {
     font-size: 0.85rem;
     color: #555555;
@@ -3384,6 +3388,12 @@ select.form-control {
     margin: 0 0 0.75rem;
     font-weight: 600;
     color: var(--ga-carbon);
+}
+
+/* Fecha del último cambio de precio en el renglón del ticket. Va dentro de
+   .item-meta, que ya es gris y chica; esto solo evita que se parta. */
+.item-precio-fecha {
+    white-space: nowrap;
 }
 
 /* ===== Entrega y eliminación de ventas (historial) ===== */

@@ -134,14 +134,15 @@ try {
 
         // Cuando se le movio el precio por ultima vez: es justo el dato que se
         // quiere ver antes de volver a moverlo.
-        $cambios = ultimosCambiosDePrecio($pdo, [$codigo]);
+        $cambio = ultimosCambiosDePrecio($pdo, [$codigo])[$codigo] ?? null;
 
         echo json_encode([
             'ok'          => true,
             'producto'    => $producto,
             'casa_actual' => $casaActual,
             'casas'       => casasParaMover(),
-            'ultimo_cambio_precio' => $cambios[$codigo] ?? null,
+            'ultimo_cambio_precio' => $cambio['fecha'] ?? null,
+            'precio_anterior'      => $cambio['anterior'] ?? null,
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }

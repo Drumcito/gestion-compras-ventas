@@ -68,21 +68,47 @@ document.addEventListener('DOMContentLoaded', () => {
             { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
 
+    /** Flecha de subida o bajada entre dos precios. '' si no hay con qué comparar. */
+    function flechaPrecio(antes, ahora) {
+        if (antes === null || antes === undefined || ahora === null || ahora === undefined) {
+            return '';
+        }
+
+        const a = Number(antes), b = Number(ahora);
+
+        if (a === b) return '';
+
+        return b > a
+            ? ' <span class="precio-sube" title="Subió">▲</span>'
+            : ' <span class="precio-baja" title="Bajó">▼</span>';
+    }
+
     /**
-     * Desde cuando rige el precio que se está viendo.
+     * Desde cuándo rige el precio que se está viendo, y de cuánto venía.
      *
      * Si al producto nunca se le movió el precio no hay nada en el historial, y
      * entonces lo que vale es desde cuándo está en el catálogo: trae el mismo
      * precio con el que entró.
+     *
+     * Devuelve HTML (lleva la flecha), así que lo que venga de la base ya va
+     * escapado o es un número.
      */
-    function textoPrecioDesde(p) {
-        if (p.ultimo_cambio_precio) {
-            return 'Precio cambiado el ' + fechaCorta(p.ultimo_cambio_precio);
+    function htmlPrecioDesde(p) {
+        if (!p.ultimo_cambio_precio) {
+            const alta = fechaCorta(p.precio_desde);
+
+            return alta ? 'Sin cambios desde el alta · ' + esc(alta) : '';
         }
 
-        const alta = fechaCorta(p.precio_desde);
+        let texto = 'Precio cambiado el ' + esc(fechaCorta(p.ultimo_cambio_precio));
 
-        return alta ? 'Sin cambios desde el alta · ' + alta : '';
+        // El historial guarda el BRUTO, que es justo el que se edita aquí.
+        if (p.precio_anterior !== null && p.precio_anterior !== undefined) {
+            texto += ' · antes ' + esc(money(p.precio_anterior)) + ' bruto' +
+                     flechaPrecio(p.precio_anterior, p.precio_mayoreo);
+        }
+
+        return texto;
     }
 
     // ---------- Casas ----------
@@ -222,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             : 'Porcentaje de la casa') + '">' +
                         pctTexto(p.porcentaje_neto) + '%</span></span>';
 
-            const desde = textoPrecioDesde(p);
+            const desde = htmlPrecioDesde(p);
 
             fila.innerHTML =
                 '<div class="venta-fila-datos">' +
@@ -234,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 '</div>' +
                 '<div class="venta-fila-derecha">' +
                     '<div class="precios-producto">' + precios +
-                        (desde ? '<span class="precio-fecha">' + esc(desde) + '</span>' : '') +
+                        (desde ? '<span class="precio-fecha">' + desde + '</span>' : '') +
                     '</div>' +
                     (window.ES_ADMIN
                         ? '<div class="producto-acciones">' +
@@ -306,7 +332,10 @@ document.addEventListener('DOMContentLoaded', () => {
             '<h2 class="detalle-titulo">Editar producto</h2>' +
             '<p class="detalle-sub">Código interno: <span class="codigo-prod">' + esc(p.codigo_interno) + '</span>' +
                 (datos.ultimo_cambio_precio
-                    ? ' · precio cambiado el ' + fechaCorta(datos.ultimo_cambio_precio)
+                    ? ' · precio cambiado el ' + fechaCorta(datos.ultimo_cambio_precio) +
+                      (datos.precio_anterior !== null && datos.precio_anterior !== undefined
+                          ? ' · antes ' + money(datos.precio_anterior)
+                          : '')
                     : ' · nunca se le ha cambiado el precio') + '</p>' +
             '<div class="form-group">' +
                 '<label for="ed-nombre">Nombre / concepto</label>' +
@@ -469,7 +498,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 esc(p.etiqueta_casa) + ' no se tocan. Las ventas ya registradas conservan su precio.</p>' +
             '<p class="detalle-sub">Precio bruto: <strong>' + money(bruto) + '</strong>' +
                 (p.ultimo_cambio_precio
-                    ? ' · cambiado el ' + fechaCorta(p.ultimo_cambio_precio)
+                    ? ' · cambiado el ' + fechaCorta(p.ultimo_cambio_precio) +
+                      (p.precio_anterior !== null && p.precio_anterior !== undefined
+                          ? ' · antes ' + money(p.precio_anterior)
+                          : '')
                     : ' · nunca se le ha cambiado') + '</p>' +
             '<p class="pct-actual">Actualmente: <strong>' + pctTexto(efectivo) + '%</strong> → ' +
                 '<strong>' + money(netoJS(bruto, efectivo)) + '</strong> ' +

@@ -242,6 +242,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const nuevo = Number(actual.precio_neto);
 
+            // La fecha se refresca siempre, aunque el neto quede igual: pudo
+            // haberse movido el bruto y el porcentaje en sentidos contrarios.
+            item.precio_fecha = actual.ultimo_cambio_precio || null;
+            item.precio_antes = actual.precio_anterior_neto ?? null;
+
             if (nuevo !== Number(item.precio)) {
                 cambios.push({ nombre: item.nombre, antes: Number(item.precio), ahora: nuevo });
                 item.precio = nuevo;
@@ -419,8 +424,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     (p.marca ? ' · ' + esc(p.marca) : '') +
                     // Solo se dice cuando SI se le movió el precio: al vendedor
                     // le sirve para saber si lo que cotizó ayer sigue igual.
+                    // El precio de antes va en NETO (lo que costaba), nunca el
+                    // bruto: ese no sale de la caja fuerte del servidor.
                     (p.ultimo_cambio_precio
-                        ? ' · precio del ' + fechaCorta(p.ultimo_cambio_precio)
+                        ? ' · el precio cambió: ' + fechaCorta(p.ultimo_cambio_precio) +
+                          (p.precio_anterior_neto !== null && p.precio_anterior_neto !== undefined
+                              ? ', antes ' + money(p.precio_anterior_neto)
+                              : '')
                         : '') + '</span>' +
                 '<span class="res-precio">' + precioTexto + '</span>';
 
@@ -649,6 +659,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 nombre:         producto.nombre,
                 // Precio neto ya calculado por el servidor (bruto + % de la casa).
                 precio:         Number(producto.precio_neto),
+                // Cuando se le movió el precio por última vez. Viaja con el
+                // renglón para que siga a la vista una vez agregado, y porque
+                // el borrador guarda el ticket tal cual.
+                precio_fecha:   producto.ultimo_cambio_precio || null,
+                precio_antes:   producto.precio_anterior_neto ?? null,
                 cantidad:       1,
             });
         }
@@ -691,6 +706,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<p class="item-meta">' + metaCasa +
                     '<span class="codigo-prod">' + esc(item.codigo_visible) + '</span>' +
                     // Solo el admin puede ajustar el % de un producto durante la venta.
+                    (item.precio_fecha
+                        ? ' · <span class="item-precio-fecha">el precio cambió: ' +
+                              fechaCorta(item.precio_fecha) +
+                              (item.precio_antes !== null && item.precio_antes !== undefined
+                                  ? ', antes ' + money(item.precio_antes)
+                                  : '') + '</span>'
+                        : '') +
                     (window.ES_ADMIN
                         ? ' · <button type="button" class="link-editar-pct" data-i="' + indice + '">Editar precio</button>'
                         : '') +
@@ -894,6 +916,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // devuelve el servidor (el que se cobrará al guardar la venta).
             if (indicePorcentaje !== null && items[indicePorcentaje] && datos.neto !== null) {
                 items[indicePorcentaje].precio = Number(datos.neto);
+
+                // La fecha la manda el servidor leyendo el historial: si solo se
+                // movió el porcentaje, el precio sigue siendo el de antes y la
+                // fecha no debe cambiar.
+                items[indicePorcentaje].precio_fecha = datos.ultimo_cambio_precio || null;
+                items[indicePorcentaje].precio_antes = datos.precio_anterior_neto ?? null;
             }
 
             cerrarModalPorcentaje();

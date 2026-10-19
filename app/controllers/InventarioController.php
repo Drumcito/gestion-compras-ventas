@@ -137,8 +137,19 @@ try {
         // Si nunca se le movio el precio no hay fecha de cambio; lo que vale
         // entonces es desde cuando esta en el catalogo, porque trae el mismo
         // precio con el que entro.
-        $p['ultimo_cambio_precio'] = $cambios[$p['codigo_interno']] ?? null;
+        $cambio = $cambios[$p['codigo_interno']] ?? null;
+
+        $p['ultimo_cambio_precio'] = $cambio['fecha'] ?? null;
         $p['precio_desde']         = $p['fecha_creacion'];
+
+        // El bruto anterior y lo que costaba entonces. El neto de antes se saca
+        // con el porcentaje de HOY, igual que el actual: el historial solo
+        // guarda el bruto, no el porcentaje que regia en ese momento.
+        $p['precio_anterior']      = $cambio['anterior'] ?? null;
+        $p['precio_anterior_neto'] = isset($cambio['anterior'])
+            ? netoDe($cambio['anterior'], $p['porcentaje_neto'])
+            : null;
+
         unset($p['fecha_creacion']);
     }
     unset($p);
