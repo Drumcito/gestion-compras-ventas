@@ -51,6 +51,17 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const codigoVisible = (p) => p.codigo_proveedor || p.codigo_interno;
 
+    /** '2026-10-06 17:48:38' -> '06/10/2026'. Cadena vacia si no hay fecha. */
+    function fechaCorta(iso) {
+        if (!iso) return '';
+
+        // El servidor manda 'YYYY-MM-DD HH:MM:SS'; Safari no lo parsea sin la T.
+        const d = new Date(String(iso).replace(' ', 'T'));
+
+        return isNaN(d) ? '' : d.toLocaleDateString('es-MX',
+            { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
     // Los nombres salen del catalogo y se pintan con innerHTML: uno con < o &
     // rompe la pantalla (y desde que se pueden dar de alta productos pegando
     // desde Excel, el texto ya no viene solo de los archivos del proveedor).
@@ -405,7 +416,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<span class="res-nombre">' + esc(p.nombre) + badgeCasa + '</span>' +
                 '<span class="res-meta">' +
                     '<span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
-                    (p.marca ? ' · ' + esc(p.marca) : '') + '</span>' +
+                    (p.marca ? ' · ' + esc(p.marca) : '') +
+                    // Solo se dice cuando SI se le movió el precio: al vendedor
+                    // le sirve para saber si lo que cotizó ayer sigue igual.
+                    (p.ultimo_cambio_precio
+                        ? ' · precio del ' + fechaCorta(p.ultimo_cambio_precio)
+                        : '') + '</span>' +
                 '<span class="res-precio">' + precioTexto + '</span>';
 
             fila.addEventListener('click', () => agregarItem(p));

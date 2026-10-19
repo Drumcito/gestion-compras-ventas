@@ -57,6 +57,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if (segundos > 0) temporizadorAviso = setTimeout(() => { aviso.hidden = true; }, segundos * 1000);
     }
 
+    /** '2026-10-06 17:48:38' -> '06/10/2026'. Cadena vacia si no hay fecha. */
+    function fechaCorta(iso) {
+        if (!iso) return '';
+
+        // El servidor manda 'YYYY-MM-DD HH:MM:SS'; Safari no lo parsea sin la T.
+        const d = new Date(String(iso).replace(' ', 'T'));
+
+        return isNaN(d) ? '' : d.toLocaleDateString('es-MX',
+            { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    /**
+     * Desde cuando rige el precio que se está viendo.
+     *
+     * Si al producto nunca se le movió el precio no hay nada en el historial, y
+     * entonces lo que vale es desde cuándo está en el catálogo: trae el mismo
+     * precio con el que entró.
+     */
+    function textoPrecioDesde(p) {
+        if (p.ultimo_cambio_precio) {
+            return 'Precio cambiado el ' + fechaCorta(p.ultimo_cambio_precio);
+        }
+
+        const alta = fechaCorta(p.precio_desde);
+
+        return alta ? 'Sin cambios desde el alta · ' + alta : '';
+    }
+
     // ---------- Casas ----------
     /**
      * Vuelve a pintar las pestañas de casa. Se llama también después de crear una
@@ -194,6 +222,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             : 'Porcentaje de la casa') + '">' +
                         pctTexto(p.porcentaje_neto) + '%</span></span>';
 
+            const desde = textoPrecioDesde(p);
+
             fila.innerHTML =
                 '<div class="venta-fila-datos">' +
                     '<p class="venta-fila-cliente">' + esc(p.nombre) + '</p>' +
@@ -203,7 +233,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         (p.categoria ? ' · ' + esc(p.categoria) : '') + '</p>' +
                 '</div>' +
                 '<div class="venta-fila-derecha">' +
-                    '<div class="precios-producto">' + precios + '</div>' +
+                    '<div class="precios-producto">' + precios +
+                        (desde ? '<span class="precio-fecha">' + esc(desde) + '</span>' : '') +
+                    '</div>' +
                     (window.ES_ADMIN
                         ? '<div class="producto-acciones">' +
                               '<span class="chip btn-editar-porcentaje" ' +
@@ -272,7 +304,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         contenido.innerHTML =
             '<h2 class="detalle-titulo">Editar producto</h2>' +
-            '<p class="detalle-sub">Código interno: <span class="codigo-prod">' + esc(p.codigo_interno) + '</span></p>' +
+            '<p class="detalle-sub">Código interno: <span class="codigo-prod">' + esc(p.codigo_interno) + '</span>' +
+                (datos.ultimo_cambio_precio
+                    ? ' · precio cambiado el ' + fechaCorta(datos.ultimo_cambio_precio)
+                    : ' · nunca se le ha cambiado el precio') + '</p>' +
             '<div class="form-group">' +
                 '<label for="ed-nombre">Nombre / concepto</label>' +
                 '<input type="text" id="ed-nombre" class="form-control" maxlength="150" value="' + esc(p.nombre) + '">' +
@@ -432,7 +467,10 @@ document.addEventListener('DOMContentLoaded', () => {
             '<p class="aviso aviso-info">El precio de venta (neto) sale del bruto más un porcentaje. ' +
                 'Aquí lo cambias <strong>solo para este producto</strong>; los demás de ' +
                 esc(p.etiqueta_casa) + ' no se tocan. Las ventas ya registradas conservan su precio.</p>' +
-            '<p class="detalle-sub">Precio bruto: <strong>' + money(bruto) + '</strong></p>' +
+            '<p class="detalle-sub">Precio bruto: <strong>' + money(bruto) + '</strong>' +
+                (p.ultimo_cambio_precio
+                    ? ' · cambiado el ' + fechaCorta(p.ultimo_cambio_precio)
+                    : ' · nunca se le ha cambiado') + '</p>' +
             '<p class="pct-actual">Actualmente: <strong>' + pctTexto(efectivo) + '%</strong> → ' +
                 '<strong>' + money(netoJS(bruto, efectivo)) + '</strong> ' +
                 '<span class="detalle-sub">(' + (p.usa_casa

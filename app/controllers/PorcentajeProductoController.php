@@ -176,6 +176,11 @@ try {
                 'usa_casa'            => $override === null,
                 'etiqueta_casa'       => etiquetaCasa($casa),
                 'neto_actual'         => netoDe($producto['precio_mayoreo'], $porcEfectivo),
+
+                // Cuando se le movio el precio por ultima vez: el dato que se
+                // quiere tener a la vista antes de volver a moverlo.
+                'ultimo_cambio_precio' => ultimosCambiosDePrecio($pdo, [$producto['codigo_interno']])
+                                          [$producto['codigo_interno']] ?? null,
             ],
         ], JSON_UNESCAPED_UNICODE);
         exit;

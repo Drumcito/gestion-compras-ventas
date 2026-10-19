@@ -138,12 +138,20 @@ try {
     // producto (el suyo propio si lo tiene, o el de su casa si no). El bruto no se
     // manda al navegador; lo unico que se cobra es el neto (y VentaController lo
     // recalcula por su cuenta al guardar).
+    // Cuando se le movio el precio por ultima vez, para los 25 resultados de un
+    // tiron. Aqui NO se cae a la fecha de alta del producto (como si hace
+    // Inventario): vista_catalogo no la trae, y al vendedor solo le sirve saber
+    // si el precio se movio hace poco.
+    $cambios = ultimosCambiosDePrecio($pdo, array_column($productos, 'codigo_interno'));
+
     foreach ($productos as &$producto) {
         $producto['nombre_casa']  = etiquetaCasa($producto['codigo_casa']);
         $producto['precio_neto']  = netoDe(
             $producto['precio_mayoreo'],
             porcentajeProducto($producto['porcentaje_neto'], $producto['codigo_casa'])
         );
+        $producto['ultimo_cambio_precio'] = $cambios[$producto['codigo_interno']] ?? null;
+
         unset($producto['precio_mayoreo'], $producto['porcentaje_neto']);
     }
     unset($producto);

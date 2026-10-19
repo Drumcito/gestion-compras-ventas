@@ -110,7 +110,7 @@ try {
     // sin emulacion no acepta marcadores en esa posicion.
     $stmt = $pdo->prepare(
         "SELECT codigo_interno, codigo_proveedor, nombre, marca, categoria,
-                precio_mayoreo, porcentaje_neto
+                precio_mayoreo, porcentaje_neto, fecha_creacion
            FROM {$tabla}
           WHERE activo = 1{$filtro}
           ORDER BY {$orden}
@@ -124,11 +124,22 @@ try {
     $porcCasa  = porcentajeCasa($casa);
     $productos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Cuando se le movio el precio por ultima vez. Es UNA consulta para toda la
+    // pagina (50 productos), no una por producto.
+    $cambios = ultimosCambiosDePrecio($pdo, array_column($productos, 'codigo_interno'));
+
     foreach ($productos as &$p) {
         $override             = $p['porcentaje_neto'];
         $p['porcentaje_neto'] = porcentajeProducto($override, $casa);
         $p['porcentaje_propio'] = $override !== null;   // true = distinto al de la casa
         $p['precio_neto']     = netoDe($p['precio_mayoreo'], $p['porcentaje_neto']);
+
+        // Si nunca se le movio el precio no hay fecha de cambio; lo que vale
+        // entonces es desde cuando esta en el catalogo, porque trae el mismo
+        // precio con el que entro.
+        $p['ultimo_cambio_precio'] = $cambios[$p['codigo_interno']] ?? null;
+        $p['precio_desde']         = $p['fecha_creacion'];
+        unset($p['fecha_creacion']);
     }
     unset($p);
 

@@ -263,6 +263,46 @@ function catalogoDeProductos(PDO $pdo, array $codigos, array $columnas = ['nombr
     return $catalogo;
 }
 
+/**
+ * Ultima vez que se le cambio el precio a cada producto.
+ *
+ * Sale de historial_precios, que es donde el trigger de cada tabla de catalogo
+ * anota los cambios de precio_mayoreo. Un producto al que nunca se le ha movido
+ * el precio NO aparece en el resultado: quien llama decide que poner en ese
+ * caso (en Inventario se cae a la fecha de alta del producto).
+ *
+ * @param array $codigos codigos internos (BNS03-01270)
+ * @return array codigo interno => fecha del ultimo cambio ('Y-m-d H:i:s')
+ */
+function ultimosCambiosDePrecio(PDO $pdo, array $codigos): array
+{
+    $codigos = array_values(array_unique(array_filter($codigos)));
+
+    if ($codigos === []) {
+        return [];
+    }
+
+    // Marcadores posicionales: con PDO sin emulacion un marcador con nombre no
+    // se puede repetir, y aqui hace falta uno por codigo.
+    $marcadores = implode(',', array_fill(0, count($codigos), '?'));
+
+    $stmt = $pdo->prepare(
+        "SELECT codigo_interno_producto, MAX(fecha_cambio) AS fecha
+           FROM historial_precios
+          WHERE codigo_interno_producto IN ({$marcadores})
+          GROUP BY codigo_interno_producto"
+    );
+    $stmt->execute($codigos);
+
+    $fechas = [];
+
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+        $fechas[$fila['codigo_interno_producto']] = $fila['fecha'];
+    }
+
+    return $fechas;
+}
+
 /** DDL de una tabla de catalogo, igual a las cuatro que ya existen. */
 function ddlTablaProductos(string $tabla, int $numero): string
 {
