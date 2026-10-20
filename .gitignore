@@ -36,3 +36,11 @@ config/smtp.prod.php
 
 # Notas PDF generadas al vuelo (no se versionan)
 public/notas/
+
+# Imagenes de producto: se suben directo al servidor (pesan); solo va el README
+public/img/productos/*
+!public/img/productos/README.md
+
+# Catalogo en linea: lista de productos generada (se rehace sola)
+catalogo/cache/*
+!catalogo/cache/.htaccess

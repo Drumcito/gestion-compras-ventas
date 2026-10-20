@@ -1,0 +1,24 @@
+# Raiz del subdominio del catalogo (catalogo.ga-be.net).
+Options -Indexes
+DirectoryIndex index.php
+AddDefaultCharset UTF-8
+AddCharset UTF-8 .js .css .json
+
+# Comprimir texto (el JSON del catalogo pesa ~2 MB sin comprimir).
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+</IfModule>
+
+# Los assets llevan ?v=fecha en la URL: se pueden guardar mucho tiempo.
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 30 days"
+    ExpiresByType application/javascript "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set X-Frame-Options "SAMEORIGIN"
+</IfModule>

@@ -2922,6 +2922,14 @@ select.form-control {
     background: #eef3ee;
 }
 
+/* Chip que es un enlace (abre un PDF): mismo aspecto que un botón chip. */
+.chip-enlace {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-decoration: none;
+}
+
 /* El alta lleva tabla de vista previa: necesita más ancho que editar un precio. */
 .modal-caja-ancha {
     max-width: 860px;
@@ -3601,4 +3609,24 @@ select.form-control {
 .compra-reparto .reparto-pendiente {
     color: #8a5a10;
     font-weight: 600;
+}
+
+/* ===== CONTACTOS DEL CATÁLOGO (pestaña de Usuarios, solo admin) ===== */
+
+/* Filtro con su rótulo arriba, como los campos de fecha del historial. */
+.campo-filtro label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+    color: #333333;
+}
+
+.campo-filtro .form-control {
+    width: auto;
+    padding: 0.5rem 0.75rem;
+}
+
+.contactos-nota {
+    margin: 0.9rem 0 0.6rem;
+    font-size: 0.85rem;
 }

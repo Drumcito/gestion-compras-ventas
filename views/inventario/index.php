@@ -63,6 +63,10 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
                         <button type="button" class="chip chip-nuevo" id="btn-agregar-productos">
                             <i class="ph ph-package" aria-hidden="true"></i> Agregar productos
                         </button>
+                        <a class="chip chip-enlace" href="../../app/controllers/CatalogoOfertasController.php"
+                           target="_blank" rel="noopener" title="PDF: top 10 más vendidos y top 5 ofertas">
+                            <i class="ph ph-file-pdf" aria-hidden="true"></i> Catálogo PDF
+                        </a>
                     <?php endif; ?>
                 </div>
             </div>

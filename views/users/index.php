@@ -8,7 +8,8 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Ambos roles entran, pero con distinto alcance:
-//   - admin: gestiona usuarios del sistema y clientes (alta, edicion, baja).
+//   - admin: gestiona usuarios del sistema y clientes (alta, edicion, baja), y
+//     la lista de contactos que llegan del catalogo en linea.
 //   - vendedor: solo puede DAR DE ALTA clientes; no ve el listado ni puede
 //     editarlos o borrarlos. El control real esta en los controladores; esto es
 //     solo la interfaz.
@@ -42,6 +43,10 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
             <button type="button" class="segmento" role="tab"
                     aria-selected="false" data-panel="panel-clientes">
                 <i class="ph ph-storefront" aria-hidden="true"></i> Clientes
+            </button>
+            <button type="button" class="segmento" role="tab"
+                    aria-selected="false" data-panel="panel-contactos">
+                <i class="ph ph-address-book" aria-hidden="true"></i> Contactos
             </button>
         </div>
 
@@ -78,6 +83,55 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
             <div id="aviso-clientes" class="aviso" hidden></div>
             <div id="lista-clientes" class="lista-ventas"></div>
+        </section>
+
+        <!-- Panel: contactos que dejaron sus datos en el catálogo en línea. Aquí
+             solo se gestiona la lista (bajas y export); no se envía nada. -->
+        <section class="card-form card-historial" id="panel-contactos" hidden>
+            <div class="filtros">
+                <div class="filtros-rango">
+                    <div class="search-container clientes-buscador">
+                        <input type="text" id="buscar-contacto" class="form-control"
+                               placeholder="Buscar por nombre, teléfono o correo…"
+                               autocomplete="off">
+                        <i class="ph ph-magnifying-glass search-icon" aria-hidden="true"></i>
+                    </div>
+
+                    <div class="campo-filtro">
+                        <label for="filtro-promos">Promociones</label>
+                        <select id="filtro-promos" class="form-control">
+                            <option value="todos">Todos</option>
+                            <option value="si">Aceptan promociones</option>
+                            <option value="no">No aceptan</option>
+                        </select>
+                    </div>
+
+                    <div class="campo-filtro">
+                        <label for="filtro-estado">Estado</label>
+                        <select id="filtro-estado" class="form-control">
+                            <option value="activos">Activos</option>
+                            <option value="bajas">Dados de baja</option>
+                            <option value="todos">Todos</option>
+                        </select>
+                    </div>
+
+                    <button type="button" class="chip btn-exportar" id="btn-exportar-contactos"
+                            title="Descargar los contactos del filtro actual">
+                        <i class="ph ph-download-simple"></i> Descargar Excel
+                    </button>
+                </div>
+
+                <p class="detalle-sub contactos-nota">
+                    Si alguien responde <b>BAJA</b> por WhatsApp o correo, márcalo aquí con
+                    “Dar de baja”: deja de salir en la lista de activos. Las promociones solo
+                    se mandan a quien las aceptó.
+                </p>
+
+                <p class="resumen-periodo" id="conteo-contactos"></p>
+            </div>
+
+            <div id="aviso-contactos" class="aviso" hidden></div>
+            <div id="lista-contactos" class="lista-ventas"></div>
         </section>
     </main>
 
@@ -127,6 +181,7 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
     <?php if ($esAdmin): ?>
     <script src="<?= recurso('js/usuarios.js') ?>"></script>
+    <script src="<?= recurso('js/contactos_catalogo.js') ?>"></script>
     <?php endif; ?>
     <script src="<?= recurso('js/clientes.js') ?>"></script>
     <?php if ($esAdmin): ?>

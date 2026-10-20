@@ -107,6 +107,58 @@ function urlPdfNota(int $ventaId): string
  */
 function enviarNotaPorCorreo(string $para, string $asunto, string $cuerpoHtml, string $pdf, string $nombrePdf): void
 {
+    $mail = nuevoCorreoSmtp();
+
+    try {
+        $mail->addAddress($para);
+        $mail->addStringAttachment($pdf, $nombrePdf, 'base64', 'application/pdf');
+
+        $mail->isHTML(true);
+        $mail->Subject = $asunto;
+        $mail->Body    = $cuerpoHtml;
+        $mail->AltBody = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $cuerpoHtml));
+
+        $mail->send();
+
+    } catch (\PHPMailer\PHPMailer\Exception $e) {
+        error_log('Correo nota: ' . $mail->ErrorInfo);
+        throw new RuntimeException('No se pudo enviar el correo: ' . $mail->ErrorInfo);
+    }
+}
+
+/**
+ * Correo HTML sin adjuntos (p. ej. el aviso del formulario del catalogo).
+ * $responderA: a quien le llega la respuesta si el destinatario contesta.
+ */
+function enviarCorreoSimple(string $para, string $asunto, string $cuerpoHtml, ?string $responderA = null): void
+{
+    $mail = nuevoCorreoSmtp();
+
+    try {
+        $mail->addAddress($para);
+        if ($responderA !== null && $responderA !== '') {
+            $mail->addReplyTo($responderA);
+        }
+
+        $mail->isHTML(true);
+        $mail->Subject = $asunto;
+        $mail->Body    = $cuerpoHtml;
+        $mail->AltBody = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $cuerpoHtml));
+
+        $mail->send();
+
+    } catch (\PHPMailer\PHPMailer\Exception $e) {
+        error_log('Correo: ' . $mail->ErrorInfo);
+        throw new RuntimeException('No se pudo enviar el correo: ' . $mail->ErrorInfo);
+    }
+}
+
+/**
+ * PHPMailer ya conectado al SMTP de la config y con el remitente puesto. Lanza
+ * RuntimeException si el SMTP no esta configurado.
+ */
+function nuevoCorreoSmtp(): \PHPMailer\PHPMailer\PHPMailer
+{
     if (!smtpConfigurado()) {
         throw new RuntimeException(
             'El correo todavia no esta configurado. Pon los datos de tu cuenta en config/smtp.local.php (o smtp.prod.php).'
@@ -136,19 +188,11 @@ function enviarNotaPorCorreo(string $para, string $asunto, string $cuerpoHtml, s
             : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
 
         $mail->setFrom((string) $cfg['from_email'], (string) ($cfg['from_name'] ?? 'GA-BE'));
-        $mail->addAddress($para);
-
-        $mail->addStringAttachment($pdf, $nombrePdf, 'base64', 'application/pdf');
-
-        $mail->isHTML(true);
-        $mail->Subject = $asunto;
-        $mail->Body    = $cuerpoHtml;
-        $mail->AltBody = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $cuerpoHtml));
-
-        $mail->send();
 
     } catch (\PHPMailer\PHPMailer\Exception $e) {
-        error_log('Correo nota: ' . $mail->ErrorInfo);
-        throw new RuntimeException('No se pudo enviar el correo: ' . $mail->ErrorInfo);
+        error_log('Correo: ' . $mail->ErrorInfo);
+        throw new RuntimeException('No se pudo preparar el correo: ' . $mail->ErrorInfo);
     }
+
+    return $mail;
 }

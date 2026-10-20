@@ -28,6 +28,18 @@ sin framework** del lado del cliente. No requiere paso de compilación.
   o **correo**.
 - **Inventario** (solo admin): alta/edición de productos, precios y porcentajes,
   creación de casas y borrado recuperable de productos.
+- **Catálogo PDF** (solo admin, botón en Inventario): volante de dos hojas, el
+  top 10 de **más vendidos** y el top 5 de **ofertas** (los que más bajaron de
+  precio), con QR al catálogo en línea.
+  Se configura en `config/catalogo.php`; las imágenes van en
+  `public/img/productos/` (ver su README).
+- **Catálogo en línea** (carpeta `catalogo/`, raíz del subdominio
+  `catalogo.ga-be.net`): sitio público con todos los productos activos, búsqueda
+  en tiempo real, filtros rápidos por marca/ofertas/más vendidos, modo claro y
+  oscuro, pedido por WhatsApp, formulario de contacto (guarda el consentimiento
+  en `catalogo_contactos`, migración 011) y Aviso de Privacidad / Términos.
+  Nunca muestra la casa ni el código del proveedor. En cPanel, el subdominio se
+  crea con *Document Root* = `public_html/GABE/catalogo`.
 - **Estadísticas y ganancias** (dashboard): resúmenes del periodo.
 - **Usuarios y permisos**: dos roles (`admin` y `vendedor`), con cambio de
   contraseña obligatorio en el primer acceso.
