@@ -37,14 +37,17 @@ catalogoCabecera('Aviso de Privacidad', 'Aviso de Privacidad Integral de ' . $le
         </div>
 
         <h2>2. Datos Personales Recabados</h2>
-        <p>Para la adecuada atención de sus solicitudes mediante nuestro formulario de contacto, recabamos las siguientes categorías de datos personales de identificación y contacto:</p>
+        <p>Para la adecuada atención de sus solicitudes mediante nuestro formulario de contacto y nuestro carrito de pedidos, recabamos las siguientes categorías de datos personales de identificación y contacto:</p>
         <ul>
             <li><strong>Nombre completo</strong> (de la persona física o del representante comercial/negocio).</li>
             <li><strong>Medios de contacto:</strong> Número telefónico (móvil o fijo) y/o dirección de correo electrónico.</li>
             <li><strong>Preferencia de comunicaciones comerciales:</strong> Manifestación expresa para la recepción de promociones y novedades.</li>
         </ul>
         <p>
-            <strong>Datos de trazabilidad y seguridad:</strong> Con fines de validación del consentimiento y prevención de fraudes o envíos abusivos mediante herramientas automatizadas (bots), registramos de forma automática la fecha y hora de envío, la versión del aviso de privacidad aceptada, la dirección IP de origen y las características del agente de usuario (navegador y sistema operativo).
+            <strong>Pedidos desde el carrito:</strong> Cuando usted envía su carrito mediante el botón "Enviar pedido por WhatsApp", registramos el folio del pedido, los productos y cantidades seleccionados con su precio, y el nombre o negocio que, de manera opcional, haya escrito. El carrito no solicita teléfono ni correo: el número de WhatsApp desde el que nos escriba lo recibimos a través de dicha aplicación al iniciar la conversación.
+        </p>
+        <p>
+            <strong>Datos de trazabilidad y seguridad:</strong> Con fines de validación del consentimiento y prevención de fraudes o envíos abusivos mediante herramientas automatizadas (bots), registramos de forma automática, tanto en el formulario como en los pedidos del carrito, la fecha y hora de envío, la versión del aviso de privacidad vigente, la dirección IP de origen y las características del agente de usuario (navegador y sistema operativo).
         </p>
         <p>
             <strong>Manifestación sobre datos sensibles y financieros:</strong> Hacemos constar que a través de este sitio web <strong>no se recaban datos personales sensibles</strong>, ni datos de carácter patrimonial o financiero. Esta plataforma no efectúa transacciones comerciales directas ni procesamiento de pagos en línea.
@@ -54,6 +57,7 @@ catalogoCabecera('Aviso de Privacidad', 'Aviso de Privacidad Integral de ' . $le
         <p>Los datos personales recabados serán tratados para las siguientes finalidades primarias y estrictamente necesarias:</p>
         <ol>
             <li>Gestionar, procesar y responder a sus solicitudes de información, cotizaciones y atención al cliente.</li>
+            <li>Registrar los pedidos enviados desde el carrito, identificarlos por su folio, confirmar existencias y, en su caso, formalizar la venta y emitir la nota correspondiente.</li>
             <li>Remitir catálogos de productos (incluidos documentos en formato PDF), listas de precios vigentes y la información requerida, a través de correo electrónico o la plataforma WhatsApp, según el canal facilitado por el titular.</li>
             <li>Brindar seguimiento comercial a sus consultas, cotizaciones y pedidos en trámite.</li>
             <li>Mantener la trazabilidad técnica, acreditar el otorgamiento del consentimiento y garantizar la seguridad del sitio web y de sus formularios.</li>
@@ -109,7 +113,7 @@ catalogoCabecera('Aviso de Privacidad', 'Aviso de Privacidad Integral de ' . $le
             <li><strong>Identificación del titular:</strong> Nombre completo del titular y medio para comunicarle la respuesta (correo electrónico preferente).</li>
             <li><strong>Acreditación de identidad:</strong> Copia legible de identificación oficial vigente (INE, Pasaporte) o, en su caso, instrumento notarial o carta poder firmada ante dos testigos que acredite la representación legal.</li>
             <li><strong>Descripción clara:</strong> Indicación puntual del derecho ARCO que desea ejercer y los datos personales objeto de la solicitud.</li>
-            <li><strong>Datos adicionales:</strong> Teléfono o correo electrónico originalmente proporcionado en el formulario para agilizar su localización en nuestros sistemas.</li>
+            <li><strong>Datos adicionales:</strong> Teléfono o correo electrónico originalmente proporcionado en el formulario, o el folio del pedido enviado desde el carrito, para agilizar su localización en nuestros sistemas.</li>
         </ol>
         <p>
             <strong>Plazos de atención:</strong> Se dará respuesta en un plazo no mayor a <strong>veinte (20) días hábiles</strong>, contados a partir de la recepción efectiva de la solicitud completa. De resultar procedente, se hará efectiva dentro de los <strong>quince (15) días hábiles</strong> siguientes a la fecha de comunicación de la respuesta. El ejercicio de estos derechos es gratuito, reservándose únicamente el cobro de los costos justificados de reproducción de documentos o cargos de envío de ser el caso.
@@ -117,7 +121,14 @@ catalogoCabecera('Aviso de Privacidad', 'Aviso de Privacidad Integral de ' . $le
 
         <h2>10. Uso de Cookies y Almacenamiento Local</h2>
         <p>
-            Este sitio web <strong>no emplea cookies de seguimiento publicitario ni herramientas analíticas de terceros</strong> destinadas a perfilar su comportamiento en línea. Únicamente se utiliza el almacenamiento local de su navegador (<em>Local Storage</em>) para guardar la preferencia estética de visualización (modo claro/modo oscuro). Dicha información reside exclusivamente en su dispositivo y puede ser eliminada en cualquier momento desde las opciones de configuración y limpieza de su navegador.
+            Este sitio web <strong>no emplea cookies de seguimiento publicitario ni herramientas analíticas de terceros</strong> destinadas a perfilar su comportamiento en línea. Únicamente se utiliza el almacenamiento local de su navegador (<em>Local Storage</em>) para guardar:
+        </p>
+        <ul>
+            <li>La preferencia estética de visualización (modo claro/modo oscuro).</li>
+            <li>El contenido de su carrito: los productos y cantidades que agregue, el nombre o negocio que opcionalmente escriba y el folio del pedido, para que no se pierdan al recargar o cerrar la página.</li>
+        </ul>
+        <p>
+            Dicha información reside exclusivamente en su dispositivo y solo se nos envía cuando usted pulsa "Enviar pedido por WhatsApp" (ver sección 2). Puede eliminarla en cualquier momento con el botón "Vaciar carrito" o desde las opciones de configuración y limpieza de su navegador.
         </p>
 
         <h2>11. Protección de Menores de Edad</h2>
@@ -141,7 +152,7 @@ catalogoCabecera('Aviso de Privacidad', 'Aviso de Privacidad Integral de ' . $le
         </p>
 
         <p class="vigencia">
-            Al enviar el formulario de contacto y marcar la casilla de aceptación, usted manifiesta expresamente haber leído, comprendido y aceptado los términos estipulados en el presente Aviso de Privacidad (versión <?= e($legal['version']) ?>).
+            Al enviar el formulario de contacto y marcar la casilla de aceptación, o al enviar un pedido desde el carrito, usted manifiesta expresamente haber leído, comprendido y aceptado los términos estipulados en el presente Aviso de Privacidad (versión <?= e($legal['version']) ?>).
         </p>
     </main>
 <?php

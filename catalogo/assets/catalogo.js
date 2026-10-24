@@ -339,7 +339,7 @@
             '</div>' +
             '<div class="tarjeta-cuerpo">' +
                 '<span class="ref">REF ' + escapar(p.c) + '</span>' +
-                '<h3>' + resaltar(p.n, p.nn) + '</h3>' +
+                '<h3><button type="button" class="ver-detalle" data-accion="ver">' + resaltar(p.n, p.nn) + '</button></h3>' +
                 (p.m ? '<span class="marca-producto">' + escapar(p.m) + '</span>' : '') +
                 '<div class="precios"><span class="precio">' + dinero(p.p) + '</span>' +
                     (p.a ? '<span class="antes"><span class="solo-lector">Antes </span>' + dinero(p.a) + '</span>' : '') +
@@ -363,12 +363,9 @@
         '</div>';
     }
 
-    el.rejilla.addEventListener('click', function (ev) {
-        var b = ev.target.closest('button[data-accion]');
-        if (!b) { return; }
-        var tarjetaEl = b.closest('.tarjeta');
-        var codigo = tarjetaEl.getAttribute('data-c');
-        var accion = b.getAttribute('data-accion');
+    /** Agregar / − / + desde una tarjeta o desde el detalle (contenedor con data-c). */
+    function accionCarrito(contenedor, accion) {
+        var codigo = contenedor.getAttribute('data-c');
         var it = enCarrito(codigo);
 
         if (accion === 'menos') {
@@ -377,9 +374,78 @@
             agregar(porCodigo[codigo]);
         }
         // El boton se redibujo: el foco pasa al que quedo en su lugar.
-        var nuevo = tarjetaEl.querySelector('[data-accion="' + accion + '"]') || tarjetaEl.querySelector('.accion button');
+        var nuevo = contenedor.querySelector('.accion [data-accion="' + accion + '"]') || contenedor.querySelector('.accion button');
         if (nuevo) { nuevo.focus(); }
+    }
+
+    el.rejilla.addEventListener('click', function (ev) {
+        var tarjetaEl = ev.target.closest('.tarjeta[data-c]');
+        if (!tarjetaEl) { return; }
+        var b = ev.target.closest('button[data-accion]');
+        // La imagen y el nombre abren el detalle; los botones del carrito, el carrito.
+        if ((b && b.getAttribute('data-accion') === 'ver') || (!b && ev.target.closest('.tarjeta-imagen'))) {
+            abrirDetalle(tarjetaEl.getAttribute('data-c'), b || tarjetaEl.querySelector('.ver-detalle'));
+        } else if (b) {
+            accionCarrito(tarjetaEl, b.getAttribute('data-accion'));
+        }
     });
+
+    // ---------- Detalle de un producto ----------
+    var de = { dialogo: $('detalle'), interior: $('detalle-interior'), cerrar: $('detalle-cerrar') };
+    var origenDetalle = null;    // a donde regresa el foco al cerrar
+
+    function abrirDetalle(codigo, origen) {
+        var p = porCodigo[codigo];
+        if (!p || !de.dialogo) { return; }
+        origenDetalle = origen;
+
+        var imagen = p.img
+            ? '<img src="img.php?c=' + encodeURIComponent(p.c) + '" alt="' + escapar(p.n) + '" width="800" height="800">'
+            : DIBUJO;
+        de.interior.setAttribute('data-c', p.c);
+        de.interior.innerHTML =
+            '<div class="detalle-imagen' + (p.img ? '' : ' sin-imagen') + '">' + imagen +
+                (p.d ? '<span class="descuento">-' + p.d + '%</span>' : '') +
+                (rangoVendido[p.c] ? '<span class="top-vendido">TOP ' + rangoVendido[p.c] + '</span>' : '') +
+            '</div>' +
+            '<div class="detalle-datos">' +
+                '<span class="ref">REF ' + escapar(p.c) + '</span>' +
+                '<h2 id="detalle-nombre">' + escapar(p.n) + '</h2>' +
+                (p.m || p.cat
+                    ? '<p class="detalle-marca">' + [p.m, p.cat].filter(Boolean).map(escapar).join(' · ') + '</p>'
+                    : '') +
+                '<div class="precios"><span class="precio">' + dinero(p.p) + '</span>' +
+                    (p.a ? '<span class="antes"><span class="solo-lector">Antes </span>' + dinero(p.a) + '</span>' : '') +
+                '</div>' +
+                '<p class="detalle-iva">IVA incluido · sujeto a cambio sin previo aviso</p>' +
+                (whatsapp ? '<div class="accion">' + accionTarjeta(p.c) + '</div>' : '') +
+            '</div>';
+
+        if (de.dialogo.showModal) { de.dialogo.showModal(); } else { de.dialogo.setAttribute('open', ''); }
+    }
+
+    function cerrarDetalle() {
+        if (de.dialogo.close) { de.dialogo.close(); } else { de.dialogo.removeAttribute('open'); }
+    }
+
+    if (de.dialogo) {
+        de.cerrar.addEventListener('click', cerrarDetalle);
+        de.dialogo.addEventListener('click', function (ev) {
+            if (ev.target === de.dialogo) { cerrarDetalle(); return; }
+            var b = ev.target.closest('.accion button[data-accion]');
+            if (b) { accionCarrito(de.interior, b.getAttribute('data-accion')); }
+        });
+        de.dialogo.addEventListener('close', function () {
+            de.interior.removeAttribute('data-c');
+            if (origenDetalle && document.contains(origenDetalle)) { origenDetalle.focus(); }
+        });
+        de.interior.addEventListener('error', function (ev) {
+            if (ev.target.tagName === 'IMG') {
+                ev.target.parentNode.classList.add('sin-imagen');
+                ev.target.outerHTML = DIBUJO;
+            }
+        }, true);
+    }
 
     // Una imagen que no carga se cambia por el dibujo, igual que un producto sin imagen.
     el.rejilla.addEventListener('error', function (ev) {
@@ -409,7 +475,11 @@
     var CLAVE_CARRITO = 'gabe-carrito';
     var CARRITO_MAX = parseInt(main.getAttribute('data-carrito-max'), 10) || 20;
     var PIEZAS_MAX = 999;
-    var carrito = { nombre: '', productos: [] };    // productos: [{ c, n, m, p, q, x? }]
+    // folio: va en el mensaje y con el se guarda el pedido en el sistema. Cambia
+    // cuando cambian los productos; el mismo carrito reenviado conserva el suyo.
+    var carrito = { nombre: '', folio: '', productos: [] };    // productos: [{ c, n, m, p, q, x? }]
+    var LETRAS_FOLIO = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';    // sin 0/O ni 1/I/L
+    var FICHA = main.getAttribute('data-ficha') || '';
     var ca = {
         abrir: $('abrir-carrito'), contador: $('contador-carrito'),
         flotante: $('carrito-flotante'), flotanteTexto: $('carrito-flotante-texto'),
@@ -428,6 +498,7 @@
         var lista = guardado && Array.isArray(guardado.productos) ? guardado.productos : [];
         carrito = {
             nombre: guardado && typeof guardado.nombre === 'string' ? guardado.nombre.slice(0, 80) : '',
+            folio: guardado && /^[2-9A-HJKMNP-Z]{6}$/.test(guardado.folio) ? guardado.folio : '',
             productos: lista.filter(function (it) {
                 return it && typeof it.c === 'string' && typeof it.n === 'string' && isFinite(it.p) && it.q >= 1;
             }).slice(0, CARRITO_MAX).map(function (it) {
@@ -439,7 +510,8 @@
     function guardarCarrito() {
         try {
             localStorage.setItem(CLAVE_CARRITO, JSON.stringify({
-                v: 1, actualizado: new Date().toISOString(), nombre: carrito.nombre, productos: carrito.productos
+                v: 1, actualizado: new Date().toISOString(), nombre: carrito.nombre, folio: carrito.folio,
+                productos: carrito.productos
             }));
         } catch (e) { /* modo privado o sin espacio: dura solo esta visita */ }
     }
@@ -502,9 +574,12 @@
 
     /** Guarda y redibuja; sin codigo, redibuja todas las tarjetas a la vista. */
     function cambioCarrito(codigo, sinGuardar) {
-        if (!sinGuardar) { guardarCarrito(); }
+        if (!sinGuardar) {
+            carrito.folio = '';    // otros productos = otro pedido
+            guardarCarrito();
+        }
         pintarCarrito();
-        Array.prototype.forEach.call(el.rejilla.querySelectorAll('.tarjeta[data-c]'), function (t) {
+        Array.prototype.forEach.call(document.querySelectorAll('.tarjeta[data-c], .detalle-interior[data-c]'), function (t) {
             var c = t.getAttribute('data-c');
             var lugar = t.querySelector('.accion');
             if (lugar && (!codigo || c === codigo)) { lugar.innerHTML = accionTarjeta(c); }
@@ -533,6 +608,7 @@
      *   Productos: 3 · Piezas: 7
      *   *Total: $1,234.50* (IVA incluido)
      *   A nombre de: Ferretería López
+     *   Folio del pedido: K7P3Q9
      *
      *   ¿Me confirman existencias? Gracias.
      *
@@ -555,8 +631,40 @@
         lineas.push('Productos: ' + formato0.format(carrito.productos.length) + ' · Piezas: ' + formato0.format(t.piezas));
         lineas.push('*Total: ' + dinero(t.total) + '* (IVA incluido)');
         if (carrito.nombre.trim()) { lineas.push('A nombre de: ' + carrito.nombre.trim()); }
+        lineas.push('Folio del pedido: ' + folioCarrito());
         lineas.push('', '¿Me confirman existencias? Gracias.');
         return lineas.join('\n');
+    }
+
+    function folioCarrito() {
+        if (!carrito.folio) {
+            var azar = new Uint32Array(6);
+            window.crypto.getRandomValues(azar);
+            carrito.folio = Array.prototype.map.call(azar, function (n) {
+                return LETRAS_FOLIO.charAt(n % LETRAS_FOLIO.length);
+            }).join('');
+            guardarCarrito();
+        }
+        return carrito.folio;
+    }
+
+    /**
+     * Copia del pedido en el sistema (sale en el Historial de Ventas). keepalive:
+     * la peticion termina aunque el navegador se vaya a WhatsApp. Si falla no
+     * pasa nada: el mensaje ya trae todo.
+     */
+    function guardarPedido() {
+        try {
+            fetch('api/pedido.php', {
+                method: 'POST',
+                keepalive: true,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    folio: folioCarrito(), nombre: carrito.nombre.trim(), ficha: FICHA,
+                    productos: carrito.productos.map(function (it) { return { c: it.c, q: it.q }; })
+                })
+            }).catch(function () { /* sin conexion: el mensaje de WhatsApp basta */ });
+        } catch (e) { /* navegador sin fetch */ }
     }
 
     function enlaceCarrito() {
@@ -667,6 +775,7 @@
         });
 
         ca.enviar.addEventListener('click', function () {
+            guardarPedido();
             // No se vacia solo: si WhatsApp no abrio, el pedido sigue aqui.
             ca.vaciar.textContent = '¿Ya lo enviaste? Vaciar carrito';
         });

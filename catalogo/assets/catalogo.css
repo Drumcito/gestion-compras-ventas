@@ -316,6 +316,7 @@ a { color: var(--acento-texto); }
     margin: 0; font-size: .92rem; font-weight: 600; line-height: 1.3;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
+.tarjeta h3 .ver-detalle { display: inline; }
 .tarjeta h3 mark { background: color-mix(in srgb, var(--naranja-claro) 55%, transparent); color: inherit; border-radius: 3px; }
 .marca-producto { font-size: .8rem; color: var(--acento-texto); font-weight: 600; }
 
@@ -466,6 +467,14 @@ a { color: var(--acento-texto); }
 .campo-carrito input:focus { outline: none; border-color: var(--naranja); }
 .carrito-enviar { margin: 0; height: 48px; font-size: 1rem; }
 .carrito-enviar svg { width: 20px; height: 20px; }
+.carrito-horario {
+    margin: 0; display: flex; align-items: center; gap: 6px;
+    font-size: .84rem; font-weight: 600; color: var(--texto);
+}
+.carrito-horario svg {
+    flex: none; width: 16px; height: 16px;
+    fill: none; stroke: var(--acento-texto); stroke-width: 2; stroke-linecap: round;
+}
 .carrito-nota { margin: 0; font-size: .78rem; color: var(--texto-2); }
 .carrito-vaciar { justify-self: center; font-size: .86rem; color: var(--texto-2); }
 
@@ -477,6 +486,54 @@ a { color: var(--acento-texto); }
     transition: opacity .2s, transform .2s;
 }
 .aviso-carrito.visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- Detalle de producto ---------- */
+.tarjeta-imagen { cursor: zoom-in; }
+.ver-detalle {
+    display: inline; padding: 0; border: 0; background: none;
+    color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.ver-detalle:hover { text-decoration: underline; text-decoration-color: var(--naranja); }
+
+.detalle {
+    width: min(860px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px);
+    padding: 0; border: 0; border-radius: var(--radio);
+    background: var(--superficie); color: var(--texto);
+    box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+}
+.detalle::backdrop { background: rgb(0 0 0 / 55%); }
+.detalle-cerrar {
+    position: absolute; top: 10px; right: 10px; z-index: 2;
+    width: 40px; height: 40px; border: 0; border-radius: 50%;
+    background: rgb(0 0 0 / 55%); color: #fff; font-size: 1.6rem; line-height: 1; cursor: pointer;
+}
+.detalle-interior {
+    display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+}
+.detalle-imagen {
+    position: relative; aspect-ratio: 1 / 1; background: #fff;
+    display: grid; place-items: center;
+}
+.detalle-imagen img { width: 100%; height: 100%; object-fit: contain; padding: 5%; }
+.detalle-imagen.sin-imagen { background: var(--hueco); }
+.detalle-imagen.sin-imagen svg { width: 34%; height: 34%; fill: var(--hueco-dibujo); }
+.detalle-datos {
+    padding: 28px 22px 22px; display: flex; flex-direction: column; gap: 6px; min-width: 0;
+}
+.detalle-datos h2 { margin: 0; font-size: 1.25rem; line-height: 1.3; overflow-wrap: anywhere; }
+.detalle-marca { margin: 0; font-size: .9rem; font-weight: 600; color: var(--acento-texto); }
+.detalle-datos .precios { margin-top: 10px; padding-top: 0; }
+.detalle-datos .precio { font-size: 1.8rem; }
+.detalle-iva { margin: 0; font-size: .8rem; color: var(--texto-2); }
+.detalle-datos .accion { margin-top: auto; padding-top: 12px; }
+.detalle-datos .agregar, .detalle-datos .accion .cantidad { height: 44px; font-size: .95rem; }
+
+@media (max-width: 640px) {
+    .detalle { width: 100vw; max-height: 100dvh; height: 100dvh; border-radius: 0; margin: 0; }
+    .detalle[open] { overflow-y: auto; }
+    .detalle-interior { grid-template-columns: 1fr; }
+    .detalle-datos { padding: 16px 16px 24px; }
+}
 
 /* Que el boton flotante no tape el final de la pagina. */
 .pagina-catalogo .pie { padding-bottom: 76px; }

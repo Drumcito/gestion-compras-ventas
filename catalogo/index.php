@@ -9,7 +9,9 @@
  * venir al servidor. Los resultados se ven por paginas (sitio.por_pagina).
  *
  * Carrito: sin cuenta ni sesion. Se guarda como JSON en el navegador del
- * visitante (localStorage) y se manda completo en un solo mensaje de WhatsApp.
+ * visitante (localStorage) y se manda completo en un solo mensaje de WhatsApp;
+ * al enviarlo se guarda una copia con su folio (api/pedido.php) para que salga
+ * en el Historial de Ventas del sistema.
  */
 
 require_once __DIR__ . '/inc/bootstrap.php';
@@ -17,6 +19,7 @@ require_once __DIR__ . '/inc/layout.php';
 
 $cfg = configCatalogo();
 $whatsapp = numeroWhatsapp((string) $cfg['whatsapp']);
+$horario = trim((string) ($cfg['sitio']['horario'] ?? ''));
 
 header('Content-Type: text/html; charset=utf-8');
 
@@ -29,7 +32,8 @@ catalogoCabecera(
     <main id="contenido" class="catalogo" data-whatsapp="<?= e($whatsapp) ?>"
           data-marcas-rapidas="<?= (int) $cfg['sitio']['marcas_rapidas'] ?>"
           data-por-pagina="<?= (int) $cfg['sitio']['por_pagina'] ?>"
-          data-carrito-max="<?= (int) ($cfg['sitio']['carrito_max'] ?? 20) ?>">
+          data-carrito-max="<?= (int) ($cfg['sitio']['carrito_max'] ?? 20) ?>"
+          data-ficha="<?= e(fichaFormulario()) ?>">
         <section class="buscador" aria-label="Buscar y filtrar">
             <div class="buscador-interior">
                 <div class="caja-busqueda">
@@ -111,9 +115,16 @@ catalogoCabecera(
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm4.5 12.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.7 11.7 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>
                     Enviar pedido por WhatsApp
                 </a>
+                <?php if ($horario !== ''): ?>
+                    <p class="carrito-horario">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        <span>Horario de atención: <?= e($horario) ?></span>
+                    </p>
+                <?php endif; ?>
                 <p class="carrito-nota">
                     Precios finales con IVA incluido, sujetos a cambio sin previo aviso y a disponibilidad:
-                    te confirmamos existencias por WhatsApp. Tu carrito se guarda solo en este navegador.
+                    te confirmamos existencias por WhatsApp. Al enviarlo guardamos una copia de tu pedido para
+                    atenderlo; consulta el <a href="aviso-de-privacidad.php" target="_blank">Aviso de Privacidad</a>.
                 </p>
                 <button type="button" class="enlace carrito-vaciar" id="carrito-vaciar">Vaciar carrito</button>
             </div>
@@ -121,6 +132,12 @@ catalogoCabecera(
 
         <p class="aviso-carrito" id="aviso-carrito" role="status" aria-live="polite"></p>
     <?php endif; ?>
+
+    <!-- Detalle de un producto: imagen grande y nombre completo. Lo llena catalogo.js. -->
+    <dialog class="detalle" id="detalle" aria-labelledby="detalle-nombre">
+        <button type="button" class="detalle-cerrar" id="detalle-cerrar" aria-label="Cerrar">×</button>
+        <div class="detalle-interior" id="detalle-interior"></div>
+    </dialog>
 
     <script src="<?= e(asset('catalogo.js')) ?>" defer></script>
 <?php

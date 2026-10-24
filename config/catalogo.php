@@ -60,6 +60,10 @@ return [
         // que quiera, hasta 999). Todo se manda en un solo mensaje de WhatsApp;
         // con mas de ~30 el enlace se vuelve muy largo para algunos celulares.
         'carrito_max'    => 20,
+        // Horario de atencion: sale en el carrito, junto al boton de enviar, para
+        // que quien escribe de noche sepa cuando le contestan. Vacio = no se
+        // muestra.
+        'horario'        => 'Lunes a sábado de 9:00 a 18:00 h',
     ],
 
     // ---------- Datos legales (aviso de privacidad y terminos) ----------
@@ -77,8 +81,8 @@ return [
         // 'incluido' = los precios publicados ya incluyen IVA; 'mas_iva' = no lo
         // incluyen. Debe coincidir con lo que realmente se cobra.
         'iva'          => 'incluido',
-        'version'      => '1.0',
-        'fecha'        => '19 de octubre de 2026',
+        'version'      => '1.1',
+        'fecha'        => '24 de octubre de 2026',
     ],
 
     // ---------- Imagenes de producto ----------
