@@ -64,7 +64,7 @@ function fraseIva(): string
 {
     switch (configCatalogo()['legal']['iva'] ?? '') {
         case 'incluido':
-            return 'Los precios publicados incluyen IVA.';
+            return 'Los precios publicados ya incluyen IVA.';
         case 'mas_iva':
             return 'Los precios publicados no incluyen IVA; el impuesto se agrega al momento de facturar.';
         default:

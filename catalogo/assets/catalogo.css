@@ -225,6 +225,10 @@ a { color: var(--acento-texto); }
     color: var(--texto-2); font-size: .92rem;
 }
 .resultados-info p { margin: 0; }
+.nota-precios {
+    max-width: var(--ancho); margin: 0 auto; padding: 0 16px;
+    color: var(--texto-2); font-size: .8rem;
+}
 .enlace {
     background: none; border: 0; padding: 0; cursor: pointer;
     color: var(--acento-texto); font: inherit; text-decoration: underline;
@@ -235,6 +239,45 @@ a { color: var(--acento-texto); }
     display: grid; gap: 14px;
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 }
+
+/* En computadora, 5 columnas: una pagina de 10 son dos filas completas. */
+@media (min-width: 1024px) {
+    .rejilla { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+/* ---------- Paginacion ---------- */
+.paginacion {
+    max-width: var(--ancho); margin: 0 auto; padding: 0 16px 36px;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px;
+}
+.paginacion:empty { display: none; }
+
+.pag-boton {
+    min-width: 40px; height: 40px; padding: 0 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--borde); border-radius: 10px;
+    background: var(--superficie); color: var(--texto);
+    font: inherit; font-size: .92rem; font-weight: 600; cursor: pointer;
+}
+.pag-boton:hover:not(:disabled) { border-color: var(--naranja); color: var(--acento-texto); }
+.pag-boton:disabled { opacity: .45; cursor: default; }
+.pag-actual-num {
+    background: var(--chip-activo-fondo); border-color: var(--chip-activo-fondo);
+    color: var(--chip-activo-texto); cursor: default;
+}
+.pag-hueco { min-width: 20px; text-align: center; color: var(--texto-2); }
+
+/* "Pagina 6 de 2,781": solo en celular, donde se esconden los numeros. */
+.pag-actual { display: none; padding: 0 6px; color: var(--texto-2); font-size: .9rem; }
+
+.pag-ir { display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; }
+.pag-ir label { display: inline-flex; align-items: center; gap: 6px; color: var(--texto-2); font-size: .9rem; }
+.pag-ir input {
+    width: 76px; height: 40px; padding: 0 8px;
+    border: 1px solid var(--borde); border-radius: 10px;
+    background: var(--superficie); color: var(--texto); font: inherit;
+}
+.pag-ir input:focus { outline: none; border-color: var(--naranja); }
 
 .tarjeta {
     position: relative;
@@ -288,6 +331,155 @@ a { color: var(--acento-texto); }
 }
 .pedir:hover { filter: brightness(1.08); }
 .pedir svg { width: 16px; height: 16px; fill: currentColor; }
+
+/* ---------- Carrito ---------- */
+.icono-trazo, .boton-carrito svg, .carrito-flotante svg {
+    fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.boton-carrito {
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; padding: 0; border-radius: 999px;
+    border: 1px solid rgb(255 255 255 / 45%); background: rgb(0 0 0 / 14%); color: #fff; cursor: pointer;
+}
+.boton-carrito:hover { background: rgb(0 0 0 / 26%); }
+.boton-carrito svg { width: 20px; height: 20px; }
+.contador-carrito {
+    position: absolute; top: -5px; right: -5px;
+    min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+    background: var(--rojo); color: #fff; border: 2px solid #fff;
+    font-size: .7rem; font-weight: 800; line-height: 16px; text-align: center;
+}
+
+.agregar, .accion .cantidad {
+    margin-top: 8px; width: 100%; height: 36px; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font: inherit; font-size: .88rem; font-weight: 600;
+}
+.agregar {
+    border: 0; background: var(--carbon); color: #fff; cursor: pointer;
+}
+:root[data-tema="oscuro"] .agregar { background: var(--naranja-claro); color: #1f2023; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-tema="claro"]) .agregar { background: var(--naranja-claro); color: #1f2023; }
+}
+.agregar:hover { filter: brightness(1.12); }
+.agregar svg { width: 17px; height: 17px; }
+
+.cantidad {
+    display: inline-flex; align-items: center;
+    border: 1px solid var(--naranja); border-radius: 10px; background: var(--superficie);
+    overflow: hidden;
+}
+.accion .cantidad { justify-content: space-between; gap: 0; }
+.cantidad button {
+    flex: none; width: 38px; height: 100%; min-height: 34px; border: 0;
+    background: color-mix(in srgb, var(--naranja-claro) 25%, var(--superficie));
+    color: var(--texto); font: inherit; font-size: 1.15rem; font-weight: 700; cursor: pointer;
+}
+.cantidad button:hover:not(:disabled) { background: color-mix(in srgb, var(--naranja-claro) 50%, var(--superficie)); }
+.cantidad button:disabled { opacity: .4; cursor: default; }
+.cantidad span { font-size: .84rem; color: var(--texto); white-space: nowrap; }
+.cantidad input {
+    width: 52px; height: 34px; border: 0; text-align: center;
+    background: transparent; color: var(--texto); font: inherit; font-weight: 700;
+    -moz-appearance: textfield;
+}
+.cantidad input::-webkit-inner-spin-button, .cantidad input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.cantidad input:focus { outline: none; background: var(--superficie-2); }
+
+.carrito-flotante {
+    position: fixed; right: 16px; bottom: 16px; z-index: 20;
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 52px; padding: 0 20px; border: 0; border-radius: 999px;
+    background: var(--verde-wa); color: #fff; box-shadow: 0 6px 20px rgb(0 0 0 / 28%);
+    font: inherit; font-weight: 700; font-size: .95rem; cursor: pointer;
+}
+.carrito-flotante[hidden] { display: none; }
+.carrito-flotante:hover { filter: brightness(1.08); }
+.carrito-flotante svg { width: 22px; height: 22px; }
+
+.carrito {
+    inset: 0 0 0 auto; margin: 0;
+    width: min(440px, 100vw); max-width: 100vw; height: 100%; max-height: 100dvh;
+    padding: 0; border: 0;
+    background: var(--superficie); color: var(--texto);
+    box-shadow: -8px 0 30px rgb(0 0 0 / 25%);
+}
+.carrito[open] { display: flex; flex-direction: column; }
+.carrito::backdrop { background: rgb(0 0 0 / 45%); }
+
+.carrito-cabeza {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 16px; border-bottom: 1px solid var(--borde);
+}
+.carrito-cabeza h2 { margin: 0; font-size: 1.15rem; }
+.carrito-cerrar {
+    width: 38px; height: 38px; border: 0; border-radius: 50%;
+    background: var(--superficie-2); color: var(--texto-2); font-size: 1.5rem; line-height: 1; cursor: pointer;
+}
+
+.carrito-lista { list-style: none; margin: 0; padding: 4px 16px; flex: 1; overflow-y: auto; }
+.carrito-vacio { padding: 40px 8px; text-align: center; color: var(--texto-2); }
+.carrito-vacio strong { display: block; color: var(--texto); margin-bottom: 4px; }
+
+.carrito-item {
+    display: grid; gap: 6px 12px; grid-template-columns: 64px minmax(0, 1fr);
+    padding: 12px 0; border-bottom: 1px solid var(--borde);
+}
+.carrito-imagen {
+    width: 64px; height: 64px; border-radius: 10px; overflow: hidden;
+    background: #fff; display: grid; place-items: center; border: 1px solid var(--borde);
+}
+.carrito-imagen img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+.carrito-imagen.sin-imagen { background: var(--hueco); }
+.carrito-imagen.sin-imagen svg { width: 50%; height: 50%; fill: var(--hueco-dibujo); }
+.carrito-datos { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.carrito-datos strong { font-size: .9rem; line-height: 1.3; }
+.carrito-precio { font-size: .86rem; color: var(--texto-2); }
+.carrito-precio b { color: var(--texto); }
+.carrito-falta { font-size: .8rem; color: var(--rojo); }
+.carrito-controles {
+    grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.carrito-controles .cantidad { height: 36px; }
+.carrito-controles .enlace { font-size: .86rem; color: var(--texto-2); }
+
+.carrito-pie {
+    display: grid; gap: 10px;
+    padding: 14px 16px 18px; border-top: 1px solid var(--borde); background: var(--superficie-2);
+}
+.carrito-pie[hidden] { display: none; }
+.carrito-resumen {
+    margin: 0; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px;
+    color: var(--texto-2); font-size: .9rem;
+}
+.carrito-resumen strong { font-size: 1.3rem; color: var(--texto); margin-left: 6px; }
+.campo-carrito label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
+.campo-carrito small { font-weight: 400; color: var(--texto-2); }
+.campo-carrito input {
+    width: 100%; height: 42px; padding: 0 12px;
+    border: 1px solid var(--borde); border-radius: 10px;
+    background: var(--superficie); color: var(--texto); font: inherit;
+}
+.campo-carrito input:focus { outline: none; border-color: var(--naranja); }
+.carrito-enviar { margin: 0; height: 48px; font-size: 1rem; }
+.carrito-enviar svg { width: 20px; height: 20px; }
+.carrito-nota { margin: 0; font-size: .78rem; color: var(--texto-2); }
+.carrito-vaciar { justify-self: center; font-size: .86rem; color: var(--texto-2); }
+
+.aviso-carrito {
+    position: fixed; left: 50%; bottom: 84px; z-index: 30;
+    transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
+    max-width: calc(100vw - 32px); margin: 0; padding: 10px 16px; border-radius: 12px;
+    background: var(--carbon); color: #fff; font-size: .9rem; box-shadow: var(--sombra);
+    transition: opacity .2s, transform .2s;
+}
+.aviso-carrito.visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* Que el boton flotante no tape el final de la pagina. */
+.pagina-catalogo .pie { padding-bottom: 76px; }
 
 .esqueleto { min-height: 330px; background: linear-gradient(90deg, var(--superficie) 0%, var(--superficie-2) 50%, var(--superficie) 100%); background-size: 200% 100%; animation: brillo 1.2s infinite linear; }
 @keyframes brillo { to { background-position: -200% 0; } }
@@ -386,6 +578,12 @@ a { color: var(--acento-texto); }
     .marca img { width: 36px; height: 36px; }
     .marca strong { font-size: .8rem; white-space: nowrap; }
     .pedir-largo { display: none; }
+    .carrito-flotante { left: 16px; right: 16px; justify-content: center; }
+
+    /* Celular: ‹ Pagina 6 de 2,781 › + "Ir a"; los numeros no caben. */
+    .pag-numero, .pag-hueco, .pag-texto { display: none; }
+    .pag-actual { display: inline; }
+    .pag-ir { flex-basis: 100%; justify-content: center; margin: 4px 0 0; }
     .rejilla { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-inline: 10px; }
     .tarjeta-cuerpo { padding: 10px; }
     .tarjeta h3 { font-size: .84rem; }
@@ -396,4 +594,5 @@ a { color: var(--acento-texto); }
 
 @media (prefers-reduced-motion: reduce) {
     .esqueleto { animation: none; }
+    .aviso-carrito { transition: none; }
 }

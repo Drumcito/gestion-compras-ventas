@@ -55,6 +55,12 @@ function catalogoCabecera(string $titulo, string $descripcion, string $pagina = 
                         <span>WhatsApp</span>
                     </a>
                 <?php endif; ?>
+                <?php if ($pagina === 'catalogo' && $whatsapp !== ''): ?>
+                    <button type="button" class="boton-carrito" id="abrir-carrito" aria-label="Abrir carrito" aria-haspopup="dialog">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h2.8l2.5 12a1.6 1.6 0 0 0 1.6 1.3h8.7a1.6 1.6 0 0 0 1.6-1.2L21 7.5H5.7"/></svg>
+                        <span class="contador-carrito" id="contador-carrito" hidden>0</span>
+                    </button>
+                <?php endif; ?>
                 <button type="button" class="boton-tema" id="boton-tema" aria-label="Cambiar a modo oscuro">
                     <svg class="icono-luna" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
                     <svg class="icono-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/></svg>
@@ -155,7 +161,7 @@ function catalogoPie(): void
                 Las imágenes de los productos son ilustrativas y de uso referencial: no son de nuestra autoría y
                 pertenecen a sus respectivos titulares. El producto real puede variar en color, empaque o presentación.
                 Las marcas mencionadas son propiedad de sus dueños y se usan solo para identificar los productos.
-                Precios en pesos mexicanos, sujetos a cambio y disponibilidad. <?= fraseIva() ?>
+                Precios en pesos mexicanos, sujetos a cambio sin previo aviso y a disponibilidad. <?= fraseIva() ?>
             </p>
             <p>© <?= date('Y') ?> <?= e($legal['responsable']) ?>. Aviso de Privacidad versión <?= e($legal['version']) ?>.</p>
         </div>

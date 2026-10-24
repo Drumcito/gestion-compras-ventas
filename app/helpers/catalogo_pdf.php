@@ -528,7 +528,7 @@ function catalogoPie(CatalogoPdf $pdf, array $cfg, bool $muestra): void
     }
 
     $pdf->color([160, 160, 160], 'T');
-    $vigencia = 'Precios netos vigentes al ' . date('d/m/Y') . '. Sujetos a cambio sin previo aviso.';
+    $vigencia = 'Precios netos con IVA incluido, vigentes al ' . date('d/m/Y') . '. Sujetos a cambio sin previo aviso.';
     if ($muestra) {
         $vigencia = 'MUESTRA: los precios "Antes" son inventados para revisar el diseño.';
     }

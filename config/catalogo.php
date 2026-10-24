@@ -53,6 +53,13 @@ return [
         'cache_minutos'  => 10,
         // Marcas que salen como filtro rapido (las de mas productos).
         'marcas_rapidas' => 10,
+        // Productos por pagina. 10 llena dos filas de 5 en computadora y cinco
+        // de 2 en celular.
+        'por_pagina'     => 10,
+        // Productos distintos que caben en el carrito (cada uno con las piezas
+        // que quiera, hasta 999). Todo se manda en un solo mensaje de WhatsApp;
+        // con mas de ~30 el enlace se vuelve muy largo para algunos celulares.
+        'carrito_max'    => 20,
     ],
 
     // ---------- Datos legales (aviso de privacidad y terminos) ----------
@@ -69,7 +76,7 @@ return [
         'correo_datos' => 'comercializadoragabe@ga-be.net',
         // 'incluido' = los precios publicados ya incluyen IVA; 'mas_iva' = no lo
         // incluyen. Debe coincidir con lo que realmente se cobra.
-        'iva'          => '',
+        'iva'          => 'incluido',
         'version'      => '1.0',
         'fecha'        => '19 de octubre de 2026',
     ],
