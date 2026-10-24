@@ -3517,6 +3517,153 @@ select.form-control {
     }
 }
 
+/* ===== Pedidos en línea (catálogo público) ===== */
+/* Naranja muy claro: lo que llegó del catálogo en línea se distingue de un
+   vistazo, tanto el pedido por atender como la venta en que se convirtió. */
+
+.pedidos-linea {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin: 0 0 1rem;
+    padding: 0.9rem 1rem;
+    background: #fff6ea;
+    border: 1px solid #ffbb5b;
+    border-radius: 12px;
+}
+
+.pedidos-linea[hidden] { display: none; }
+
+.pedidos-linea-titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    color: #8a4f00;
+}
+
+.pedidos-linea-ayuda {
+    margin: -0.3rem 0 0;
+    font-size: 0.8rem;
+    color: #7a5a30;
+}
+
+.pedido-linea {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: #ffffff;
+    border: 1px solid #ffd59a;
+    border-left: 4px solid #ffbb5b;
+    border-radius: 10px;
+    padding: 0.7rem 0.9rem;
+}
+
+.pedido-linea-cabeza {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.pedido-linea-datos {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.pedido-linea-cliente { font-weight: 600; color: #222222; }
+.pedido-linea-meta { font-size: 0.8rem; color: #666666; }
+.pedido-linea-total { font-weight: 700; font-size: 1.1rem; color: #a35c00; white-space: nowrap; }
+
+.pedido-linea-productos summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #a35c00;
+    font-weight: 600;
+}
+
+.pedido-linea-productos ul {
+    margin: 0.4rem 0 0;
+    padding-left: 1.1rem;
+    font-size: 0.85rem;
+    color: #333333;
+}
+
+.pedido-linea-productos li { margin: 0.15rem 0; }
+.pedido-cant { font-weight: 700; }
+.pedido-precio { color: #666666; white-space: nowrap; }
+
+.pedido-linea-acciones {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-cargar-pedido {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+}
+
+/* Venta que salió de un pedido en línea, dentro del listado. */
+.lista-ventas .venta-fila.venta-en-linea,
+.lista-ventas .venta-fila.venta-en-linea:nth-child(even) {
+    background: #fff3e2;
+    box-shadow: inset 4px 0 0 #ffbb5b;
+}
+
+.lista-ventas .venta-fila.venta-en-linea:hover {
+    background: #ffe9cc;
+}
+
+.etiqueta-en-linea {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #fff0d9;
+    color: #8a4f00;
+    border: 1px solid #ffbb5b;
+    text-transform: none;
+}
+
+.detalle-en-linea {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: #fff3e2;
+    border: 1px solid #ffbb5b;
+    border-radius: 8px;
+    padding: 0.2rem 0.6rem;
+    color: #8a4f00;
+}
+
+/* Aviso arriba del ticket de Venta mientras se cobra un pedido en línea. */
+.pedido-linea-venta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    padding: 0.6rem 0.9rem;
+    background: #fff3e2;
+    border: 1px solid #ffbb5b;
+    border-radius: 10px;
+    color: #8a4f00;
+}
+
+.pedido-linea-venta[hidden] { display: none; }
+.pedido-linea-venta span { flex: 1; min-width: 12rem; }
+.pedido-linea-venta .ph { font-size: 1.2rem; }
+
+@media (max-width: 600px) {
+    .pedido-linea-acciones { justify-content: stretch; }
+    .pedido-linea-acciones > * { flex: 1; justify-content: center; }
+}
+
 /* ===== CONFIRMACIÓN DE COMPRA ===== */
 
 /* Tablas con casilla al frente: la columna se mantiene angosta. */

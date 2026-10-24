@@ -36,6 +36,10 @@ $pagoInicial      = (float) ($datos['pago_inicial'] ?? 0);
 $saldoSolicitado  = (float) ($datos['credito_aplicado'] ?? 0);
 $items            = $datos['items'] ?? [];
 
+// Pedido en linea que se esta cobrando (cargado desde el Historial). La venta
+// queda ligada a el y el pedido deja de salir como pendiente.
+$pedidoLineaId    = (int) ($datos['pedido_linea_id'] ?? 0);
+
 if (!in_array($tipoPago, ['contado', 'credito'], true)) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Tipo de pago no valido']);
@@ -195,6 +199,31 @@ try {
             'precio'      => $linea['precio'],
             'cantidad'    => $linea['cantidad'],
         ]);
+    }
+
+    // Solo si el pedido sigue pendiente: si otro usuario ya lo cobro, se avisa en
+    // lugar de registrar la misma mercancia dos veces.
+    if ($pedidoLineaId > 0) {
+        $stmt = $pdo->prepare(
+            'UPDATE pedidos_linea p
+          LEFT JOIN ventas v ON v.id = p.venta_id
+                SET p.venta_id = :venta_id, p.atendido_por = :usuario_id, p.atendido_en = NOW()
+              WHERE p.id = :pedido
+                AND p.descartado_en IS NULL
+                AND (p.venta_id IS NULL OR v.eliminada_en IS NOT NULL)'
+        );
+        $stmt->execute([
+            'venta_id'   => $ventaId,
+            'usuario_id' => $_SESSION['user_id'],
+            'pedido'     => $pedidoLineaId,
+        ]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException(
+                'Ese pedido en línea ya se cobró en otra venta o se descartó. Revisa el historial, '
+                . 'o quita el pedido de esta venta para guardarla como venta normal.'
+            );
+        }
     }
 
     // El abono inicial es opcional y puede ser 0; el trigger de pagos_credito

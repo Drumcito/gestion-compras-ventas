@@ -44,7 +44,8 @@ try {
             'SELECT v.id, v.cliente, v.cliente_id, v.fecha, v.total, v.tipo_pago, v.estado_pago,
                     v.credito_aplicado, v.fecha_vencimiento, v.entregada_en, v.usuario_id,
                     CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
-                    u.numero_empleado
+                    u.numero_empleado,
+                    (SELECT pl.folio FROM pedidos_linea pl WHERE pl.venta_id = v.id LIMIT 1) AS pedido_folio
                FROM ventas v
                JOIN usuarios u ON u.id = v.usuario_id
               WHERE v.id = :id'
@@ -202,7 +203,9 @@ try {
                 GREATEST(v.monto_cobrado + v.credito_aplicado - v.total, 0) AS devolucion,
                 CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
                 u.numero_empleado,
-                (SELECT COUNT(*) FROM detalle_venta d WHERE d.venta_id = v.id) AS piezas
+                (SELECT COUNT(*) FROM detalle_venta d WHERE d.venta_id = v.id) AS piezas,
+                -- Folio si la venta salio de un pedido del catalogo en linea (fila naranja).
+                (SELECT pl.folio FROM pedidos_linea pl WHERE pl.venta_id = v.id LIMIT 1) AS pedido_folio
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
           WHERE v.eliminada_en IS NULL' . $condicionFecha . $condicionUsuario . '

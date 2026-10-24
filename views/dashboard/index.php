@@ -45,6 +45,9 @@ $casas = ordenarCasas($casas);
 
         <div class="card-form">
             <form id="form-venta" autocomplete="off">
+                <!-- Pedido en línea que se está cobrando (cargado desde el Historial) -->
+                <div id="pedido-linea-venta" class="pedido-linea-venta" hidden></div>
+
                 <!-- Cliente -->
                 <div class="form-group">
                     <label for="cliente">Cliente:</label>

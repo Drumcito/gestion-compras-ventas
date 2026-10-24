@@ -33,6 +33,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cada linea guarda su propia casa: un mismo ticket puede mezclar proveedores.
     let items = [];
 
+    // Pedido en linea que se esta cobrando ({ id, folio, nombre }), cargado desde
+    // el Historial. Al guardar, la venta queda ligada y el pedido sale de pendientes.
+    let pedidoLinea = null;
+    const cajaPedido = document.getElementById('pedido-linea-venta');
+
     const money = (n) => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Para el editor de porcentaje (solo admin): mismo cálculo del neto que
@@ -146,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tipo_pago:   tipoPago.value,
                 pago_inicial: pagoInicial.value,
                 vencimiento: fechaVenc.value,
+                pedido_linea: pedidoLinea,
             }));
         } catch (e) {
             // Sin espacio o con el almacenamiento bloqueado: la venta sigue,
@@ -258,9 +264,11 @@ document.addEventListener('DOMContentLoaded', () => {
         camposCredito.hidden = tipoPago.value !== 'credito';
         pagoInicial.value = b.pago_inicial || '';
         fechaVenc.value = b.vencimiento || '';
+        pedidoLinea = b.pedido_linea && b.pedido_linea.id ? b.pedido_linea : null;
 
         pintarItems();
         actualizarGuardarCliente();
+        pintarPedidoLinea();
 
         // Se avisa con la opción de tirarlo: el vendedor tiene que poder empezar
         // de cero sin ir quitando pieza por pieza.
@@ -272,9 +280,15 @@ document.addEventListener('DOMContentLoaded', () => {
         aviso.innerHTML = '';
 
         const texto = document.createElement('span');
-        texto.textContent = 'Se recuperó la venta que tenías a medias: ' +
+        texto.textContent = (b.pedido_recien_cargado
+            ? 'Pedido en línea ' + pedidoLinea.folio + ' cargado: '
+            : 'Se recuperó la venta que tenías a medias: ') +
             items.length + ' producto' + (items.length === 1 ? '' : 's') +
-            ' (' + piezas + ' pieza' + (piezas === 1 ? '' : 's') + ').';
+            ' (' + piezas + ' pieza' + (piezas === 1 ? '' : 's') + ').' +
+            (b.pedido_recien_cargado ? ' Revisa cantidades y forma de pago, y guarda.' : '') +
+            (b.pedido_fuera && b.pedido_fuera.length
+                ? ' Ya no están en el catálogo: ' + b.pedido_fuera.join(', ') + '.'
+                : '');
         aviso.appendChild(texto);
 
         const boton = document.createElement('button');
@@ -326,11 +340,39 @@ document.addEventListener('DOMContentLoaded', () => {
         texto.textContent += ' ' + partes.join(' ');
     }
 
+    /** Aviso fijo arriba del ticket mientras se cobra un pedido en linea. */
+    function pintarPedidoLinea() {
+        if (!cajaPedido) return;
+
+        if (!pedidoLinea) {
+            cajaPedido.hidden = true;
+            cajaPedido.innerHTML = '';
+            return;
+        }
+
+        cajaPedido.hidden = false;
+        cajaPedido.innerHTML =
+            '<i class="ph ph-globe" aria-hidden="true"></i>' +
+            '<span>Cobrando el <strong>pedido en línea ' + esc(pedidoLinea.folio) + '</strong>' +
+                (pedidoLinea.nombre ? ' · ' + esc(pedidoLinea.nombre) : '') + '</span>' +
+            '<button type="button" class="chip" id="btn-quitar-pedido" ' +
+                'title="La venta se guarda como venta normal y el pedido sigue pendiente en el historial">' +
+                'Quitar pedido</button>';
+
+        document.getElementById('btn-quitar-pedido').addEventListener('click', () => {
+            pedidoLinea = null;
+            pintarPedidoLinea();
+            guardarBorrador();
+        });
+    }
+
     /** Deja la pantalla como recién abierta, sin borrador. */
     function vaciarVenta() {
         items = [];
         clienteSel = { id: null, nombre: '', saldo: 0 };
         aplicarSaldo = true;
+        pedidoLinea = null;
+        pintarPedidoLinea();
 
         form.reset();
         camposCredito.hidden = true;
@@ -1153,6 +1195,10 @@ document.addEventListener('DOMContentLoaded', () => {
             })),
         };
 
+        if (pedidoLinea) {
+            cuerpo.pedido_linea_id = pedidoLinea.id;
+        }
+
         if (tipoPago.value === 'credito') {
             cuerpo.pago_inicial = parseFloat(pagoInicial.value) || 0;
             cuerpo.fecha_vencimiento = fechaVenc.value || null;
@@ -1174,7 +1220,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // El id sale de la respuesta y no del cuerpo: cuando la venta dio
                 // de alta al cliente, el id lo asignó el servidor.
                 mostrarAvisoConNota(datos.venta_id, datos.total, cuerpo.cliente,
-                                    datos.cliente_id, datos.cliente_nuevo);
+                                    datos.cliente_id, datos.cliente_nuevo,
+                                    pedidoLinea ? 'Pedido en línea ' + pedidoLinea.folio + ' atendido.' : '');
+                pedidoLinea = null;
+                pintarPedidoLinea();
                 items = [];
                 clienteSel = { id: null, nombre: '', saldo: 0 };
                 aplicarSaldo = true;

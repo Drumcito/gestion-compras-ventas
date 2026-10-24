@@ -89,6 +89,9 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
             <div id="resumen-periodo" class="resumen-periodo"></div>
             <div id="aviso-historial" class="aviso" hidden></div>
 
+            <!-- Pedidos del catálogo en línea por atender (naranja claro) -->
+            <div id="pedidos-linea" class="pedidos-linea" hidden></div>
+
             <!-- Ventas recién eliminadas: recuperables por 10 minutos -->
             <div id="recuperables" class="recuperables" hidden></div>
 
@@ -119,7 +122,12 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
     </div>
 
 
-    <script>window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;</script>
+    <script>
+        window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;
+        // "Cargar en venta" deja el pedido en línea como el borrador de Venta de
+        // este usuario (mismo nombre de clave que venta.js).
+        window.USUARIO_ID = <?php echo (int) ($_SESSION['user_id'] ?? 0); ?>;
+    </script>
     <script src="<?= recurso('js/nota_datos.js') ?>"></script>
     <script src="<?= recurso('js/historial.js') ?>"></script>
 </body>
