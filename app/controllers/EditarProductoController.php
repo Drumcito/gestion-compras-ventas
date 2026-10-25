@@ -132,11 +132,17 @@ try {
         // La casa del producto sale del prefijo de su codigo (BNS03-01270).
         $casaActual = strtoupper(substr($codigo, 0, (int) strpos($codigo, '-')));
 
+        // Cuando se le movio el precio por ultima vez: es justo el dato que se
+        // quiere ver antes de volver a moverlo.
+        $cambio = ultimosCambiosDePrecio($pdo, [$codigo])[$codigo] ?? null;
+
         echo json_encode([
             'ok'          => true,
             'producto'    => $producto,
             'casa_actual' => $casaActual,
             'casas'       => casasParaMover(),
+            'ultimo_cambio_precio' => $cambio['fecha'] ?? null,
+            'precio_anterior'      => $cambio['anterior'] ?? null,
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }

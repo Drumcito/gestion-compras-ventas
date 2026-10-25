@@ -111,7 +111,7 @@ try {
     // sin emulacion no acepta marcadores en esa posicion.
     $stmt = $pdo->prepare(
         "SELECT codigo_interno, codigo_proveedor, nombre, marca, categoria,
-                precio_mayoreo, porcentaje_neto
+                precio_mayoreo, porcentaje_neto, fecha_creacion
            FROM {$tabla}
           WHERE activo = 1{$filtro}
           ORDER BY {$orden}
@@ -125,13 +125,38 @@ try {
     $porcCasa  = porcentajeCasa($casa);
     $productos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Cuando se le movio el precio por ultima vez. Es UNA consulta para toda la
+    // pagina (50 productos), no una por producto.
+    $cambios = ultimosCambiosDePrecio($pdo, array_column($productos, 'codigo_interno'));
+
     foreach ($productos as &$p) {
         $override             = $p['porcentaje_neto'];
         $p['porcentaje_neto'] = porcentajeProducto($override, $casa);
         $p['porcentaje_propio'] = $override !== null;   // true = distinto al de la casa
         $p['precio_neto']     = netoDe($p['precio_mayoreo'], $p['porcentaje_neto']);
+<<<<<<< HEAD
         // Version de su imagen (0 = sin imagen), para la miniatura de la fila.
         $p['imagen']          = versionImagen($p['codigo_interno']);
+=======
+
+        // Si nunca se le movio el precio no hay fecha de cambio; lo que vale
+        // entonces es desde cuando esta en el catalogo, porque trae el mismo
+        // precio con el que entro.
+        $cambio = $cambios[$p['codigo_interno']] ?? null;
+
+        $p['ultimo_cambio_precio'] = $cambio['fecha'] ?? null;
+        $p['precio_desde']         = $p['fecha_creacion'];
+
+        // El bruto anterior y lo que costaba entonces. El neto de antes se saca
+        // con el porcentaje de HOY, igual que el actual: el historial solo
+        // guarda el bruto, no el porcentaje que regia en ese momento.
+        $p['precio_anterior']      = $cambio['anterior'] ?? null;
+        $p['precio_anterior_neto'] = isset($cambio['anterior'])
+            ? netoDe($cambio['anterior'], $p['porcentaje_neto'])
+            : null;
+
+        unset($p['fecha_creacion']);
+>>>>>>> 8dc750ce417ed3dc44095bbaa6736e1728f96c17
     }
     unset($p);
 

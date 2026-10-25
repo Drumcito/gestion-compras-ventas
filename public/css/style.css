@@ -2537,6 +2537,18 @@ select.form-control {
     gap: 0.15rem;
 }
 
+/* Desde cuando rige el precio que se esta viendo. Va debajo del bruto y el
+   neto, en gris y chico: es contexto, no un dato que se lea de corrido. */
+.precio-fecha {
+    font-size: 0.72rem;
+    color: #777777;
+    white-space: nowrap;
+}
+
+/* Flechita de subio / bajo junto al precio anterior. */
+.precio-sube { color: #b3261e; }
+.precio-baja { color: #1b7f3b; }
+
 .precio-etiqueta {
     font-size: 0.85rem;
     color: #555555;
@@ -2694,7 +2706,15 @@ select.form-control {
     .precios-producto {
         align-items: flex-start;
         flex-direction: row;
+        flex-wrap: wrap;
         gap: 0.75rem;
+    }
+
+    /* En el telefono el bruto y el neto van en renglon; la fecha se pasa
+       completa al siguiente para no apretarlos. */
+    .precio-fecha {
+        flex-basis: 100%;
+        white-space: normal;
     }
 }
 
@@ -3499,6 +3519,12 @@ select.form-control {
     color: var(--ga-carbon);
 }
 
+/* Fecha del último cambio de precio en el renglón del ticket. Va dentro de
+   .item-meta, que ya es gris y chica; esto solo evita que se parta. */
+.item-precio-fecha {
+    white-space: nowrap;
+}
+
 /* ===== Entrega y eliminación de ventas (historial) ===== */
 
 /* Botones de acción a la derecha de cada fila (palomita / eliminar). */
@@ -3561,6 +3587,13 @@ select.form-control {
 }
 
 /* ----- Panel de ventas recuperables ----- */
+/* `display: flex` le gana al atributo `hidden`, asi que sin esto la caja se
+   dibuja vacia (un recuadro amarillo sin nada) cuando no hay nada que
+   recuperar. Pasa igual en Historial y en Inventario. */
+.recuperables[hidden] {
+    display: none;
+}
+
 .recuperables {
     display: flex;
     flex-direction: column;

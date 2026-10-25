@@ -60,18 +60,23 @@ try {
         );
 
         $productos = [];
+        $cambios   = ultimosCambiosDePrecio($pdo, array_keys($catalogo));
 
         foreach ($catalogo as $codigo => $fila) {
             $casa = strtoupper(substr($codigo, 0, strpos($codigo, '-') ?: 0));
+            $pct  = porcentajeProducto($fila['porcentaje_neto'], $casa);
+
+            $cambio = $cambios[$codigo] ?? null;
 
             $productos[] = [
                 'codigo_interno' => $codigo,
                 'nombre'         => $fila['nombre'],
                 'activo'         => (int) $fila['activo'] === 1,
-                'precio_neto'    => netoDe(
-                    $fila['precio_mayoreo'],
-                    porcentajeProducto($fila['porcentaje_neto'], $casa)
-                ),
+                'precio_neto'    => netoDe($fila['precio_mayoreo'], $pct),
+                'ultimo_cambio_precio' => $cambio['fecha'] ?? null,
+                'precio_anterior_neto' => isset($cambio['anterior'])
+                    ? netoDe($cambio['anterior'], $pct)
+                    : null,
             ];
         }
 
@@ -138,12 +143,29 @@ try {
     // producto (el suyo propio si lo tiene, o el de su casa si no). El bruto no se
     // manda al navegador; lo unico que se cobra es el neto (y VentaController lo
     // recalcula por su cuenta al guardar).
+    // Cuando se le movio el precio por ultima vez, para los 25 resultados de un
+    // tiron. Aqui NO se cae a la fecha de alta del producto (como si hace
+    // Inventario): vista_catalogo no la trae, y al vendedor solo le sirve saber
+    // si el precio se movio hace poco.
+    $cambios = ultimosCambiosDePrecio($pdo, array_column($productos, 'codigo_interno'));
+
     foreach ($productos as &$producto) {
+        $pct = porcentajeProducto($producto['porcentaje_neto'], $producto['codigo_casa']);
+
         $producto['nombre_casa']  = etiquetaCasa($producto['codigo_casa']);
-        $producto['precio_neto']  = netoDe(
-            $producto['precio_mayoreo'],
-            porcentajeProducto($producto['porcentaje_neto'], $producto['codigo_casa'])
-        );
+        $producto['precio_neto']  = netoDe($producto['precio_mayoreo'], $pct);
+
+        $cambio = $cambios[$producto['codigo_interno']] ?? null;
+
+        // Solo la fecha y lo que COSTABA (neto). El bruto anterior no sale al
+        // navegador: es el costo del proveedor, igual que el bruto de hoy. El
+        // neto de antes se saca con el porcentaje actual, porque el historial
+        // guarda el bruto pero no el porcentaje que regia entonces.
+        $producto['ultimo_cambio_precio'] = $cambio['fecha'] ?? null;
+        $producto['precio_anterior_neto'] = isset($cambio['anterior'])
+            ? netoDe($cambio['anterior'], $pct)
+            : null;
+
         unset($producto['precio_mayoreo'], $producto['porcentaje_neto']);
     }
     unset($producto);

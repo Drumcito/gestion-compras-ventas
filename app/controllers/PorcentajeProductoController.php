@@ -162,6 +162,9 @@ try {
         $porcCasa    = porcentajeCasa($casa);
         $porcEfectivo = porcentajeProducto($override, $casa);
 
+        $cambio = ultimosCambiosDePrecio($pdo, [$producto['codigo_interno']])
+                      [$producto['codigo_interno']] ?? null;
+
         echo json_encode([
             'ok' => true,
             'producto' => [
@@ -176,6 +179,12 @@ try {
                 'usa_casa'            => $override === null,
                 'etiqueta_casa'       => etiquetaCasa($casa),
                 'neto_actual'         => netoDe($producto['precio_mayoreo'], $porcEfectivo),
+
+                // Cuando se le movio el precio por ultima vez y de cuanto
+                // venia: el dato que se quiere tener a la vista antes de
+                // volver a moverlo.
+                'ultimo_cambio_precio' => $cambio['fecha'] ?? null,
+                'precio_anterior'      => $cambio['anterior'] ?? null,
             ],
         ], JSON_UNESCAPED_UNICODE);
         exit;
@@ -273,6 +282,8 @@ try {
         throw $e;
     }
 
+    $cambioFinal = ultimosCambiosDePrecio($pdo, [$codigo])[$codigo] ?? null;
+
     echo json_encode([
         'ok'                  => true,
         'cambios'             => 1,
@@ -287,6 +298,15 @@ try {
         'precio_anterior'     => $brutoAntes,
         'precio_mayoreo'      => $brutoFinal,
         'neto'                => netoDe($brutoFinal, $porcEfectivo),
+
+        // Se relee del historial en lugar de poner "hoy" a mano: si el precio no
+        // cambio (solo se movio el porcentaje) debe seguir saliendo la fecha
+        // vieja, porque el precio sigue siendo el mismo de entonces.
+        'ultimo_cambio_precio' => $cambioFinal['fecha'] ?? null,
+        'precio_anterior_cambio' => $cambioFinal['anterior'] ?? null,
+        'precio_anterior_neto'   => isset($cambioFinal['anterior'])
+            ? netoDe($cambioFinal['anterior'], $porcEfectivo)
+            : null,
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (RuntimeException $e) {

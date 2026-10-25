@@ -263,6 +263,61 @@ function catalogoDeProductos(PDO $pdo, array $codigos, array $columnas = ['nombr
     return $catalogo;
 }
 
+/**
+ * Ultimo cambio de precio de cada producto: cuando fue y de cuanto a cuanto.
+ *
+ * Sale de historial_precios, que es donde el trigger de cada tabla de catalogo
+ * anota los cambios de precio_mayoreo. Un producto al que nunca se le ha movido
+ * el precio NO aparece en el resultado: quien llama decide que poner en ese
+ * caso (en Inventario se cae a la fecha de alta del producto).
+ *
+ * Los precios que devuelve son BRUTOS, que es lo que guarda el historial. Al
+ * vendedor no se le manda el bruto (ver ProductoController): ahi se convierten
+ * a neto antes de salir al navegador.
+ *
+ * @param array $codigos codigos internos (BNS03-01270)
+ * @return array codigo interno => ['fecha' => 'Y-m-d H:i:s',
+ *                                  'anterior' => float|null, 'nuevo' => float|null]
+ */
+function ultimosCambiosDePrecio(PDO $pdo, array $codigos): array
+{
+    $codigos = array_values(array_unique(array_filter($codigos)));
+
+    if ($codigos === []) {
+        return [];
+    }
+
+    // Marcadores posicionales: con PDO sin emulacion un marcador con nombre no
+    // se puede repetir, y aqui hace falta uno por codigo.
+    $marcadores = implode(',', array_fill(0, count($codigos), '?'));
+
+    // El "ultimo" cambio se elige por MAX(id), no por MAX(fecha_cambio): dos
+    // cambios del mismo segundo tienen la misma fecha y devolverian dos filas
+    // por producto. El id es unico y siempre va hacia adelante.
+    $stmt = $pdo->prepare(
+        "SELECT h.codigo_interno_producto, h.fecha_cambio, h.precio_anterior, h.precio_nuevo
+           FROM historial_precios h
+           JOIN (SELECT codigo_interno_producto, MAX(id) AS id
+                   FROM historial_precios
+                  WHERE codigo_interno_producto IN ({$marcadores})
+                  GROUP BY codigo_interno_producto) u
+             ON u.id = h.id"
+    );
+    $stmt->execute($codigos);
+
+    $cambios = [];
+
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+        $cambios[$fila['codigo_interno_producto']] = [
+            'fecha'    => $fila['fecha_cambio'],
+            'anterior' => $fila['precio_anterior'] === null ? null : (float) $fila['precio_anterior'],
+            'nuevo'    => $fila['precio_nuevo'] === null ? null : (float) $fila['precio_nuevo'],
+        ];
+    }
+
+    return $cambios;
+}
+
 /** DDL de una tabla de catalogo, igual a las cuatro que ya existen. */
 function ddlTablaProductos(string $tabla, int $numero): string
 {
