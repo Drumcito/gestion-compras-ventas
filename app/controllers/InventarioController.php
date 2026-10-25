@@ -18,6 +18,7 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
 
 require_once __DIR__ . '/../../config/conexionBD.php';
 require_once __DIR__ . '/../helpers/casas.php';
+require_once __DIR__ . '/../helpers/catalogo_ofertas.php';   // imagenes de producto
 
 // El mapa casa -> tabla sale de la base (ver app/helpers/casas.php), asi que una
 // casa creada desde esta misma pantalla queda disponible sin tocar codigo.
@@ -129,6 +130,8 @@ try {
         $p['porcentaje_neto'] = porcentajeProducto($override, $casa);
         $p['porcentaje_propio'] = $override !== null;   // true = distinto al de la casa
         $p['precio_neto']     = netoDe($p['precio_mayoreo'], $p['porcentaje_neto']);
+        // Version de su imagen (0 = sin imagen), para la miniatura de la fila.
+        $p['imagen']          = versionImagen($p['codigo_interno']);
     }
     unset($p);
 

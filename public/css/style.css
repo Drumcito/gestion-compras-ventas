@@ -2409,6 +2409,127 @@ select.form-control {
     gap: 0.5rem;
 }
 
+/* ----- Imagen del producto (Inventario) ----- */
+/* Miniatura al inicio de la fila: clic para agregar o cambiar la imagen. */
+.prod-miniatura {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 1px solid #dddddd;
+    border-radius: 8px;
+    background: #ffffff;
+    overflow: hidden;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.prod-miniatura img { width: 100%; height: 100%; object-fit: contain; }
+
+/* Con la miniatura a la izquierda, los datos ocupan el espacio de en medio. */
+.producto-fila .venta-fila-datos { flex: 1; min-width: 0; }
+
+.prod-miniatura.sin-imagen {
+    border-style: dashed;
+    background: #f7f7f7;
+    color: #999999;
+    font-size: 1.3rem;
+}
+
+.prod-miniatura:hover { border-color: #08660b; color: #08660b; }
+
+.imagen-producto-nombre { margin: -0.5rem 0 1rem; color: #555555; font-size: 0.9rem; }
+
+.imagen-editor {
+    display: grid;
+    grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+    gap: 1.2rem;
+    align-items: start;
+}
+
+.imagen-vista {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border: 1px solid #dddddd;
+    border-radius: 12px;
+    background: #ffffff;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+}
+
+.imagen-vista img { width: 100%; height: 100%; object-fit: contain; }
+.imagen-vista.sin-imagen { background: #f4f4f4; color: #bbbbbb; font-size: 3.5rem; }
+
+.imagen-sin-guardar {
+    position: absolute;
+    left: 0.5rem;
+    bottom: 0.5rem;
+    background: rgba(52, 55, 60, 0.85);
+    color: #ffffff;
+    font-size: 0.72rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+}
+
+.imagen-lado { display: flex; flex-direction: column; gap: 0.7rem; min-width: 0; }
+.imagen-meta { margin: 0; font-size: 0.85rem; color: #555555; }
+.imagen-ayuda { margin: 0; font-size: 0.8rem; color: #666666; }
+
+.imagen-soltar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 1.2rem 1rem;
+    border: 2px dashed #c7c7c7;
+    border-radius: 12px;
+    background: #fafafa;
+    color: #555555;
+    text-align: center;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.imagen-soltar .ph { font-size: 1.8rem; color: #08660b; }
+.imagen-soltar strong { color: #08660b; text-decoration: underline; }
+.imagen-soltar:hover, .imagen-soltar.arrastrando { border-color: #08660b; background: #f0f7f0; }
+
+.imagen-soltar kbd {
+    font-family: inherit;
+    font-size: 0.75rem;
+    padding: 0 0.3rem;
+    border: 1px solid #cccccc;
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: #ffffff;
+}
+
+.imagen-botones { display: flex; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; }
+.imagen-botones .btn-save { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+.imagen-progreso { margin: 0.8rem 0 0.4rem; font-weight: 600; }
+
+.imagen-resultados {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 40vh;
+    overflow-y: auto;
+    font-size: 0.85rem;
+}
+
+.imagen-resultados li { padding: 0.3rem 0; border-bottom: 1px solid #eeeeee; overflow-wrap: anywhere; }
+.imagen-resultados .imagen-ok .ph { color: #08660b; }
+.imagen-resultados .imagen-error { color: #b71c1c; }
+
+@media (max-width: 600px) {
+    .imagen-editor { grid-template-columns: 1fr; }
+    .imagen-vista { max-width: 280px; width: 100%; justify-self: center; }
+}
+
 .precios-producto {
     display: flex;
     flex-direction: column;

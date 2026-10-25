@@ -9,7 +9,8 @@
  *
  * Formato (compacto, para que pese poco):
  *   { "generado": "...", "productos": [[codigo, nombre, marca, categoria,
- *     precio, antes|null, descuento, imagen 0/1], ...], "vendidos": [codigos] }
+ *     precio, antes|null, descuento, version de imagen (0 = sin imagen)], ...],
+ *     "vendidos": [codigos] }
  */
 
 require_once __DIR__ . '/../inc/bootstrap.php';

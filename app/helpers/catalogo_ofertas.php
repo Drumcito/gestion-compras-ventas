@@ -233,6 +233,27 @@ function imagenesDisponibles(): array
 }
 
 /**
+ * Version de la imagen de un producto (fecha del archivo, en segundos), o 0 si
+ * no tiene. Va en la direccion de la imagen: el navegador la guarda un año y al
+ * cambiarla la direccion cambia sola.
+ */
+function versionImagen(string $codigoInterno): int
+{
+    $ruta = imagenProducto($codigoInterno);
+    return $ruta !== null && is_file($ruta) ? (int) filemtime($ruta) : 0;
+}
+
+/**
+ * Miniatura de 400 px (public/img/productos/400/), o null si no hay: las que se
+ * copiaron a mano al servidor solo tienen la grande, y entonces se usa esa.
+ */
+function miniaturaProducto(string $codigoInterno): ?string
+{
+    $ruta = configCatalogo()['dir_imagenes'] . '/400/' . strtoupper($codigoInterno) . '.jpg';
+    return is_file($ruta) ? $ruta : null;
+}
+
+/**
  * Catalogo completo para el sitio publico (carpeta catalogo/): todos los
  * productos activos con precio, con su neto y, si bajo de precio en la ventana
  * de ofertas, su "Antes".
@@ -279,7 +300,8 @@ function obtenerCatalogoPublico(PDO $pdo, int $diasOfertas): array
             netoDe($bruto, $porcentaje),
             $descuento >= 1 ? netoDe($antes, $porcentaje) : null,
             $descuento >= 1 ? $descuento : 0,
-            isset($imagenes[strtoupper($f['codigo_interno'])]) ? 1 : 0,
+            // Version de la imagen (0 = sin imagen): va en su direccion para cache.
+            isset($imagenes[strtoupper($f['codigo_interno'])]) ? versionImagen($f['codigo_interno']) : 0,
         ];
     }
     return $productos;

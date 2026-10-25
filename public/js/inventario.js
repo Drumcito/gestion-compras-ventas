@@ -17,6 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const RUTA_INV    = '../../app/controllers/InventarioController.php';
     const RUTA_EDITAR = '../../app/controllers/EditarProductoController.php';
     const RUTA_PCT    = '../../app/controllers/PorcentajeProductoController.php';
+    const RUTA_IMG    = '../../app/controllers/ImagenProductoController.php';
+
+    // Las imagenes se ven por el mismo img.php del catalogo en linea: con la
+    // version en la direccion el navegador las guarda y, al cambiarla, pide la nueva.
+    const urlImagen = (codigo, version, miniatura) => '../../catalogo/img.php?c=' +
+        encodeURIComponent(codigo) + (miniatura ? '&t=400' : '') + '&v=' + version;
 
     // Mismo cálculo que netoDe() en el servidor: bruto + %, a 2 decimales.
     const netoJS = (bruto, pct) => (bruto === null || bruto === '' || isNaN(parseFloat(bruto)))
@@ -195,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         pctTexto(p.porcentaje_neto) + '%</span></span>';
 
             fila.innerHTML =
+                (window.ES_ADMIN ? botonMiniatura(p.codigo_interno, p.imagen) : '') +
                 '<div class="venta-fila-datos">' +
                     '<p class="venta-fila-cliente">' + esc(p.nombre) + '</p>' +
                     '<p class="venta-fila-meta">' +
@@ -228,6 +235,380 @@ document.addEventListener('DOMContentLoaded', () => {
         btnAnterior.disabled = datos.pagina <= 1;
         btnSiguiente.disabled = datos.pagina >= datos.paginas;
     }
+
+    // ---------- Imagen del producto ----------
+    // Las imagenes son archivos (public/img/productos/), no van en la base. El
+    // navegador las deja cuadradas, con fondo blanco y en 800 y 400 px antes de
+    // subirlas: asi pesan poco y no hace falta GD en el servidor.
+
+    function botonMiniatura(codigo, version) {
+        return '<button type="button" class="prod-miniatura btn-imagen' + (version ? '' : ' sin-imagen') + '" ' +
+            'data-codigo="' + esc(codigo) + '" ' +
+            'title="' + (version ? 'Cambiar la imagen' : 'Agregar imagen') + '" ' +
+            'aria-label="' + (version ? 'Cambiar la imagen' : 'Agregar imagen') + '">' +
+            (version
+                ? '<img src="' + urlImagen(codigo, version, true) + '" alt="" loading="lazy" width="48" height="48">'
+                : '<i class="ph ph-camera-plus" aria-hidden="true"></i>') +
+            '</button>';
+    }
+
+    function cargarImagenDeArchivo(archivo) {
+        return new Promise((resolver, rechazar) => {
+            const url = URL.createObjectURL(archivo);
+            const img = new Image();
+            img.onload  = () => { URL.revokeObjectURL(url); resolver(img); };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                rechazar(new Error('No se pudo leer «' + archivo.name + '». Usa JPG, PNG o WebP ' +
+                    '(las fotos HEIC del iPhone hay que exportarlas como JPG).'));
+            };
+            img.src = url;
+        });
+    }
+
+    function lienzo(ancho, alto) {
+        const c = document.createElement('canvas');
+        c.width = ancho;
+        c.height = alto;
+        return c;
+    }
+
+    /**
+     * Cuadrado de lado x lado, fondo blanco y el producto centrado ocupando el
+     * 90% (el estandar de public/img/productos/README.md). Una foto grande se
+     * reduce a la mitad varias veces antes del tamaño final: de un jalon queda
+     * "pixeleada".
+     */
+    function cuadrado(img, lado) {
+        const ancho = img.naturalWidth || img.width;
+        const alto  = img.naturalHeight || img.height;
+        const escala = Math.min(lado * 0.9 / ancho, lado * 0.9 / alto);
+        const destAncho = Math.max(1, Math.round(ancho * escala));
+        const destAlto  = Math.max(1, Math.round(alto * escala));
+
+        let fuente = img;
+        let fAncho = ancho;
+        let fAlto = alto;
+        while (fAncho / 2 > destAncho && fAlto / 2 > destAlto) {
+            const mitad = lienzo(Math.round(fAncho / 2), Math.round(fAlto / 2));
+            const ctx = mitad.getContext('2d');
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(fuente, 0, 0, mitad.width, mitad.height);
+            fuente = mitad;
+            fAncho = mitad.width;
+            fAlto = mitad.height;
+        }
+
+        const final = lienzo(lado, lado);
+        const ctx = final.getContext('2d');
+        ctx.fillStyle = '#ffffff';    // un PNG transparente queda sobre blanco
+        ctx.fillRect(0, 0, lado, lado);
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(fuente, Math.round((lado - destAncho) / 2), Math.round((lado - destAlto) / 2), destAncho, destAlto);
+        return final;
+    }
+
+    const aBlob = (canvas, calidad) => new Promise((resolver, rechazar) => {
+        canvas.toBlob((b) => (b ? resolver(b) : rechazar(new Error('No se pudo preparar la imagen.'))),
+            'image/jpeg', calidad);
+    });
+
+    /** La foto, lista para subir: { grande, chica, vista, original: [ancho, alto] }. */
+    async function prepararImagen(archivo) {
+        if (!archivo || !/^image\//.test(archivo.type || 'image/')) {
+            throw new Error('«' + (archivo ? archivo.name : '') + '» no es una imagen.');
+        }
+        const img    = await cargarImagenDeArchivo(archivo);
+        const grande = cuadrado(img, 800);
+        const chica  = lienzo(400, 400);
+        const ctx = chica.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(grande, 0, 0, 400, 400);
+
+        const blobGrande = await aBlob(grande, 0.85);
+        return {
+            grande:   blobGrande,
+            chica:    await aBlob(chica, 0.82),
+            vista:    URL.createObjectURL(blobGrande),
+            original: [img.naturalWidth, img.naturalHeight],
+        };
+    }
+
+    async function subirImagen(codigo, lista) {
+        const datos = new FormData();
+        datos.append('accion', 'subir');
+        datos.append('codigo', codigo);
+        datos.append('grande', lista.grande, 'grande.jpg');
+        datos.append('chica', lista.chica, 'chica.jpg');
+
+        const respuesta = await fetch(RUTA_IMG, { method: 'POST', body: datos });
+        return respuesta.json();
+    }
+
+    /** Refleja en la lista la imagen nueva (o que se quito) sin recargar. */
+    function actualizarMiniatura(codigo, version) {
+        const fila = [...listaProductos.querySelectorAll('.producto-fila')]
+            .find((f) => f.dataset.codigo.toUpperCase() === String(codigo).toUpperCase());
+        const boton = fila && fila.querySelector('.prod-miniatura');
+        if (boton) boton.outerHTML = botonMiniatura(fila.dataset.codigo, version);
+    }
+
+    let imagenLista  = null;   // foto preparada y aun sin guardar
+    let imagenCodigo = null;   // producto abierto en la ventana de imagen
+
+    function soltarVistaPrevia() {
+        if (imagenLista) URL.revokeObjectURL(imagenLista.vista);
+        imagenLista = null;
+    }
+
+    function pesoTexto(bytes) {
+        return bytes >= 1048576
+            ? (bytes / 1048576).toLocaleString('es-MX', { maximumFractionDigits: 1 }) + ' MB'
+            : Math.round(bytes / 1024) + ' KB';
+    }
+
+    async function abrirImagen(codigo) {
+        soltarVistaPrevia();
+        imagenCodigo = null;
+        contenido.innerHTML = '<p class="venta-vacia">Cargando...</p>';
+        modal.hidden = false;
+
+        try {
+            const datos = await (await fetch(RUTA_IMG + '?accion=info&codigo=' + encodeURIComponent(codigo))).json();
+            if (!datos.ok) {
+                contenido.innerHTML = '<p class="aviso aviso-error">' + esc(datos.error || 'No se pudo cargar') + '</p>';
+                return;
+            }
+            imagenCodigo = datos.codigo;
+            pintarImagen(datos);
+        } catch (e) {
+            contenido.innerHTML = '<p class="aviso aviso-error">Error de conexión.</p>';
+        }
+    }
+
+    function pintarImagen(d) {
+        const meta = !d.version
+            ? 'Este producto todavía no tiene imagen.'
+            : (d.datos
+                ? 'Subida por ' + esc((d.datos.subida_por || 'un usuario borrado').trim()) + ' el ' +
+                  esc(String(d.datos.subida_en).slice(0, 10).split('-').reverse().join('/')) +
+                  ' · ' + d.datos.ancho + ' × ' + d.datos.alto + ' px · ' + pesoTexto(Number(d.datos.peso_bytes))
+                : 'Imagen copiada directo al servidor' +
+                  (d.miniatura ? '.' : ' (sin miniatura de 400 px: vuelve a subirla para que cargue más rápido).'));
+
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Imagen del producto</h2>' +
+            '<p class="imagen-producto-nombre">' + esc(d.nombre) + ' · <span class="codigo-prod">' + esc(d.codigo) + '</span></p>' +
+            '<div class="imagen-editor">' +
+                '<div class="imagen-vista' + (d.version ? '' : ' sin-imagen') + '" id="imagen-vista">' +
+                    (d.version
+                        ? '<img src="' + urlImagen(d.codigo, d.version, false) + '" alt="" width="800" height="800">'
+                        : '<i class="ph ph-image" aria-hidden="true"></i>') +
+                '</div>' +
+                '<div class="imagen-lado">' +
+                    '<p class="imagen-meta" id="imagen-meta">' + meta + '</p>' +
+                    '<label class="imagen-soltar" id="imagen-soltar">' +
+                        '<i class="ph ph-upload-simple" aria-hidden="true"></i>' +
+                        '<span>Arrastra una foto aquí, pégala con <kbd>Ctrl</kbd>+<kbd>V</kbd> o ' +
+                            '<strong>elige un archivo</strong></span>' +
+                        '<input type="file" id="imagen-archivo" accept="image/*" hidden>' +
+                    '</label>' +
+                    '<p class="imagen-ayuda">Se ajusta sola: queda cuadrada, con fondo blanco y en 800 y 400 px ' +
+                        '(unos 100 KB). Mejor si la foto es de 800 px o más.</p>' +
+                    '<div id="aviso-imagen" class="aviso" hidden></div>' +
+                    '<div class="imagen-botones">' +
+                        (d.version
+                            ? '<button type="button" class="chip chip-peligro" id="btn-quitar-imagen">' +
+                                '<i class="ph ph-trash"></i> Quitar imagen</button>'
+                            : '') +
+                        '<button type="button" class="btn-save" id="btn-guardar-imagen" disabled>' +
+                            '<i class="ph ph-floppy-disk"></i> Guardar imagen</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+    }
+
+    function avisoImagen(texto, tipo) {
+        const caja = document.getElementById('aviso-imagen');
+        if (!caja) return;
+        caja.textContent = texto;
+        caja.className = 'aviso aviso-' + tipo;
+        caja.hidden = !texto;
+    }
+
+    async function elegirImagen(archivo) {
+        // La ventana pudo cambiar a otro editor (precio, %): solo con la de imagen.
+        if (!imagenCodigo || !archivo || !document.getElementById('imagen-vista')) return;
+        avisoImagen('Preparando la imagen…', 'info');
+
+        try {
+            const lista = await prepararImagen(archivo);
+            soltarVistaPrevia();
+            imagenLista = lista;
+
+            const vista = document.getElementById('imagen-vista');
+            vista.classList.remove('sin-imagen');
+            vista.innerHTML = '<img src="' + lista.vista + '" alt="" width="800" height="800">' +
+                '<span class="imagen-sin-guardar">Vista previa · sin guardar</span>';
+            document.getElementById('btn-guardar-imagen').disabled = false;
+
+            const [ancho, alto] = lista.original;
+            avisoImagen(Math.max(ancho, alto) < 600
+                ? 'La foto es pequeña (' + ancho + ' × ' + alto + ' px): se verá algo borrosa en grande.'
+                : 'Lista: ' + pesoTexto(lista.grande.size) + '. Revisa la vista previa y guarda.',
+                Math.max(ancho, alto) < 600 ? 'alerta' : 'ok');
+        } catch (e) {
+            avisoImagen(e.message, 'error');
+        }
+    }
+
+    async function guardarImagen() {
+        if (!imagenLista || !imagenCodigo) return;
+        const boton = document.getElementById('btn-guardar-imagen');
+        boton.disabled = true;
+        boton.textContent = 'Guardando...';
+
+        try {
+            const datos = await subirImagen(imagenCodigo, imagenLista);
+            if (!datos.ok) {
+                avisoImagen(datos.error || 'No se pudo guardar la imagen.', 'error');
+                boton.disabled = false;
+                boton.innerHTML = '<i class="ph ph-floppy-disk"></i> Guardar imagen';
+                return;
+            }
+            soltarVistaPrevia();
+            actualizarMiniatura(datos.codigo, datos.version);
+            modal.hidden = true;
+            mostrarAviso('Imagen guardada: ' + datos.nombre + '. Ya se ve en el catálogo en línea.', 'ok');
+        } catch (e) {
+            avisoImagen('Error de conexión al subir la imagen.', 'error');
+            boton.disabled = false;
+            boton.innerHTML = '<i class="ph ph-floppy-disk"></i> Guardar imagen';
+        }
+    }
+
+    async function quitarImagen() {
+        if (!imagenCodigo || !confirm('¿Quitar la imagen de este producto? Deja de verse en el catálogo y en el PDF.')) {
+            return;
+        }
+        const datos = new FormData();
+        datos.append('accion', 'quitar');
+        datos.append('codigo', imagenCodigo);
+
+        try {
+            const r = await (await fetch(RUTA_IMG, { method: 'POST', body: datos })).json();
+            if (!r.ok) {
+                avisoImagen(r.error || 'No se pudo quitar la imagen.', 'error');
+                return;
+            }
+            actualizarMiniatura(r.codigo, 0);
+            modal.hidden = true;
+            mostrarAviso('Se quitó la imagen de ' + r.nombre + '.', 'ok');
+        } catch (e) {
+            avisoImagen('Error de conexión.', 'error');
+        }
+    }
+
+    // ----- Varias a la vez: cada archivo se llama como el codigo del producto -----
+    function abrirSubidaMasiva() {
+        soltarVistaPrevia();
+        imagenCodigo = null;
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Subir varias imágenes</h2>' +
+            '<p class="imagen-ayuda">Nombra cada foto con el <strong>código del producto</strong>: el del proveedor ' +
+                '(el que ves en la lista, p. ej. <code>IMP641.jpg</code>) o el interno (<code>BNS03-07092.jpg</code>). ' +
+                'Cada una se ajusta sola a 800 y 400 px y reemplaza la que hubiera.</p>' +
+            '<label class="imagen-soltar" id="imagen-soltar-varias">' +
+                '<i class="ph ph-images" aria-hidden="true"></i>' +
+                '<span>Arrastra las fotos aquí o <strong>elígelas</strong></span>' +
+                '<input type="file" id="imagen-archivos" accept="image/*" multiple hidden>' +
+            '</label>' +
+            '<p class="imagen-progreso" id="imagen-progreso" hidden></p>' +
+            '<ul class="imagen-resultados" id="imagen-resultados"></ul>';
+        modal.hidden = false;
+    }
+
+    let subiendoVarias = false;
+
+    async function subirVarias(archivos) {
+        if (subiendoVarias || !archivos.length) return;
+        subiendoVarias = true;
+
+        const progreso   = document.getElementById('imagen-progreso');
+        const resultados = document.getElementById('imagen-resultados');
+        resultados.innerHTML = '';
+        progreso.hidden = false;
+        let bien = 0;
+
+        // Una por una: no saturar al servidor ni la memoria del navegador.
+        for (let i = 0; i < archivos.length; i++) {
+            const archivo = archivos[i];
+            const codigo = archivo.name.replace(/\.[^.]+$/, '').trim();
+            progreso.textContent = 'Subiendo ' + (i + 1) + ' de ' + archivos.length + '…';
+
+            const li = document.createElement('li');
+            try {
+                const lista = await prepararImagen(archivo);
+                URL.revokeObjectURL(lista.vista);
+                const r = await subirImagen(codigo, lista);
+                if (!r.ok) throw new Error(r.error || 'No se pudo subir');
+
+                bien++;
+                actualizarMiniatura(r.codigo, r.version);
+                li.className = 'imagen-ok';
+                li.innerHTML = '<i class="ph ph-check-circle"></i> <strong>' + esc(archivo.name) + '</strong> → ' + esc(r.nombre);
+            } catch (e) {
+                li.className = 'imagen-error';
+                li.innerHTML = '<i class="ph ph-x-circle"></i> <strong>' + esc(archivo.name) + '</strong>: ' + esc(e.message);
+            }
+            resultados.appendChild(li);
+        }
+
+        progreso.textContent = 'Listo: ' + bien + ' de ' + archivos.length + ' imágenes guardadas.';
+        subiendoVarias = false;
+    }
+
+    // Elegir / arrastrar dentro de la ventana (una o varias, segun cual este abierta).
+    contenido.addEventListener('change', (e) => {
+        if (e.target.id === 'imagen-archivo') elegirImagen(e.target.files[0]);
+        if (e.target.id === 'imagen-archivos') subirVarias([...e.target.files]);
+        if (e.target.type === 'file') e.target.value = '';
+    });
+
+    contenido.addEventListener('dragover', (e) => {
+        const zona = e.target.closest('.imagen-soltar');
+        if (!zona) return;
+        e.preventDefault();
+        zona.classList.add('arrastrando');
+    });
+
+    contenido.addEventListener('dragleave', (e) => {
+        const zona = e.target.closest('.imagen-soltar');
+        if (zona) zona.classList.remove('arrastrando');
+    });
+
+    contenido.addEventListener('drop', (e) => {
+        const zona = e.target.closest('.imagen-soltar');
+        if (!zona) return;
+        e.preventDefault();
+        zona.classList.remove('arrastrando');
+        const archivos = [...e.dataTransfer.files];
+        if (zona.id === 'imagen-soltar-varias') subirVarias(archivos);
+        else elegirImagen(archivos[0]);
+    });
+
+    // Pegar una imagen copiada (de una pagina o captura) con la ventana abierta.
+    document.addEventListener('paste', (e) => {
+        if (modal.hidden || !imagenCodigo) return;
+        const archivo = [...(e.clipboardData ? e.clipboardData.files : [])].find((f) => /^image\//.test(f.type));
+        if (archivo) {
+            e.preventDefault();
+            elegirImagen(archivo);
+        }
+    });
+
+    const btnSubirImagenes = document.getElementById('btn-subir-imagenes');
+    if (btnSubirImagenes) btnSubirImagenes.addEventListener('click', abrirSubidaMasiva);
 
     // ---------- Editar producto (nombre, código, precio y casa) ----------
     async function abrirEditor(codigo) {
@@ -1394,6 +1775,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const imagen = e.target.closest('.btn-imagen');
+        if (imagen) {
+            e.stopPropagation();
+            abrirImagen(imagen.dataset.codigo);
+            return;
+        }
+
         // "Editar %" abre solo el editor de porcentaje; sin esto, el clic caería
         // en la fila y abriría el editor completo del producto.
         const editarPct = e.target.closest('.btn-editar-porcentaje');
@@ -1412,7 +1800,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
         // El botón de borrar se activa solo con Enter/Espacio; que no dispare
         // además la apertura del editor.
-        if (e.target.closest('.btn-borrar-prod')) return;
+        if (e.target.closest('.btn-borrar-prod, .btn-imagen')) return;
         const fila = e.target.closest('.producto-fila');
         if (fila) { e.preventDefault(); abrirEditor(fila.dataset.codigo); }
     });
@@ -1429,6 +1817,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.id === 'btn-cancelar-borrado') modal.hidden = true;
         const btnBorrar = e.target.closest('#btn-confirmar-borrado');
         if (btnBorrar) borrarProducto(btnBorrar.dataset.codigo);
+
+        if (e.target.closest('#btn-guardar-imagen')) guardarImagen();
+        if (e.target.closest('#btn-quitar-imagen')) quitarImagen();
     });
 
     cajaRecuperables.addEventListener('click', (e) => {
