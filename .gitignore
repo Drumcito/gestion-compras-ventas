@@ -44,3 +44,6 @@ public/img/productos/*
 # Catalogo en linea: lista de productos generada (se rehace sola)
 catalogo/cache/*
 !catalogo/cache/.htaccess
+
+# PDF de prueba del catalogo generados en local (no se versionan)
+/catalogo-*.pdf

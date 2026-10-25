@@ -134,10 +134,6 @@ try {
         $p['porcentaje_neto'] = porcentajeProducto($override, $casa);
         $p['porcentaje_propio'] = $override !== null;   // true = distinto al de la casa
         $p['precio_neto']     = netoDe($p['precio_mayoreo'], $p['porcentaje_neto']);
-<<<<<<< HEAD
-        // Version de su imagen (0 = sin imagen), para la miniatura de la fila.
-        $p['imagen']          = versionImagen($p['codigo_interno']);
-=======
 
         // Si nunca se le movio el precio no hay fecha de cambio; lo que vale
         // entonces es desde cuando esta en el catalogo, porque trae el mismo
@@ -156,7 +152,9 @@ try {
             : null;
 
         unset($p['fecha_creacion']);
->>>>>>> 8dc750ce417ed3dc44095bbaa6736e1728f96c17
+
+        // Version de su imagen (0 = sin imagen), para la miniatura de la fila.
+        $p['imagen'] = versionImagen($p['codigo_interno']);
     }
     unset($p);
 
