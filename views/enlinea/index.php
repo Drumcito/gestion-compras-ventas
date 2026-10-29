@@ -1,16 +1,12 @@
 <?php
 /**
- * Pedidos y ventas que llegaron por el catálogo en línea.
+ * Sección "En línea": las ventas que salieron de un pedido del catálogo.
  *
- * Son el mismo flujo visto en dos momentos:
- *
- *   - Arriba, los pedidos POR ATENDER: lo que mandó un cliente desde el
- *     catálogo y todavía nadie cobró. De ahí se pasan a Venta o se descartan.
- *   - Abajo, las ventas que YA salieron de un pedido, con su folio.
- *
- * La ven los dos roles, pero con distinto alcance: el admin todas las ventas,
- * el vendedor solo las que él atendió. El control real está en
- * PedidoLineaController; esto es nada más la pantalla.
+ * Es la MISMA pantalla del Historial (mismo marcado y mismo historial.js), con
+ * window.SOLO_EN_LINEA puesto: así hereda todo lo de allá —editar, eliminar y
+ * recuperar, marcar entregada, abonos, notas, resumen de productos, exportar—
+ * sin duplicar nada. Lo único propio es el panel de pedidos por atender, que
+ * pinta enlinea.js.
  */
 session_start();
 require_once __DIR__ . '/../partials/assets.php';
@@ -20,6 +16,8 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+$nombreUsuario = $_SESSION['user_name'] ?? 'Usuario';
+$rolUsuario = ucfirst($_SESSION['user_role'] ?? 'Rol');
 $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 ?>
 <!DOCTYPE html>
@@ -36,32 +34,94 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
     <?php $seccionActiva = 'enlinea'; include __DIR__ . '/../partials/menu.php'; ?>
 
+
+    <!-- CONTENIDO PRINCIPAL -->
     <main class="main-content">
         <h1 class="page-title">En línea</h1>
-
-        <div id="aviso" class="aviso" hidden></div>
 
         <!-- Pedidos del catálogo que nadie ha cobrado todavía -->
         <div id="pedidos-linea" class="pedidos-linea" hidden></div>
 
         <div class="card-form card-historial">
+            <!-- Filtros -->
             <div class="filtros">
+                <!-- Busqueda por cliente: trae TODAS las ventas de ese cliente,
+                     sin importar el rango de fechas. -->
                 <div class="filtros-busqueda">
                     <div class="search-container">
-                        <input type="text" id="buscar-enlinea" class="form-control"
-                               placeholder="Buscar por folio, cliente o número de venta…"
-                               autocomplete="off">
-                        <i class="ph ph-magnifying-glass search-icon"></i>
+                        <input type="text" id="buscar-cliente" class="form-control"
+                               maxlength="150" autocomplete="off"
+                               placeholder="Buscar todas las ventas de un cliente…">
+                        <i class="ph ph-magnifying-glass search-icon" aria-hidden="true"></i>
+                        <button type="button" id="btn-limpiar-cliente" class="buscar-cliente-limpiar"
+                                title="Quitar la búsqueda por cliente" aria-label="Quitar búsqueda" hidden>
+                            <i class="ph ph-x"></i>
+                        </button>
                     </div>
+                </div>
+
+                <div class="filtros-rapidos">
+                    <button type="button" class="chip chip-activo" data-rango="hoy">Hoy</button>
+                    <button type="button" class="chip" data-rango="ayer">Ayer</button>
+                    <button type="button" class="chip" data-rango="semana">Esta semana</button>
+                    <button type="button" class="chip" data-rango="mes">Este mes</button>
+                    <button type="button" class="chip" data-rango="anio">Este año</button>
+                </div>
+
+                <div class="filtros-rango">
+                    <div class="campo-fecha">
+                        <label for="desde">Desde:</label>
+                        <input type="date" id="desde" class="form-control">
+                    </div>
+                    <div class="campo-fecha">
+                        <label for="hasta">Hasta:</label>
+                        <input type="date" id="hasta" class="form-control">
+                    </div>
+                    <!-- Filtro por vendedor: solo el admin lo usa. El vendedor ve
+                         unicamente sus ventas, asi que el campo va oculto (pero
+                         presente, para que el script siga leyendo su valor). -->
+                    <div class="campo-fecha"<?= $esAdmin ? '' : ' hidden' ?>>
+                        <label for="filtro-usuario">Vendedor:</label>
+                        <select id="filtro-usuario" class="form-control">
+                            <option value="0">Todos</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn-save btn-filtrar" id="btn-filtrar">Filtrar</button>
+                    <button type="button" class="chip btn-exportar" id="btn-productos"
+                            title="Resumen de lo vendido en el periodo filtrado">
+                        <i class="ph ph-package"></i> Ver productos
+                    </button>
+                    <button type="button" class="chip btn-exportar" id="btn-exportar"
+                            title="Descargar las ventas del filtro actual">
+                        <i class="ph ph-download-simple"></i> Descargar Excel
+                    </button>
                 </div>
             </div>
 
-            <div id="resumen-enlinea" class="resumen-periodo"></div>
-            <div id="lista-enlinea" class="lista-ventas"></div>
+            <div id="resumen-periodo" class="resumen-periodo"></div>
+            <div id="aviso-historial" class="aviso" hidden></div>
+
+
+            <!-- Ventas recién eliminadas: recuperables por 10 minutos -->
+            <div id="recuperables" class="recuperables" hidden></div>
+
+            <!-- Listado de ventas -->
+            <div id="lista-ventas" class="lista-ventas"></div>
+
+            <!-- Aparece al marcar ventas: imprime sus notas, 2 por hoja -->
+            <div id="barra-seleccion" class="barra-seleccion" hidden>
+                <span id="cuenta-seleccion"></span>
+                <div class="barra-seleccion-acciones">
+                    <button type="button" class="chip" id="btn-limpiar-seleccion">Quitar selección</button>
+                    <button type="button" class="btn-save" id="btn-imprimir-seleccion">
+                        <i class="ph ph-printer"></i> Imprimir notas
+                    </button>
+                </div>
+            </div>
         </div>
     </main>
 
-    <!-- Detalle de una venta -->
+    <!-- Detalle de la venta -->
     <div id="modal-detalle" class="modal" hidden>
         <div class="modal-caja">
             <button type="button" class="modal-cerrar" id="btn-cerrar-detalle" title="Cerrar">
@@ -71,12 +131,21 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
         </div>
     </div>
 
+
     <script>
-        window.ES_ADMIN   = <?php echo $esAdmin ? 'true' : 'false'; ?>;
-        // Cargar un pedido en Venta pasa por el borrador del navegador, que va
-        // por usuario (ver venta.js).
+        window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;
+        // "Cargar en venta" deja el pedido en línea como el borrador de Venta de
+        // este usuario (mismo nombre de clave que venta.js).
         window.USUARIO_ID = <?php echo (int) ($_SESSION['user_id'] ?? 0); ?>;
     </script>
+    <script src="<?= recurso('js/nota_datos.js') ?>"></script>
+    <script>
+        // Esta pantalla es el Historial filtrado: historial.js manda
+        // solo_linea=1 en sus consultas y trae únicamente las ventas que
+        // nacieron de un pedido del catálogo, con todas sus funciones.
+        window.SOLO_EN_LINEA = true;
+    </script>
+    <script src="<?= recurso('js/historial.js') ?>"></script>
     <script src="<?= recurso('js/enlinea.js') ?>"></script>
 </body>
 </html>

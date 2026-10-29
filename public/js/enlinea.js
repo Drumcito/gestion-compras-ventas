@@ -1,26 +1,23 @@
 /**
- * Sección "En línea": pedidos del catálogo y las ventas que salieron de ellos.
+ * Panel de pedidos del catálogo por atender, en la sección "En línea".
  *
- * Arriba, los pedidos POR ATENDER (el mismo panel que antes vivía en Historial,
- * movido aquí para que tengan su propio lugar). Abajo, las ventas que ya se
- * cobraron a partir de un pedido, con su folio.
+ * Es lo ÚNICO propio de esa pantalla: la lista de ventas, los filtros y todo lo
+ * demás los pone historial.js, que esa vista carga con window.SOLO_EN_LINEA
+ * para que traiga solo las ventas nacidas de un pedido.
  *
- * El alcance lo decide el servidor (PedidoLineaController): el admin ve todas
- * las ventas, el vendedor solo las que él atendió.
+ * Un pedido deja de salir aquí cuando se cobra (queda ligado a una venta) o
+ * cuando se descarta. Si esa venta se elimina, el pedido vuelve a aparecer
+ * como pendiente: así no se pierde lo que el cliente mandó.
  */
 document.addEventListener('DOMContentLoaded', () => {
     const RUTA_PEDIDOS = '../../app/controllers/PedidoLineaController.php';
-    const RUTA_DETALLE = '../../app/controllers/HistorialController.php';
 
-    const aviso        = document.getElementById('aviso');
-    const cajaPedidos  = document.getElementById('pedidos-linea');
-    const lista        = document.getElementById('lista-enlinea');
-    const resumen      = document.getElementById('resumen-enlinea');
-    const buscador     = document.getElementById('buscar-enlinea');
-    const modal        = document.getElementById('modal-detalle');
-    const contenido    = document.getElementById('contenido-detalle');
-    const btnCerrar    = document.getElementById('btn-cerrar-detalle');
+    const cajaPedidos = document.getElementById('pedidos-linea');
+    const aviso       = document.getElementById('aviso-historial');
 
+    if (!cajaPedidos) return;
+
+    let pedidos = [];
     let temporizadorAviso = null;
 
     function esc(texto) {
@@ -28,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         div.textContent = texto === null || texto === undefined ? '' : texto;
 
         // innerHTML escapa < > &, pero NO las comillas, y esto se mete dentro de
-        // atributos (value="…"). Un nombre con comillas cortaría el atributo.
+        // atributos (data-folio="…"): un nombre con comillas cortaría el atributo.
         return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
@@ -45,18 +42,22 @@ document.addEventListener('DOMContentLoaded', () => {
             { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
+    /** Se reusa el aviso de la pantalla; si no estuviera, no se pierde el mensaje. */
     function mostrarAviso(texto, tipo, segundos = 5) {
+        if (!aviso) {
+            alert(texto);
+            return;
+        }
+
         clearTimeout(temporizadorAviso);
         aviso.textContent = texto;
         aviso.className = 'aviso aviso-' + tipo;
         aviso.hidden = false;
+
         if (segundos > 0) {
             temporizadorAviso = setTimeout(() => { aviso.hidden = true; }, segundos * 1000);
         }
     }
-
-    // ---------- Pedidos por atender ----------
-    let pedidos = [];
 
     async function cargarPedidos() {
         try {
@@ -198,127 +199,10 @@ document.addEventListener('DOMContentLoaded', () => {
         cargarPedidos();
     }
 
-    // ---------- Ventas que salieron de un pedido ----------
-    let ventas = [];
+    // historial.js la llama cada vez que reconstruye la lista de ventas: al
+    // eliminar o recuperar una venta, su pedido cambia de estado.
+    window.recargarPedidosLinea = cargarPedidos;
 
-    async function cargarVentas() {
-        lista.innerHTML = '<p class="venta-vacia">Cargando…</p>';
-
-        try {
-            const datos = await (await fetch(RUTA_PEDIDOS + '?accion=ventas')).json();
-
-            if (!datos.ok) {
-                lista.innerHTML = '';
-                mostrarAviso(datos.error || 'No se pudieron cargar las ventas en línea.', 'error');
-                return;
-            }
-
-            ventas = datos.ventas || [];
-
-        } catch (e) {
-            lista.innerHTML = '';
-            mostrarAviso('Error de conexión.', 'error');
-            return;
-        }
-
-        pintarVentas();
-    }
-
-    function pintarVentas() {
-        const termino = buscador.value.trim().toLowerCase();
-
-        const visibles = termino === ''
-            ? ventas
-            : ventas.filter((v) =>
-                String(v.folio || '').toLowerCase().includes(termino) ||
-                String(v.cliente || '').toLowerCase().includes(termino) ||
-                String(v.nombre_pedido || '').toLowerCase().includes(termino) ||
-                String(v.venta_id).includes(termino));
-
-        const suma = visibles.reduce((t, v) => t + Number(v.total), 0);
-
-        resumen.textContent = visibles.length === 0
-            ? (ventas.length === 0
-                ? 'Todavía no hay ventas que hayan salido del catálogo.'
-                : 'Ninguna venta coincide con la búsqueda.')
-            : visibles.length + ' venta' + (visibles.length === 1 ? '' : 's') +
-              ' en línea · ' + money(suma);
-
-        lista.innerHTML = '';
-
-        visibles.forEach((v) => {
-            const fila = document.createElement('div');
-            fila.className = 'venta-fila venta-en-linea';
-            fila.dataset.id = v.venta_id;
-            fila.tabIndex = 0;
-
-            fila.innerHTML =
-                '<div class="venta-fila-datos">' +
-                    '<p class="venta-fila-cliente">' + (v.cliente ? esc(v.cliente) : 'Sin cliente') +
-                        '<span class="etiqueta-en-linea"><i class="ph ph-globe"></i> ' +
-                            esc(v.folio) + '</span></p>' +
-                    '<p class="venta-fila-meta">Venta #' + v.venta_id + ' · ' + fechaLegible(v.fecha) +
-                        ' · ' + v.renglones + ' producto' + (Number(v.renglones) === 1 ? '' : 's') +
-                        ' · ' + v.piezas + ' pieza' + (Number(v.piezas) === 1 ? '' : 's') +
-                        (v.vendedor ? ' · ' + esc(v.vendedor.trim()) : '') + '</p>' +
-                    '<p class="venta-fila-meta">Pedido del ' + fechaLegible(v.pedido_en) +
-                        (v.nombre_pedido ? ' · lo mandó ' + esc(v.nombre_pedido) : '') + '</p>' +
-                '</div>' +
-                '<div class="venta-fila-derecha">' +
-                    '<span class="venta-fila-total">' + money(v.total) + '</span>' +
-                    '<span class="venta-fila-meta">' + esc(v.tipo_pago) + ' · ' + esc(v.estado_pago) + '</span>' +
-                '</div>';
-
-            lista.appendChild(fila);
-        });
-    }
-
-    /** El detalle es el mismo de Historial: se reusa su controlador. */
-    async function verDetalle(id) {
-        contenido.innerHTML = '<p class="venta-vacia">Cargando…</p>';
-        modal.hidden = false;
-
-        try {
-            const datos = await (await fetch(RUTA_DETALLE + '?accion=detalle&id=' + encodeURIComponent(id))).json();
-
-            if (!datos.ok) {
-                contenido.innerHTML = '<p class="aviso aviso-error">' +
-                    esc(datos.error || 'No se pudo cargar la venta') + '</p>';
-                return;
-            }
-
-            const v = datos.venta;
-
-            const filas = v.items.map((i) =>
-                '<tr>' +
-                    '<td>' + esc(i.nombre_producto) + '</td>' +
-                    '<td class="num">' + money(i.precio_aplicado) + '</td>' +
-                    '<td class="num">' + i.cantidad + '</td>' +
-                    '<td class="num">' + money(i.subtotal) + '</td>' +
-                '</tr>'
-            ).join('');
-
-            contenido.innerHTML =
-                '<h2 class="detalle-titulo">Venta #' + v.id + '</h2>' +
-                '<div class="detalle-cabecera">' +
-                    '<p><strong>' + (v.cliente ? esc(v.cliente) : 'Sin cliente') + '</strong></p>' +
-                    '<p class="detalle-sub">' + fechaLegible(v.fecha) +
-                        (v.pedido_folio ? ' · pedido en línea ' + esc(v.pedido_folio) : '') + '</p>' +
-                '</div>' +
-                '<table class="tabla-detalle">' +
-                    '<thead><tr><th>Producto</th><th class="num">C/U</th>' +
-                        '<th class="num">Cant.</th><th class="num">Subtotal</th></tr></thead>' +
-                    '<tbody>' + filas + '</tbody>' +
-                '</table>' +
-                '<p class="detalle-total">Total: <strong>' + money(v.total) + '</strong></p>' +
-                '<p class="detalle-sub">Para cambiarla o imprimir su nota, ábrela en Historial.</p>';
-
-        } catch (e) {
-            contenido.innerHTML = '<p class="aviso aviso-error">Error de conexión.</p>';
-        }
-    }
-
-    // ---------- Eventos ----------
     cajaPedidos.addEventListener('click', (e) => {
         const cargarBtn = e.target.closest('.btn-cargar-pedido');
         if (cargarBtn) {
@@ -331,27 +215,5 @@ document.addEventListener('DOMContentLoaded', () => {
         if (descartarBtn) descartarPedido(descartarBtn.dataset.id, descartarBtn.dataset.folio);
     });
 
-    lista.addEventListener('click', (e) => {
-        const fila = e.target.closest('.venta-fila');
-        if (fila) verDetalle(fila.dataset.id);
-    });
-
-    lista.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-
-        const fila = e.target.closest('.venta-fila');
-        if (fila) {
-            e.preventDefault();
-            verDetalle(fila.dataset.id);
-        }
-    });
-
-    buscador.addEventListener('input', pintarVentas);
-
-    btnCerrar.addEventListener('click', () => { modal.hidden = true; });
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') modal.hidden = true; });
-
     cargarPedidos();
-    cargarVentas();
 });

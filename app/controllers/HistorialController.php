@@ -157,11 +157,20 @@ try {
     }
     $condicionUsuario = $filtroUsuario > 0 ? ' AND v.usuario_id = :usuario' : '';
 
+    // La seccion "En linea" es esta misma pantalla, pero solo con las ventas que
+    // nacieron de un pedido del catalogo. Con el filtro puesto, todo lo demas
+    // (fechas, vendedor, busqueda por cliente, resumen de productos, las
+    // recuperables) funciona igual.
+    $soloEnLinea    = ($_GET['solo_linea'] ?? '') === '1';
+    $condicionLinea = $soloEnLinea
+        ? ' AND EXISTS (SELECT 1 FROM pedidos_linea pl WHERE pl.venta_id = v.id)'
+        : '';
+
     // ---------- Resumen de productos vendidos en el periodo ----------
     // La consulta vive en app/helpers/resumen_productos.php porque la comparten
     // esta pantalla y la hoja imprimible del mismo resumen.
     if ($accion === 'productos') {
-        $datos = resumenProductosVendidos($pdo, $desde, $hasta, $filtroUsuario);
+        $datos = resumenProductosVendidos($pdo, $desde, $hasta, $filtroUsuario, $soloEnLinea);
 
         echo json_encode([
             'ok'        => true,
@@ -208,7 +217,7 @@ try {
                 (SELECT pl.folio FROM pedidos_linea pl WHERE pl.venta_id = v.id LIMIT 1) AS pedido_folio
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
-          WHERE v.eliminada_en IS NULL' . $condicionFecha . $condicionUsuario . '
+          WHERE v.eliminada_en IS NULL' . $condicionFecha . $condicionUsuario . $condicionLinea . '
           ORDER BY v.fecha DESC, v.id DESC'
     );
 
@@ -240,6 +249,7 @@ try {
            JOIN usuarios u ON u.id = v.usuario_id
           WHERE v.eliminada_en IS NOT NULL'
         . ($esAdmin ? '' : ' AND v.usuario_id = :usuario')
+        . $condicionLinea
         . ' ORDER BY v.eliminada_en DESC';
 
     $stmt = $pdo->prepare($sqlRecuperables);

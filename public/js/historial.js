@@ -52,6 +52,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const codigoVisible = (p) =>
         p.codigo_proveedor || p.codigo_interno_producto || p.codigo_interno;
 
+    // La seccion "En linea" carga este mismo archivo con la bandera puesta: es
+    // el historial, pero solo con las ventas que salieron del catalogo. Todo lo
+    // demas (editar, eliminar, entregar, abonos, notas, exportar) es identico.
+    const SOLO_LINEA = window.SOLO_EN_LINEA ? '&solo_linea=1' : '';
+
     function esc(texto) {
         const div = document.createElement('div');
         div.textContent = texto === null || texto === undefined ? '' : texto;
@@ -118,7 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const url = '../../app/controllers/HistorialController.php'
                 + '?accion=listar&desde=' + desde + '&hasta=' + hasta
                 + '&usuario=' + (filtroUsuario.value || 0)
-                + (termino ? '&cliente=' + encodeURIComponent(termino) : '');
+                + (termino ? '&cliente=' + encodeURIComponent(termino) : '')
+                + SOLO_LINEA;
             const respuesta = await fetch(url);
 
             if (respuesta.status === 401) {
@@ -158,6 +164,14 @@ document.addEventListener('DOMContentLoaded', () => {
         barraSeleccion.hidden = true;
         llenarVendedores(datos.vendedores || [], datos.usuario);
         pintarRecuperables(datos.recuperables || []);
+
+        // En la sección "En línea", un pedido deja de estar pendiente cuando su
+        // venta existe y vuelve a estarlo si esa venta se elimina. Como eso pasa
+        // desde aquí (eliminar / recuperar / editar), hay que repintar el panel
+        // de pedidos o se queda mostrando lo de hace un momento.
+        if (typeof window.recargarPedidosLinea === 'function') {
+            window.recargarPedidosLinea();
+        }
 
         // Buscando por cliente el periodo no aplica: se muestra a quién se buscó.
         const contexto = datos.cliente
@@ -264,7 +278,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const url = '../../app/controllers/HistorialController.php'
                 + '?accion=productos&desde=' + desde + '&hasta=' + hasta
-                + '&usuario=' + (filtroUsuario.value || 0);
+                + '&usuario=' + (filtroUsuario.value || 0)
+                + SOLO_LINEA;
 
             const respuesta = await fetch(url);
 
@@ -2105,7 +2120,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location = '../../app/controllers/ExportarHistorialController.php'
             + '?desde=' + desde
             + '&hasta=' + hasta
-            + '&usuario=' + (filtroUsuario.value || 0);
+            + '&usuario=' + (filtroUsuario.value || 0)
+            + SOLO_LINEA;
     });
 
     filtroUsuario.addEventListener('change', () => {

@@ -28,6 +28,12 @@ if ($desde > $hasta) {
 // vendedor solo exporta sus propias ventas y sin la columna de casa (no la ve).
 $esAdmin       = ($_SESSION['user_role'] ?? '') === 'admin';
 $filtroUsuario = isset($_GET['usuario']) ? (int) $_GET['usuario'] : 0;
+
+// La seccion "En linea" descarga con este mismo boton, pero solo lo que salio
+// de un pedido del catalogo.
+$condicionLinea = ($_GET['solo_linea'] ?? '') === '1'
+    ? ' AND EXISTS (SELECT 1 FROM pedidos_linea pl WHERE pl.venta_id = v.id)'
+    : '';
 if (!$esAdmin) {
     $filtroUsuario = (int) $_SESSION['user_id'];
 }
@@ -53,7 +59,7 @@ try {
            FROM ventas v
            JOIN usuarios u ON u.id = v.usuario_id
           WHERE v.eliminada_en IS NULL
-            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicion . '
+            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicion . $condicionLinea . '
           ORDER BY v.fecha DESC, v.id DESC'
     );
     $stmt->execute($parametros);
@@ -71,7 +77,7 @@ try {
            JOIN usuarios u ON u.id = v.usuario_id
            JOIN casas c   ON c.id = d.casa_id
           WHERE v.eliminada_en IS NULL
-            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicion . '
+            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicion . $condicionLinea . '
           ORDER BY v.fecha DESC, v.id DESC, d.id'
     );
     $stmt->execute($parametros);

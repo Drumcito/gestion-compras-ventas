@@ -14,9 +14,16 @@ require_once __DIR__ . '/casas.php';
  * @param  int $usuarioId 0 = todos los vendedores.
  * @return array{productos: array, resumen: array}
  */
-function resumenProductosVendidos(PDO $pdo, string $desde, string $hasta, int $usuarioId = 0): array
+function resumenProductosVendidos(PDO $pdo, string $desde, string $hasta, int $usuarioId = 0,
+                                  bool $soloEnLinea = false): array
 {
     $condicionUsuario = $usuarioId > 0 ? ' AND v.usuario_id = :usuario' : '';
+
+    // La seccion "En linea" usa esta misma hoja, pero solo con lo que se vendio
+    // a partir de un pedido del catalogo.
+    $condicionLinea = $soloEnLinea
+        ? ' AND EXISTS (SELECT 1 FROM pedidos_linea pl WHERE pl.venta_id = v.id)'
+        : '';
 
     $stmt = $pdo->prepare(
         'SELECT c.nombre AS casa, c.codigo_casa,
@@ -29,7 +36,7 @@ function resumenProductosVendidos(PDO $pdo, string $desde, string $hasta, int $u
            JOIN ventas v  ON v.id = d.venta_id
            JOIN casas c   ON c.id = d.casa_id
           WHERE v.eliminada_en IS NULL
-            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicionUsuario . '
+            AND DATE(v.fecha) BETWEEN :desde AND :hasta' . $condicionUsuario . $condicionLinea . '
           GROUP BY c.nombre, c.codigo_casa, d.codigo_interno_producto
           ORDER BY piezas DESC, importe DESC'
     );
