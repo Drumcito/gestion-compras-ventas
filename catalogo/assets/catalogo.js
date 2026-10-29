@@ -105,11 +105,17 @@
                 return {
                     c: f[0], n: nombre, m: f[2], cat: f[3], p: f[4], a: f[5], d: f[6],
                     img: f[7] > 0 ? f[7] : 0,    // version de la imagen; 0 = sin imagen
+                    // Clave del producto en el catalogo de su casa. Se puede
+                    // buscar por ella, pero no se muestra: la misma clave se
+                    // repite entre casas, asi que la REF sigue siendo la interna.
+                    // (f[8] puede faltar si la cache del API es de antes.)
+                    cp: f[8] || '',
                     nn: normalizar(nombre),
                     // Para ordenar: sin los signos con que empiezan algunos nombres ("- ", "+ ").
                     o: nombre.replace(/^[^0-9A-Za-zÀ-ɏ]+/, ''),
                     cn: f[0].toLowerCase(),
-                    idx: normalizar(f[0] + ' ' + nombre + ' ' + f[2] + ' ' + f[3])
+                    cpn: String(f[8] || '').toLowerCase(),
+                    idx: normalizar(f[0] + ' ' + (f[8] || '') + ' ' + nombre + ' ' + f[2] + ' ' + f[3])
                 };
             });
             productos.forEach(function (p) { porCodigo[p.c] = p; });
@@ -306,7 +312,9 @@
     /** Que tan bien coincide con la busqueda: codigo exacto > empieza > palabra > dentro. */
     function puntaje(p) {
         var q = tokens.join(' ');
-        if (p.cn === q) { return 0; }
+        // Cuenta igual el codigo interno (REF) que la clave de la casa: quien
+        // teclea una clave completa ya sabe que pieza quiere.
+        if (p.cn === q || (p.cpn !== '' && p.cpn === q)) { return 0; }
         if (p.nn.indexOf(tokens[0]) === 0) { return 1; }
         if ((' ' + p.nn).indexOf(' ' + tokens[0]) !== -1) { return 2; }
         return 3;

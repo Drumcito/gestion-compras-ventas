@@ -4,7 +4,7 @@
  * vertical, una cabecera con el usuario arriba y un menú inferior. Se incluye
  * desde cada vista definiendo antes:
  *
- *   $seccionActiva = 'venta' | 'dashboard' | 'historial' | 'usuarios' | 'inventario';
+ *   $seccionActiva = 'venta' | 'dashboard' | 'historial' | 'enlinea' | 'usuarios' | 'inventario';
  *
  * La sección "Usuarios/Clientes" la ven ambos roles, pero con distinto alcance:
  * el admin gestiona usuarios y clientes; el vendedor solo puede dar de alta
@@ -22,6 +22,9 @@ $opciones = [
     ['clave' => 'venta',      'texto' => 'Venta',      'icono' => 'ph-currency-dollar-simple', 'url' => '../dashboard/index.php'],
     ['clave' => 'dashboard',  'texto' => 'Dashboard',  'icono' => 'ph-chart-line-up',          'url' => '../estadisticas/index.php'],
     ['clave' => 'historial',  'texto' => 'Historial',  'icono' => 'ph-clock-counter-clockwise','url' => '../historial/index.php'],
+    // Pedidos y ventas que llegaron por el catálogo. La ven los dos roles: el
+    // vendedor es quien los cobra.
+    ['clave' => 'enlinea',    'texto' => 'En línea',   'icono' => 'ph-globe', 'url' => '../enlinea/index.php'],
     // Al vendedor la sección le sirve solo para dar de alta clientes; por eso ve
     // "Clientes" en lugar de "Usuarios".
     ['clave' => 'usuarios',   'texto' => $esAdministrador ? 'Usuarios' : 'Clientes',

@@ -69,6 +69,48 @@ try {
 
     $accion = $_GET['accion'] ?? 'pendientes';
 
+    // ---------- Ventas que nacieron de un pedido del catalogo ----------
+    // Son las que se ven en la seccion "En linea". Un vendedor ve solo las que
+    // el atendio; el admin, todas. Las eliminadas quedan fuera: su pedido vuelve
+    // a contar como pendiente (ver SQL_PEDIDO_PENDIENTE).
+    if ($accion === 'ventas') {
+        $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+
+        $sql =
+            'SELECT p.folio, p.nombre AS nombre_pedido, p.creado_en AS pedido_en,
+                    p.atendido_en,
+                    v.id AS venta_id, v.cliente, v.fecha, v.total,
+                    v.tipo_pago, v.estado_pago,
+                    CONCAT(u.nombre, " ", COALESCE(u.apellido, "")) AS vendedor,
+                    (SELECT COUNT(*) FROM detalle_venta d WHERE d.venta_id = v.id) AS renglones,
+                    (SELECT COALESCE(SUM(d.cantidad), 0) FROM detalle_venta d WHERE d.venta_id = v.id) AS piezas
+               FROM pedidos_linea p
+               JOIN ventas v ON v.id = p.venta_id
+          LEFT JOIN usuarios u ON u.id = v.usuario_id
+              WHERE v.eliminada_en IS NULL'
+            . ($esAdmin ? '' : ' AND v.usuario_id = :usuario')
+            . ' ORDER BY v.fecha DESC, v.id DESC
+              LIMIT 300';
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($esAdmin ? [] : ['usuario' => $usuarioId]);
+
+        $ventas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Resumen de la seccion: cuantas y cuanto suman.
+        $total = 0.0;
+        foreach ($ventas as $v) {
+            $total += (float) $v['total'];
+        }
+
+        echo json_encode([
+            'ok'     => true,
+            'ventas' => $ventas,
+            'total'  => round($total, 2),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // ---------- Cargar un pedido en la pantalla de Venta ----------
     if ($accion === 'cargar') {
         $stmt = $pdo->prepare(

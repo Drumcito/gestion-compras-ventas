@@ -9,7 +9,8 @@
  *
  * Formato (compacto, para que pese poco):
  *   { "generado": "...", "productos": [[codigo, nombre, marca, categoria,
- *     precio, antes|null, descuento, version de imagen (0 = sin imagen)], ...],
+ *     precio, antes|null, descuento, version de imagen (0 = sin imagen),
+ *     clave de la casa], ...],
  *     "vendidos": [codigos] }
  */
 

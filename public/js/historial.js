@@ -20,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCerrar    = document.getElementById('btn-cerrar-detalle');
     const barraSeleccion = document.getElementById('barra-seleccion');
     const cajaRecuperables = document.getElementById('recuperables');
-    const cajaPedidos  = document.getElementById('pedidos-linea');
 
     const money = (n) => '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -111,7 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function cargar(desde, hasta) {
         lista.innerHTML = '<p class="venta-vacia">Cargando...</p>';
         aviso.hidden = true;
-        cargarPedidos();
 
         try {
             // Con un cliente escrito, el servidor ignora el rango de fechas y
@@ -2017,160 +2015,9 @@ document.addEventListener('DOMContentLoaded', () => {
         cargar(inputDesde.value, inputHasta.value || inputDesde.value);
     }
 
-    // ---------- Pedidos en linea (catalogo publico) ----------
-    // Los carritos que los clientes mandan por WhatsApp desde el catalogo. Salen
-    // arriba del historial, en naranja, sin importar el filtro de fechas, hasta
-    // que se cobran ("Cargar en venta") o se descartan.
-    const RUTA_PEDIDOS = '../../app/controllers/PedidoLineaController.php';
-    let pedidosLinea = [];
-
-    async function cargarPedidos() {
-        try {
-            const datos = await (await fetch(RUTA_PEDIDOS + '?accion=pendientes')).json();
-            pedidosLinea = datos.ok ? datos.pedidos : [];
-        } catch (e) {
-            pedidosLinea = [];
-        }
-        pintarPedidos();
-    }
-
-    function pintarPedidos() {
-        if (pedidosLinea.length === 0) {
-            cajaPedidos.hidden = true;
-            cajaPedidos.innerHTML = '';
-            return;
-        }
-
-        const tarjetas = pedidosLinea.map((p) => {
-            const productos = p.items.map((i) =>
-                '<li><span class="pedido-cant">' + i.cantidad + ' ×</span> ' + esc(i.nombre) +
-                    ' <span class="pedido-precio">' + money(i.precio) + '</span></li>'
-            ).join('');
-
-            return '<div class="pedido-linea">' +
-                '<div class="pedido-linea-cabeza">' +
-                    '<div class="pedido-linea-datos">' +
-                        '<span class="pedido-linea-cliente">' + (p.nombre ? esc(p.nombre) : 'Sin nombre') + '</span>' +
-                        '<span class="pedido-linea-meta">Folio <strong>' + esc(p.folio) + '</strong> · ' +
-                            fechaLegible(p.creado_en) + ' · ' +
-                            p.items.length + ' producto' + (p.items.length === 1 ? '' : 's') + ' · ' +
-                            p.piezas + ' pieza' + (Number(p.piezas) === 1 ? '' : 's') + '</span>' +
-                    '</div>' +
-                    '<span class="pedido-linea-total">' + money(p.total) + '</span>' +
-                '</div>' +
-                '<details class="pedido-linea-productos"><summary>Ver productos</summary>' +
-                    '<ul>' + productos + '</ul></details>' +
-                '<div class="pedido-linea-acciones">' +
-                    '<button type="button" class="chip btn-descartar-pedido" data-id="' + p.id + '" ' +
-                        'data-folio="' + esc(p.folio) + '">Descartar</button>' +
-                    '<button type="button" class="btn-save btn-cargar-pedido" data-id="' + p.id + '">' +
-                        '<i class="ph ph-shopping-cart"></i> Cargar en venta</button>' +
-                '</div>' +
-            '</div>';
-        }).join('');
-
-        cajaPedidos.innerHTML =
-            '<div class="pedidos-linea-titulo"><i class="ph ph-globe"></i> Pedidos en línea por atender · ' +
-                pedidosLinea.length + '</div>' +
-            '<p class="pedidos-linea-ayuda">Llegaron por WhatsApp desde el catálogo; búscalos ahí por su folio. ' +
-                '«Cargar en venta» los pasa a la pantalla de Venta para cobrarlos y sacar la nota.</p>' +
-            tarjetas;
-        cajaPedidos.hidden = false;
-    }
-
-    /**
-     * Pasa el pedido a la pantalla de Venta como si fuera una venta a medias
-     * (el mismo borrador que venta.js guarda en el navegador), con el precio de
-     * hoy. Ahi se revisa, se elige la forma de pago y se guarda.
-     */
-    async function cargarPedidoEnVenta(id) {
-        let datos;
-        try {
-            datos = await (await fetch(RUTA_PEDIDOS + '?accion=cargar&id=' + encodeURIComponent(id))).json();
-        } catch (e) {
-            mostrarAviso('Error de conexión al cargar el pedido.', 'error');
-            return;
-        }
-
-        if (!datos.ok) {
-            mostrarAviso(datos.error || 'No se pudo cargar el pedido.', 'error');
-            cargarPedidos();
-            return;
-        }
-
-        const pedido = datos.pedido;
-
-        if (pedido.items.length === 0) {
-            mostrarAviso('Ninguno de los productos del pedido ' + pedido.folio +
-                ' sigue en el catálogo. Atiéndelo por WhatsApp o descártalo.', 'error');
-            return;
-        }
-
-        const clave = 'gabe:venta:' + (window.USUARIO_ID || 0);
-
-        // No pisar una venta que alguien dejo a medias sin preguntar.
-        try {
-            const actual = JSON.parse(localStorage.getItem(clave) || 'null');
-            const otra = actual && Array.isArray(actual.items) && actual.items.length > 0 &&
-                !(actual.pedido_linea && String(actual.pedido_linea.id) === String(pedido.id));
-            if (otra && !confirm('Tienes una venta a medias en la pantalla de Venta. ' +
-                    '¿Reemplazarla por el pedido ' + pedido.folio + '?')) {
-                return;
-            }
-
-            localStorage.setItem(clave, JSON.stringify({
-                guardado_en:     Date.now(),
-                items:           pedido.items,
-                cliente:         pedido.nombre || '',
-                cliente_sel:     { id: null, nombre: '', saldo: 0 },
-                aplicar_saldo:   true,
-                guardar_cliente: false,
-                tipo_pago:       'contado',
-                pago_inicial:    '',
-                vencimiento:     '',
-                pedido_linea:    { id: pedido.id, folio: pedido.folio, nombre: pedido.nombre || '' },
-                pedido_recien_cargado: true,
-                pedido_fuera:    pedido.fuera,
-            }));
-        } catch (e) {
-            mostrarAviso('El navegador no deja guardar el pedido para pasarlo a Venta.', 'error');
-            return;
-        }
-
-        window.location.href = '../dashboard/index.php';
-    }
-
-    async function descartarPedido(id, folio) {
-        if (!confirm('¿Descartar el pedido en línea ' + folio + '? Ya no saldrá como pendiente ' +
-                '(úsalo para pedidos repetidos, de prueba o que el cliente canceló).')) {
-            return;
-        }
-
-        try {
-            const datos = await (await fetch(RUTA_PEDIDOS, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accion: 'descartar', id: id }),
-            })).json();
-
-            mostrarAviso(datos.ok ? 'Pedido ' + folio + ' descartado.' : (datos.error || 'No se pudo descartar.'),
-                datos.ok ? 'ok' : 'error');
-        } catch (e) {
-            mostrarAviso('Error de conexión al descartar el pedido.', 'error');
-        }
-        cargarPedidos();
-    }
-
-    cajaPedidos.addEventListener('click', (e) => {
-        const cargarBtn = e.target.closest('.btn-cargar-pedido');
-        if (cargarBtn) {
-            cargarBtn.disabled = true;
-            cargarPedidoEnVenta(cargarBtn.dataset.id).finally(() => { cargarBtn.disabled = false; });
-            return;
-        }
-        const descartarBtn = e.target.closest('.btn-descartar-pedido');
-        if (descartarBtn) descartarPedido(descartarBtn.dataset.id, descartarBtn.dataset.folio);
-    });
+    // Los pedidos en línea (los del catálogo) ya NO se atienden aquí: tienen
+    // su propia sección, "En línea". En este historial se quedan nada más como
+    // la etiqueta naranja de las ventas que salieron de un pedido.
 
     // ---------- Eventos ----------
     chips.forEach((chip) => {

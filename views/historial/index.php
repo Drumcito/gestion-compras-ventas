@@ -89,8 +89,6 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
             <div id="resumen-periodo" class="resumen-periodo"></div>
             <div id="aviso-historial" class="aviso" hidden></div>
 
-            <!-- Pedidos del catálogo en línea por atender (naranja claro) -->
-            <div id="pedidos-linea" class="pedidos-linea" hidden></div>
 
             <!-- Ventas recién eliminadas: recuperables por 10 minutos -->
             <div id="recuperables" class="recuperables" hidden></div>

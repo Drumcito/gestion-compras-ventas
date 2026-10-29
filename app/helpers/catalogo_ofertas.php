@@ -267,8 +267,9 @@ function miniaturaProducto(string $codigoInterno): ?string
 function obtenerCatalogoPublico(PDO $pdo, int $diasOfertas): array
 {
     $stmt = $pdo->prepare(
-        "SELECT v.codigo_interno, v.codigo_casa, v.nombre, v.marca, v.categoria,
-                v.precio_mayoreo, v.porcentaje_neto, h.precio_anterior
+        "SELECT v.codigo_interno, v.codigo_casa, v.codigo_proveedor, v.nombre,
+                v.marca, v.categoria, v.precio_mayoreo, v.porcentaje_neto,
+                h.precio_anterior
            FROM vista_catalogo v
       LEFT JOIN (" . SQL_PRIMER_CAMBIO . ") p ON p.codigo = v.codigo_interno
       LEFT JOIN historial_precios h ON h.id = p.primer_id
@@ -302,6 +303,13 @@ function obtenerCatalogoPublico(PDO $pdo, int $diasOfertas): array
             $descuento >= 1 ? $descuento : 0,
             // Version de la imagen (0 = sin imagen): va en su direccion para cache.
             isset($imagenes[strtoupper($f['codigo_interno'])]) ? versionImagen($f['codigo_interno']) : 0,
+
+            // Clave con la que el producto viene en el catalogo de SU casa. Va
+            // al final para no mover los indices que ya consume el sitio.
+            // Sirve para buscar, no para identificar: la misma clave se repite
+            // entre casas (5,219 de ellas), asi que la REF que se muestra sigue
+            // siendo el codigo interno, que si es unico.
+            trim((string) $f['codigo_proveedor']),
         ];
     }
     return $productos;
