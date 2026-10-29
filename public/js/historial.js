@@ -56,7 +56,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function esc(texto) {
         const div = document.createElement('div');
         div.textContent = texto === null || texto === undefined ? '' : texto;
-        return div.innerHTML;
+
+        // innerHTML escapa < > &, pero NO las comillas, y esto se mete dentro de
+        // atributos (value="…"). Un nombre como TLAPALERIA " ALICIA " cerraba el
+        // atributo antes de tiempo y el dato se perdía al guardar.
+        return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function fechaLegible(sql) {
@@ -1148,14 +1152,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ---------- Porcentaje del catalogo ----------
-    // Cambia el porcentaje con el que se calcula el neto de ESTE producto, sin
-    // tocar a los demás de la casa. Vale para ventas futuras; esta venta conserva
-    // su total (por eso el detalle guarda una copia del precio cobrado).
+    // ---------- Precio y porcentaje del catalogo ----------
+    // Cambia el precio bruto y/o el porcentaje con el que se calcula el neto de
+    // ESTE producto, sin tocar a los demás de la casa.
+    //
+    // Se abre desde dos lados y no hacen lo mismo con esta venta:
+    //
+    //   - desde el DETALLE: la venta ya está cerrada y conserva su total (el
+    //     detalle guarda una copia del precio cobrado). El cambio vale para las
+    //     ventas futuras.
+    //   - desde la EDICIÓN: al guardar los cambios, EditarVentaController relee
+    //     los precios del catálogo, así que esta venta también toma el nuevo.
+    //
+    // Por eso el modal avisa una cosa u otra según de dónde se haya abierto, y
+    // al cerrar regresa a la pantalla de la que vino en lugar de perder lo que
+    // se estaba editando.
     let ventaDelPorcentaje = null;
+    let volverDelPorcentaje = 'detalle';   // 'detalle' | 'edicion'
 
-    async function abrirPorcentaje(codigo, ventaId) {
-        ventaDelPorcentaje = ventaId;
+    async function abrirPorcentaje(codigo, ventaId, volverA) {
+        ventaDelPorcentaje  = ventaId;
+        volverDelPorcentaje = volverA || 'detalle';
         contenido.innerHTML = '<p class="venta-vacia">Cargando porcentaje actual...</p>';
 
         try {
@@ -1178,29 +1195,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function pintarFormularioPorcentaje(p) {
-        const bruto    = p.precio_mayoreo;
+        const bruto    = Number(p.precio_mayoreo);
         const casaPct  = Number(p.porcentaje_casa);
         const efectivo = Number(p.porcentaje_efectivo);
 
+        const desdeEdicion = volverDelPorcentaje === 'edicion';
+
+        const aviso = desdeEdicion
+            ? 'El precio de venta (neto) sale del bruto más un porcentaje. Lo cambias ' +
+              '<strong>solo para este producto</strong>; los demás de ' + esc(p.etiqueta_casa) +
+              ' no se tocan. Vale para las ventas futuras y, como esta venta está en ' +
+              'edición, <strong>también tomará el precio nuevo</strong> al guardar los cambios.'
+            : 'El precio de venta (neto) sale del bruto más un porcentaje. Lo cambias ' +
+              '<strong>solo para este producto</strong>, para las <strong>ventas futuras</strong>; ' +
+              'los demás de ' + esc(p.etiqueta_casa) + ' no se tocan y las ventas ya ' +
+              'registradas conservan su precio.';
+
         contenido.innerHTML =
-            '<h2 class="detalle-titulo">Editar porcentaje</h2>' +
+            '<h2 class="detalle-titulo">Editar precio</h2>' +
             '<div class="detalle-cabecera">' +
                 '<p><strong>' + esc(p.nombre) + '</strong></p>' +
                 '<p class="detalle-sub"><span class="codigo-prod">' + esc(codigoVisible(p)) + '</span>' +
-                    (p.marca ? ' · ' + esc(p.marca) : '') + '</p>' +
+                    (p.marca ? ' · ' + esc(p.marca) : '') +
+                    (p.ultimo_cambio_precio
+                        ? ' · cambiado el ' + fechaCortaPrecio(p.ultimo_cambio_precio) +
+                          (p.precio_anterior !== null && p.precio_anterior !== undefined
+                              ? ' · antes ' + dinero(p.precio_anterior)
+                              : '')
+                        : ' · nunca se le ha cambiado') + '</p>' +
             '</div>' +
-            '<p class="aviso aviso-info">El precio de venta (neto) sale del bruto más un porcentaje. ' +
-                'Aquí lo cambias <strong>solo para este producto</strong>, para las ' +
-                '<strong>ventas futuras</strong>; los demás de ' + esc(p.etiqueta_casa) + ' no se tocan ' +
-                'y las ventas ya registradas conservan su precio.</p>' +
-            '<p class="detalle-sub">Precio bruto: <strong>' + dinero(bruto) + '</strong></p>' +
-            '<p class="pct-actual">Actualmente: <strong>' + pctTexto(efectivo) + '%</strong> → ' +
+            '<p class="aviso aviso-info">' + aviso + '</p>' +
+            '<p class="pct-actual">Actualmente: <strong>' + dinero(bruto) + '</strong> + ' +
+                '<strong>' + pctTexto(efectivo) + '%</strong> → ' +
                 '<strong>' + dinero(netoJS(bruto, efectivo)) + '</strong> ' +
                 '<span class="detalle-sub">(' + (p.usa_casa
                     ? 'porcentaje de la casa'
                     : 'porcentaje propio; la casa usa ' + pctTexto(casaPct) + '%') + ')</span></p>' +
             '<div class="form-group">' +
-                '<label for="pct-nuevo">Nuevo porcentaje (%)</label>' +
+                '<label for="pct-bruto">Precio bruto</label>' +
+                '<input type="number" id="pct-bruto" class="form-control" min="0" step="0.01" ' +
+                       'value="' + bruto.toFixed(2) + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label for="pct-nuevo">Porcentaje (%)</label>' +
                 '<input type="number" id="pct-nuevo" class="form-control" min="0" max="999.99" step="0.01" ' +
                        'value="' + Number(efectivo).toFixed(2) + '">' +
             '</div>' +
@@ -1213,27 +1250,42 @@ document.addEventListener('DOMContentLoaded', () => {
             '<div class="detalle-acciones">' +
                 '<button type="button" class="chip" id="btn-cancelar-porcentaje">Cancelar</button>' +
                 '<button type="button" class="btn-save" id="btn-guardar-porcentaje" ' +
-                    'data-codigo="' + esc(p.codigo_interno) + '">Guardar %</button>' +
+                    'data-codigo="' + esc(p.codigo_interno) + '">Guardar</button>' +
             '</div>';
 
-        const inp   = document.getElementById('pct-nuevo');
-        const chk   = document.getElementById('pct-usar-casa');
-        const linea = document.getElementById('pct-nuevo-neto');
+        const inpBruto = document.getElementById('pct-bruto');
+        const inp      = document.getElementById('pct-nuevo');
+        const chk      = document.getElementById('pct-usar-casa');
+        const linea    = document.getElementById('pct-nuevo-neto');
 
         function refrescar() {
-            const pct = chk.checked ? casaPct : parseFloat(inp.value);
+            const pct   = chk.checked ? casaPct : parseFloat(inp.value);
+            const crudo = parseFloat(inpBruto.value);
+
             inp.disabled = chk.checked;
             if (chk.checked) inp.value = Number(casaPct).toFixed(2);
 
-            linea.innerHTML = isNaN(pct)
-                ? 'Escribe un porcentaje para ver el precio nuevo.'
-                : 'Nuevo precio de venta: <strong>' + dinero(netoJS(bruto, pct)) + '</strong> ' +
+            linea.innerHTML = (isNaN(pct) || isNaN(crudo))
+                ? 'Escribe el precio bruto y el porcentaje para ver el precio nuevo.'
+                : 'Nuevo precio de venta: <strong>' + dinero(netoJS(crudo, pct)) + '</strong> ' +
                   '(bruto + ' + pctTexto(pct) + '%)';
         }
 
         chk.addEventListener('change', refrescar);
         inp.addEventListener('input', refrescar);
+        inpBruto.addEventListener('input', refrescar);
         refrescar();
+    }
+
+    /** '2026-10-25 18:04:45' -> '25/10/2026'. Cadena vacia si no hay fecha. */
+    function fechaCortaPrecio(iso) {
+        if (!iso) return '';
+
+        // El servidor manda 'YYYY-MM-DD HH:MM:SS'; Safari no lo parsea sin la T.
+        const d = new Date(String(iso).replace(' ', 'T'));
+
+        return isNaN(d) ? '' : d.toLocaleDateString('es-MX',
+            { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
 
     async function guardarPorcentaje(codigo) {
@@ -1249,8 +1301,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    codigo:     codigo,
-                    porcentaje: usarCasa ? null : document.getElementById('pct-nuevo').value,
+                    codigo:         codigo,
+                    porcentaje:     usarCasa ? null : document.getElementById('pct-nuevo').value,
+                    precio_mayoreo: document.getElementById('pct-bruto').value,
                 }),
             });
             const datos = await respuesta.json();
@@ -1270,6 +1323,19 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 mostrarAviso(datos.nombre + ' ahora usa ' + pctTexto(datos.porcentaje_efectivo) + '%' +
                     (datos.neto !== null ? ' (neto ' + money(datos.neto) + ').' : '.'), 'ok');
+            }
+
+            // Si se venía de la edición, se regresa ahí con el precio nuevo ya
+            // puesto en el renglón: recargar el detalle perdería lo editado.
+            if (volverDelPorcentaje === 'edicion' && ventaEditando) {
+                if (datos.neto !== null && datos.neto !== undefined) {
+                    ventaEditando.items.forEach((i) => {
+                        if (i.codigo_interno === codigo) i.precio = Number(datos.neto);
+                    });
+                }
+
+                pintarEdicion();
+                return;
             }
 
             verDetalle(ventaDelPorcentaje);
@@ -1656,7 +1722,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<td>' + esc(i.nombre) +
                     '<span class="detalle-sub">' + metaCasaEdit(i) +
                     '<span class="codigo-prod">' + esc(codigoVisible(i)) + '</span></span></td>' +
-                '<td class="num">' + money(i.precio) + '</td>' +
+                '<td class="num">' + money(i.precio) +
+                    // Cambiar el precio toca el catálogo, así que es solo del admin.
+                    (window.ES_ADMIN
+                        ? '<br><button type="button" class="link-editar-precio-venta" ' +
+                              'data-codigo="' + esc(i.codigo_interno) + '">Editar precio</button>'
+                        : '') + '</td>' +
                 '<td class="num">' +
                     '<input type="number" class="input-qty edit-cantidad" data-i="' + indice + '" ' +
                            'value="' + i.cantidad + '" min="1" step="1">' +
@@ -2366,7 +2437,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const botonPorcentaje = e.target.closest('.btn-porcentaje');
         if (botonPorcentaje) {
-            abrirPorcentaje(botonPorcentaje.dataset.codigo, botonPorcentaje.dataset.venta);
+            abrirPorcentaje(botonPorcentaje.dataset.codigo, botonPorcentaje.dataset.venta, 'detalle');
+            return;
+        }
+
+        // El mismo modal, pero abierto desde la venta que se está editando: al
+        // guardar regresa al editor con el precio nuevo, sin perder lo tecleado.
+        const botonPrecioVenta = e.target.closest('.link-editar-precio-venta');
+        if (botonPrecioVenta && ventaEditando) {
+            abrirPorcentaje(botonPrecioVenta.dataset.codigo, ventaEditando.id, 'edicion');
+            return;
+        }
+
+        if (e.target.id === 'btn-cancelar-porcentaje' && volverDelPorcentaje === 'edicion'
+            && ventaEditando) {
+            pintarEdicion();
             return;
         }
 

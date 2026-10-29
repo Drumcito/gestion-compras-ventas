@@ -2608,6 +2608,24 @@ select.form-control {
 }
 
 /* "Editar %" dentro del renglón de un producto en la venta. */
+/* Mismo enlace, en la tabla de la venta que se está editando. */
+.link-editar-precio-venta {
+    border: none;
+    background: none;
+    padding: 0;
+    margin-top: 2px;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: normal;
+    color: #08660b;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.link-editar-precio-venta:hover {
+    color: #05490a;
+}
+
 .link-editar-pct {
     border: none;
     background: none;

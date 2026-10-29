@@ -18,7 +18,11 @@ window.NotaDatos = (function () {
     function esc(texto) {
         const div = document.createElement('div');
         div.textContent = texto === null || texto === undefined ? '' : texto;
-        return div.innerHTML;
+
+        // innerHTML escapa < > &, pero NO las comillas, y esto se mete dentro de
+        // atributos (value="…"). Un nombre como TLAPALERIA " ALICIA " cerraba el
+        // atributo antes de tiempo y el dato se perdía al guardar.
+        return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     /** "dirección y C.P." / "dirección, C.P. y teléfono" */
