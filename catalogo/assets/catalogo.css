@@ -192,7 +192,35 @@ a { color: var(--acento-texto); }
 .filtros-rapidos {
     display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px;
     scrollbar-width: thin;
+    align-items: center;
 }
+
+/* Dos grupos que hacen cosas distintas: "Ver" cambia la lista (todo, ofertas,
+   más vendidos) y "Marcas" filtra por fabricante. Juntos y con el mismo color
+   se confundían, así que cada uno lleva su rótulo y una línea que los parte. */
+.grupo-chips {
+    display: flex; align-items: center; gap: 8px; flex: none;
+}
+
+.grupo-chips-rotulo {
+    font-size: .7rem; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--texto-2);
+    white-space: nowrap;
+}
+
+.grupo-marcas {
+    padding-left: 12px; margin-left: 4px;
+    border-left: 1px solid var(--borde);
+}
+
+/* Los de "Ver" van rellenos y los de marca en contorno: se distinguen de un
+   vistazo aunque no se lean los rótulos. */
+.grupo-vistas .chip {
+    background: color-mix(in srgb, var(--naranja) 12%, var(--chip-fondo));
+    border-color: color-mix(in srgb, var(--naranja) 35%, var(--borde));
+    font-weight: 600;
+}
+.grupo-vistas .chip:hover { border-color: var(--naranja); }
 
 .chip {
     flex: none; height: 34px; padding: 0 14px;
@@ -270,15 +298,6 @@ a { color: var(--acento-texto); }
 /* "Pagina 6 de 2,781": solo en celular, donde se esconden los numeros. */
 .pag-actual { display: none; padding: 0 6px; color: var(--texto-2); font-size: .9rem; }
 
-.pag-ir { display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; }
-.pag-ir label { display: inline-flex; align-items: center; gap: 6px; color: var(--texto-2); font-size: .9rem; }
-.pag-ir input {
-    width: 76px; height: 40px; padding: 0 8px;
-    border: 1px solid var(--borde); border-radius: 10px;
-    background: var(--superficie); color: var(--texto); font: inherit;
-}
-.pag-ir input:focus { outline: none; border-color: var(--naranja); }
-
 .tarjeta {
     position: relative;
     display: flex; flex-direction: column;
@@ -312,6 +331,10 @@ a { color: var(--acento-texto); }
 
 .tarjeta-cuerpo { padding: 12px 12px 12px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .ref { font-size: .74rem; font-weight: 700; color: var(--texto-2); letter-spacing: .03em; }
+
+/* En el detalle se muestra la clave de la casa, no el código interno: va
+   discreta, como dato de referencia y no como título. */
+.ref-clave { font-weight: 600; opacity: .85; }
 .tarjeta h3 {
     margin: 0; font-size: .92rem; font-weight: 600; line-height: 1.3;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
@@ -640,7 +663,6 @@ a { color: var(--acento-texto); }
     /* Celular: ‹ Pagina 6 de 2,781 › + "Ir a"; los numeros no caben. */
     .pag-numero, .pag-hueco, .pag-texto { display: none; }
     .pag-actual { display: inline; }
-    .pag-ir { flex-basis: 100%; justify-content: center; margin: 4px 0 0; }
     .rejilla { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-inline: 10px; }
     .tarjeta-cuerpo { padding: 10px; }
     .tarjeta h3 { font-size: .84rem; }

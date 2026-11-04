@@ -151,7 +151,21 @@
         });
     }
 
-    function chip(texto, tipo, valor, cantidad, clase) {
+    /**
+     * Un grupo de chips con su rotulo. Son dos y hacen cosas distintas, por eso
+     * van separados: "Ver" cambia QUE lista se muestra (todo, ofertas, mas
+     * vendidos) y "Marcas" filtra por fabricante. Juntos y con el mismo color
+     * se confundian.
+     */
+    function grupoChips(rotulo, clase) {
+        var g = document.createElement('div');
+        g.className = 'grupo-chips ' + clase;
+        g.innerHTML = '<span class="grupo-chips-rotulo">' + escapar(rotulo) + '</span>';
+        el.chips.appendChild(g);
+        return g;
+    }
+
+    function chip(grupo, texto, tipo, valor, cantidad, clase) {
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'chip' + (clase ? ' ' + clase : '');
@@ -159,7 +173,7 @@
         b.setAttribute('data-valor', valor);
         b.setAttribute('aria-pressed', 'false');
         b.innerHTML = escapar(texto) + (cantidad ? '<small>' + formato0.format(cantidad) + '</small>' : '');
-        el.chips.appendChild(b);
+        grupo.appendChild(b);
     }
 
     function armarFiltros() {
@@ -168,13 +182,21 @@
         var ofertas = productos.filter(function (p) { return p.d > 0; }).length;
         var vendidos = productos.filter(function (p) { return rangoVendido[p.c]; }).length;
 
-        chip('Todos', 'todos', '', 0);
-        if (ofertas) { chip('Ofertas', 'rapido', 'ofertas', ofertas, 'chip-oferta'); }
-        if (vendidos) { chip('Más vendidos', 'rapido', 'vendidos', 0); }
-        Object.keys(marcas)
+        el.chips.innerHTML = '';
+
+        var gVer = grupoChips('Ver', 'grupo-vistas');
+        chip(gVer, 'Todos', 'todos', '', 0);
+        if (ofertas) { chip(gVer, 'Ofertas', 'rapido', 'ofertas', ofertas, 'chip-oferta'); }
+        if (vendidos) { chip(gVer, 'Más vendidos', 'rapido', 'vendidos', 0); }
+
+        var claves = Object.keys(marcas)
             .sort(function (a, b) { return marcas[b] - marcas[a]; })
-            .slice(0, MARCAS_RAPIDAS)
-            .forEach(function (m) { chip(m, 'marca', m, marcas[m]); });
+            .slice(0, MARCAS_RAPIDAS);
+
+        if (claves.length) {
+            var gMarcas = grupoChips('Marcas', 'grupo-marcas');
+            claves.forEach(function (m) { chip(gMarcas, m, 'marca', m, marcas[m]); });
+        }
 
         opciones(el.marca, marcas);
         opciones(el.categoria, categorias);
@@ -190,7 +212,7 @@
         el.orden.value = estado.orden;
 
         var algo = estado.q || estado.rapido || estado.marca || estado.categoria;
-        Array.prototype.forEach.call(el.chips.children, function (b) {
+        Array.prototype.forEach.call(el.chips.querySelectorAll('.chip'), function (b) {
             var tipo = b.getAttribute('data-tipo');
             var valor = b.getAttribute('data-valor');
             var activo = (tipo === 'todos' && !estado.rapido && !estado.marca)
@@ -258,8 +280,9 @@
     }
 
     /**
-     * Botones de pagina: primera, ultima y dos alrededor de la actual, con "…"
-     * en los huecos (1 … 4 5 [6] 7 8 … 2781), mas "Ir a" para saltar lejos.
+     * Botones de pagina. Se muestran la actual y una a cada lado, mas la primera
+     * y la ultima, con "…" en los huecos: 1 … 5 [6] 7 … 14. Con eso la barra
+     * nunca pasa de siete numeros, por grande que sea el catalogo.
      */
     function pintarPaginacion() {
         var total = totalPaginas();
@@ -270,7 +293,7 @@
 
         var numeros = [];
         for (var i = 1; i <= total; i++) {
-            if (i === 1 || i === total || Math.abs(i - pagina) <= 2) {
+            if (i === 1 || i === total || Math.abs(i - pagina) <= 1) {
                 if (numeros.length && i - numeros[numeros.length - 1] > 1) { numeros.push(0); }
                 numeros.push(i);
             }
@@ -293,10 +316,11 @@
         });
         html += boton(pagina + 1, '<span class="pag-texto">Siguiente </span>›', 'Página siguiente', 'pag-paso', pagina === total);
 
-        html += '<span class="pag-actual">Página ' + formato0.format(pagina) + ' de ' + formato0.format(total) + '</span>';
-        html += '<form class="pag-ir" novalidate><label><span>Ir a</span>' +
-            '<input type="number" name="ir" min="1" max="' + total + '" inputmode="numeric" aria-label="Ir a la página"></label>' +
-            '<button type="submit" class="pag-boton">Ir</button></form>';
+        // Sin el formulario de "Ir a": entre los números, Anterior/Siguiente y el
+        // buscador de arriba, saltar a una página suelta no hacía falta y
+        // cargaba la barra de controles.
+        html += '<span class="pag-actual">Página ' + formato0.format(pagina) +
+            ' de ' + formato0.format(total) + '</span>';
 
         el.paginacion.innerHTML = html;
     }
@@ -427,7 +451,13 @@
                 (rangoVendido[p.c] ? '<span class="top-vendido">TOP ' + rangoVendido[p.c] + '</span>' : '') +
             '</div>' +
             '<div class="detalle-datos">' +
-                '<span class="ref">REF ' + escapar(p.c) + '</span>' +
+                // Aqui va la clave con la que el producto viene en el catalogo de
+                // su casa, que es la que el cliente reconoce. El codigo interno
+                // (BNS0X-…) no se muestra: no le dice nada a quien compra. En la
+                // tarjeta si sigue saliendo, porque esa REF es unica y es la que
+                // identifica la pieza en un pedido.
+                '<span class="ref ref-clave">' +
+                    (p.cp ? 'Clave ' + escapar(p.cp) : 'REF ' + escapar(p.c)) + '</span>' +
                 '<h2 id="detalle-nombre">' + escapar(p.n) + '</h2>' +
                 (p.m || p.cat
                     ? '<p class="detalle-marca">' + [p.m, p.cat].filter(Boolean).map(escapar).join(' · ') + '</p>'
@@ -477,12 +507,6 @@
     el.paginacion.addEventListener('click', function (ev) {
         var b = ev.target.closest('button[data-pagina]');
         if (b && !b.disabled) { irAPagina(parseInt(b.getAttribute('data-pagina'), 10)); }
-    });
-
-    el.paginacion.addEventListener('submit', function (ev) {
-        ev.preventDefault();
-        var n = parseInt(ev.target.elements.ir.value, 10);
-        if (n >= 1) { irAPagina(Math.min(n, totalPaginas())); }
     });
 
     // ---------- Carrito (sin cuenta: JSON en el navegador) ----------
