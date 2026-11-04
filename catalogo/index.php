@@ -50,10 +50,6 @@ catalogoCabecera(
 
                 <div class="filtros-extra">
                     <label>
-                        <span class="solo-lector">Marca</span>
-                        <select id="filtro-marca"><option value="">Todas las marcas</option></select>
-                    </label>
-                    <label>
                         <span class="solo-lector">Categoría</span>
                         <select id="filtro-categoria"><option value="">Todas las categorías</option></select>
                     </label>

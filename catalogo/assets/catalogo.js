@@ -12,7 +12,7 @@
     var $ = function (id) { return document.getElementById(id); };
     var el = {
         busqueda: $('busqueda'), limpiar: $('limpiar-busqueda'), chips: $('filtros-rapidos'),
-        marca: $('filtro-marca'), categoria: $('filtro-categoria'), orden: $('orden'),
+        categoria: $('filtro-categoria'), orden: $('orden'),
         conteo: $('conteo'), quitar: $('quitar-filtros'), rejilla: $('rejilla'), paginacion: $('paginacion'),
         buscador: document.querySelector('.buscador'), info: document.querySelector('.resultados-info')
     };
@@ -165,18 +165,28 @@
         return g;
     }
 
-    function chip(grupo, texto, tipo, valor, cantidad, clase) {
+    /**
+     * Los chips van sin conteo: el numero no ayuda a elegir (nadie filtra por
+     * "la marca que tiene mas piezas") y hacia la fila mas larga y ruidosa. Lo
+     * que importa —cuantos hay— ya sale arriba de la rejilla al filtrar.
+     */
+    function chip(grupo, texto, tipo, valor, clase) {
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'chip' + (clase ? ' ' + clase : '');
         b.setAttribute('data-tipo', tipo);
         b.setAttribute('data-valor', valor);
         b.setAttribute('aria-pressed', 'false');
-        b.innerHTML = escapar(texto) + (cantidad ? '<small>' + formato0.format(cantidad) + '</small>' : '');
+        b.textContent = texto;
         grupo.appendChild(b);
     }
 
     function armarFiltros() {
+        // Las marcas ya no tienen select propio: se filtran con los chips de
+        // arriba, que es mas claro que tener el mismo filtro en dos lugares.
+        // Como los chips son solo las de mas productos, una marca chica se
+        // encuentra escribiendo su nombre en el buscador (la marca entra en el
+        // indice de busqueda, ver el armado de productos).
         var marcas = contar('m');
         var categorias = contar('cat');
         var ofertas = productos.filter(function (p) { return p.d > 0; }).length;
@@ -185,9 +195,9 @@
         el.chips.innerHTML = '';
 
         var gVer = grupoChips('Ver', 'grupo-vistas');
-        chip(gVer, 'Todos', 'todos', '', 0);
-        if (ofertas) { chip(gVer, 'Ofertas', 'rapido', 'ofertas', ofertas, 'chip-oferta'); }
-        if (vendidos) { chip(gVer, 'Más vendidos', 'rapido', 'vendidos', 0); }
+        chip(gVer, 'Todos', 'todos', '');
+        if (ofertas) { chip(gVer, 'Ofertas', 'rapido', 'ofertas', 'chip-oferta'); }
+        if (vendidos) { chip(gVer, 'Más vendidos', 'rapido', 'vendidos'); }
 
         var claves = Object.keys(marcas)
             .sort(function (a, b) { return marcas[b] - marcas[a]; })
@@ -195,10 +205,9 @@
 
         if (claves.length) {
             var gMarcas = grupoChips('Marcas', 'grupo-marcas');
-            claves.forEach(function (m) { chip(gMarcas, m, 'marca', m, marcas[m]); });
+            claves.forEach(function (m) { chip(gMarcas, m, 'marca', m); });
         }
 
-        opciones(el.marca, marcas);
         opciones(el.categoria, categorias);
         // Si ningun producto trae categoria, el filtro no sirve: se esconde.
         el.categoria.closest('label').hidden = Object.keys(categorias).length === 0;
@@ -207,7 +216,7 @@
     function sincronizarControles() {
         el.busqueda.value = estado.q;
         el.limpiar.hidden = estado.q === '';
-        el.marca.value = estado.marca;
+
         el.categoria.value = estado.categoria;
         el.orden.value = estado.orden;
 
@@ -380,7 +389,9 @@
                 (rangoVendido[p.c] ? '<span class="top-vendido">TOP ' + rangoVendido[p.c] + '</span>' : '') +
             '</div>' +
             '<div class="tarjeta-cuerpo">' +
-                '<span class="ref">REF ' + escapar(p.c) + '</span>' +
+                // Sin codigo a la vista: el interno (BNS0X-…) no le dice nada a
+                // quien compra. La clave de la casa sale al abrir el detalle.
+                // El codigo sigue viajando en data-c para armar el pedido.
                 '<h3><button type="button" class="ver-detalle" data-accion="ver">' + resaltar(p.n, p.nn) + '</button></h3>' +
                 (p.m ? '<span class="marca-producto">' + escapar(p.m) + '</span>' : '') +
                 '<div class="precios"><span class="precio">' + dinero(p.p) + '</span>' +
@@ -721,7 +732,9 @@
         return '<li class="carrito-item" data-c="' + escapar(it.c) + '">' +
             '<div class="carrito-imagen' + (p && p.img ? '' : ' sin-imagen') + '">' + imagen + '</div>' +
             '<div class="carrito-datos">' +
-                '<span class="ref">REF ' + escapar(it.c) + '</span>' +
+                // Mismo criterio que la tarjeta: nada de codigo interno en
+                // pantalla. En el mensaje de WhatsApp si va, porque ahi lo lee
+                // el mostrador para surtir el pedido.
                 '<strong>' + escapar(it.n) + '</strong>' +
                 '<span class="carrito-precio">' + dinero(it.p) + ' c/u · <b>' + dinero(it.p * it.q) + '</b></span>' +
                 (it.x ? '<span class="carrito-falta">Ya no aparece en el catálogo; te lo confirmamos por WhatsApp.</span>' : '') +
@@ -897,7 +910,6 @@
         filtrar();
     });
 
-    el.marca.addEventListener('change', function () { estado.marca = el.marca.value; filtrar(); });
     el.categoria.addEventListener('change', function () { estado.categoria = el.categoria.value; filtrar(); });
     el.orden.addEventListener('change', function () { estado.orden = el.orden.value; filtrar(); });
 

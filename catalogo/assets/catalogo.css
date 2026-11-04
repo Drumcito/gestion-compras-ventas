@@ -190,9 +190,14 @@ a { color: var(--acento-texto); }
 }
 
 .filtros-rapidos {
-    display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px;
+    display: flex; gap: 8px; overflow-x: auto;
     scrollbar-width: thin;
-    align-items: center;
+    align-items: flex-start;
+
+    /* Hueco para la barra de desplazamiento. Con 2px quedaba encima de los
+       chips y les comia el borde de abajo: en Firefox la barra ocupa lugar de
+       verdad (scrollbar-width: thin ~ 10px) y se dibujaba pegada a ellos. */
+    padding-bottom: 12px;
 }
 
 /* Dos grupos que hacen cosas distintas: "Ver" cambia la lista (todo, ofertas,
