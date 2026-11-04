@@ -740,6 +740,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<input type="text" id="ed-categoria" class="form-control" maxlength="60" value="' + esc(p.categoria || '') + '">' +
                 '</div>' +
             '</div>' +
+            '<div class="form-group">' +
+                '<label for="ed-sat">Código SAT ' +
+                    '<span class="detalle-sub">(ClaveProdServ, para facturar · opcional)</span></label>' +
+                '<input type="text" id="ed-sat" class="form-control" maxlength="20" ' +
+                       'inputmode="numeric" placeholder="Ej. 31161500" ' +
+                       'value="' + esc(p.codigo_sat || '') + '">' +
+            '</div>' +
             '<div class="alta-dos">' +
                 '<div class="form-group">' +
                     '<label for="ed-mayoreo">Precio bruto</label>' +
@@ -812,6 +819,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     codigo_proveedor: document.getElementById('ed-codigo').value,
                     marca:            document.getElementById('ed-marca').value,
                     categoria:        document.getElementById('ed-categoria').value,
+                    codigo_sat:       document.getElementById('ed-sat').value,
                     precio_mayoreo:   document.getElementById('ed-mayoreo').value,
                 }),
             })).json();

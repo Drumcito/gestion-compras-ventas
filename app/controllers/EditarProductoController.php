@@ -117,7 +117,8 @@ try {
         }
 
         $stmt = $pdo->prepare(
-            "SELECT codigo_interno, codigo_proveedor, nombre, marca, categoria, precio_mayoreo
+            "SELECT codigo_interno, codigo_proveedor, nombre, marca, categoria,
+                    codigo_sat, precio_mayoreo
                FROM `{$tabla}` WHERE codigo_interno = :codigo AND activo = 1 LIMIT 1"
         );
         $stmt->execute(['codigo' => $codigo]);
@@ -191,6 +192,9 @@ try {
         'nombre'           => $nombre,
         'marca'            => limpiar($datos['marca'] ?? '', 60) ?: null,
         'categoria'        => limpiar($datos['categoria'] ?? '', 60) ?: null,
+        // Clave del SAT (ClaveProdServ). Es de facturacion, no de venta: no
+        // entra en ningun precio ni en la busqueda.
+        'codigo_sat'       => limpiar($datos['codigo_sat'] ?? '', 20) ?: null,
         'precio_mayoreo'   => $nuevoPrecio,
     ];
 
@@ -220,6 +224,7 @@ try {
                 nombre           = :nombre,
                 marca            = :marca,
                 categoria        = :categoria,
+                codigo_sat       = :codigo_sat,
                 precio_mayoreo   = :precio_mayoreo
              WHERE codigo_interno = :codigo"
         )->execute($campos + ['codigo' => $codigo]);
@@ -243,11 +248,11 @@ try {
     $pdo->beginTransaction();
 
     try {
-        $columnas = ['codigo_proveedor', 'nombre', 'marca', 'categoria', 'precio_mayoreo'];
+        $columnas = ['codigo_proveedor', 'nombre', 'marca', 'categoria', 'codigo_sat', 'precio_mayoreo'];
 
         $pdo->prepare(
             "INSERT INTO `{$tablaDestino}` (" . implode(', ', $columnas) . ")
-             VALUES (:codigo_proveedor, :nombre, :marca, :categoria, :precio_mayoreo)"
+             VALUES (:codigo_proveedor, :nombre, :marca, :categoria, :codigo_sat, :precio_mayoreo)"
         )->execute($campos);
 
         $idNuevo = (int) $pdo->lastInsertId();

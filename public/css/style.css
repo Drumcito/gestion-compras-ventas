@@ -3543,6 +3543,35 @@ select.form-control {
     white-space: nowrap;
 }
 
+/* ===== Claves del SAT de una venta ===== */
+
+.tabla-sat .sat-clave {
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.tabla-sat code {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 0.92rem;
+    letter-spacing: 0.02em;
+}
+
+/* Una pieza sin ClaveProdServ capturada: no se puede facturar hasta ponerla. */
+.sat-falta {
+    font-size: 0.8rem;
+    font-style: italic;
+    color: #9a6a00;
+}
+
+/* Botón de copiar: cabe dentro de la celda sin estirar el renglón. */
+.chip-mini {
+    padding: 0.1rem 0.35rem;
+    font-size: 0.8rem;
+    line-height: 1.2;
+}
+
 /* ===== Entrega y eliminación de ventas (historial) ===== */
 
 /* Botones de acción a la derecha de cada fila (palomita / eliminar). */

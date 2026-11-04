@@ -81,7 +81,8 @@ try {
         // El detalle guarda el codigo interno, pero en pantalla se ocupa el del
         // proveedor: se busca en la tabla de cada casa.
         $catalogo = catalogoDeProductos(
-            $pdo, array_column($venta['items'], 'codigo_interno_producto'), ['codigo_proveedor']
+            $pdo, array_column($venta['items'], 'codigo_interno_producto'),
+            ['codigo_proveedor', 'codigo_sat']
         );
 
         foreach ($venta['items'] as &$item) {
@@ -89,6 +90,10 @@ try {
 
             // Si el producto ya no esta en el catalogo, queda el codigo interno.
             $item['codigo_proveedor'] = $catalogo[$item['codigo_interno_producto']]['codigo_proveedor'] ?? null;
+
+            // Clave del SAT para facturar. Puede venir vacia: no todos los
+            // productos la tienen capturada.
+            $item['codigo_sat'] = $catalogo[$item['codigo_interno_producto']]['codigo_sat'] ?? null;
         }
         unset($item);
 

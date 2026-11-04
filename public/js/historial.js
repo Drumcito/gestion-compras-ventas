@@ -1030,10 +1030,118 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<i class="ph ph-printer"></i> Imprimir nota</button>' +
                 '<button type="button" class="chip btn-enviar-nota" data-id="' + v.id + '">' +
                     '<i class="ph ph-paper-plane-tilt"></i> Enviar nota</button>' +
+                '<button type="button" class="chip btn-ver-sat" data-id="' + v.id + '">' +
+                    '<i class="ph ph-receipt"></i> Ver código SAT</button>' +
                 botonEntregaDetalle +
                 botonEditar +
                 botonEliminarDetalle +
             '</div>';
+    }
+
+    // ---------- Claves del SAT de una venta ----------
+    // Para facturar hace falta la ClaveProdServ de cada pieza. Se muestran junto
+    // al codigo de la casa y al nombre, con un boton para copiar cada una y otro
+    // para copiarlas todas de corrido (una por renglon, en el mismo orden de la
+    // venta, que es como se pegan en el portal de facturacion).
+    //
+    // La clave vive en el catalogo, no en la venta: una pieza que se dio de baja
+    // o a la que nunca se le capturo la clave sale marcada como pendiente.
+    let ventaDelSat = null;
+
+    function pintarSat(v) {
+        ventaDelSat = v.id;
+
+        const filas = v.items.map((i) => {
+            const sat = (i.codigo_sat || '').trim();
+
+            return '<tr>' +
+                '<td><span class="codigo-prod">' + esc(codigoVisible(i)) + '</span></td>' +
+                '<td>' + esc(i.nombre_producto) + '</td>' +
+                '<td class="sat-clave">' +
+                    (sat
+                        ? '<code>' + esc(sat) + '</code>' +
+                          '<button type="button" class="chip chip-mini btn-copiar-sat" ' +
+                              'data-sat="' + esc(sat) + '" title="Copiar esta clave">' +
+                              '<i class="ph ph-copy"></i></button>'
+                        : '<span class="sat-falta">Sin clave</span>') +
+                '</td>' +
+            '</tr>';
+        }).join('');
+
+        const conClave = v.items.filter((i) => (i.codigo_sat || '').trim() !== '').length;
+        const faltan   = v.items.length - conClave;
+
+        contenido.innerHTML =
+            '<h2 class="detalle-titulo">Claves del SAT · venta #' + v.id + '</h2>' +
+            '<p class="detalle-sub">ClaveProdServ de cada pieza, en el orden de la venta.</p>' +
+            (faltan > 0
+                ? '<p class="aviso aviso-alerta">' + faltan + ' de ' + v.items.length +
+                  ' pieza' + (v.items.length === 1 ? '' : 's') + ' no tiene clave capturada. ' +
+                  'Se pone desde Inventario → Editar producto → Código SAT.</p>'
+                : '') +
+            '<table class="tabla-detalle tabla-sat">' +
+                '<thead><tr><th>Código</th><th>Producto</th><th>Clave SAT</th></tr></thead>' +
+                '<tbody>' + filas + '</tbody>' +
+            '</table>' +
+            '<div id="sat-aviso" class="aviso" hidden></div>' +
+            '<div class="detalle-acciones">' +
+                '<button type="button" class="chip" id="btn-volver-sat">Volver a la venta</button>' +
+                (conClave > 0
+                    ? '<button type="button" class="btn-save" id="btn-copiar-sat-todas">' +
+                          '<i class="ph ph-copy"></i> ' +
+                          (conClave === 1 ? 'Copiar la clave' : 'Copiar las ' + conClave) +
+                      '</button>'
+                    : '') +
+            '</div>';
+    }
+
+    /**
+     * Copia al portapapeles.
+     *
+     * Va primero por el textarea + execCommand, que corre de forma SINCRONA
+     * dentro del clic. navigator.clipboard es asincrono y, para cuando resuelve,
+     * el navegador ya no considera que haya un gesto del usuario detras y lo
+     * rechaza. Queda de plan B porque execCommand esta marcado como obsoleto.
+     */
+    async function copiar(texto) {
+        try {
+            const area = document.createElement('textarea');
+            area.value = texto;
+            area.setAttribute('readonly', '');
+            area.style.position = 'fixed';
+            area.style.top = '0';
+            area.style.opacity = '0';
+            document.body.appendChild(area);
+            area.select();
+            area.setSelectionRange(0, texto.length);
+            const bien = document.execCommand('copy');
+            document.body.removeChild(area);
+
+            if (bien) return true;
+        } catch (e) {
+            // sigue al plan B
+        }
+
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(texto);
+                return true;
+            }
+        } catch (e) {
+            // ni modo: se avisa en pantalla
+        }
+
+        return false;
+    }
+
+    function avisarSat(texto, tipo) {
+        const caja = document.getElementById('sat-aviso');
+        if (!caja) return;
+
+        caja.textContent = texto;
+        caja.className = 'aviso aviso-' + tipo;
+        caja.hidden = false;
+        setTimeout(() => { caja.hidden = true; }, 3000);
     }
 
     // ---------- Nota imprimible ----------
@@ -2295,6 +2403,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (e.target.id === 'btn-guardar-precio') {
             guardarPrecio(e.target.dataset.codigo);
+            return;
+        }
+
+        if (e.target.closest('.btn-ver-sat')) {
+            const id = e.target.closest('.btn-ver-sat').dataset.id;
+            const r = await fetch(
+                '../../app/controllers/HistorialController.php?accion=detalle&id=' + id);
+            const d = await r.json();
+            if (d.ok) pintarSat(d.venta);
+            return;
+        }
+
+        if (e.target.id === 'btn-volver-sat') {
+            verDetalle(ventaDelSat);
+            return;
+        }
+
+        const copiarUna = e.target.closest('.btn-copiar-sat');
+        if (copiarUna) {
+            const bien = await copiar(copiarUna.dataset.sat);
+            avisarSat(bien ? 'Copiada: ' + copiarUna.dataset.sat : 'El navegador no dejó copiar.',
+                bien ? 'ok' : 'error');
+            return;
+        }
+
+        if (e.target.closest('#btn-copiar-sat-todas')) {
+            const claves = [...document.querySelectorAll('.btn-copiar-sat')]
+                .map((b) => b.dataset.sat);
+            const bien = await copiar(claves.join('\n'));
+            avisarSat(bien
+                ? (claves.length === 1
+                    ? 'Clave copiada.'
+                    : claves.length + ' claves copiadas, una por renglón.')
+                : 'El navegador no dejó copiar.', bien ? 'ok' : 'error');
             return;
         }
 
