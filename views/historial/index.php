@@ -127,6 +127,7 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
         window.USUARIO_ID = <?php echo (int) ($_SESSION['user_id'] ?? 0); ?>;
     </script>
     <script src="<?= recurso('js/nota_datos.js') ?>"></script>
+    <script src="<?= recurso('js/sat.js') ?>"></script>
     <script src="<?= recurso('js/historial.js') ?>"></script>
 </body>
 </html>

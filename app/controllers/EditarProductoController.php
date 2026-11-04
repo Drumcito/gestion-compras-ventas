@@ -148,6 +148,58 @@ try {
         exit;
     }
 
+    // ---------- Guardar SOLO la clave del SAT ----------
+    // Capturarlas de una en una desde la venta o desde el inventario no deberia
+    // obligar a abrir el formulario completo del producto, asi que esta accion
+    // toca unicamente codigo_sat. Vaciar el campo la borra (queda NULL).
+    if (($_GET['accion'] ?? '') === 'guardar_sat') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['ok' => false, 'error' => 'Metodo no permitido']);
+            exit;
+        }
+
+        $datos  = json_decode(file_get_contents('php://input'), true);
+        $codigo = (string) ($datos['codigo'] ?? '');
+        $tabla  = tablaDeProducto($codigo);
+
+        if ($tabla === null) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Codigo de producto no valido']);
+            exit;
+        }
+
+        $sat = limpiar($datos['codigo_sat'] ?? '', 20) ?: null;
+
+        $stmt = $pdo->prepare(
+            "UPDATE `{$tabla}` SET codigo_sat = :sat WHERE codigo_interno = :codigo AND activo = 1"
+        );
+        $stmt->execute(['sat' => $sat, 'codigo' => $codigo]);
+
+        if ($stmt->rowCount() === 0) {
+            // rowCount tambien da 0 cuando se guarda el mismo valor, asi que hay
+            // que distinguir "no cambio nada" de "ese producto ya no esta".
+            $existe = $pdo->prepare(
+                "SELECT 1 FROM `{$tabla}` WHERE codigo_interno = :codigo AND activo = 1"
+            );
+            $existe->execute(['codigo' => $codigo]);
+
+            if (!$existe->fetchColumn()) {
+                http_response_code(404);
+                echo json_encode(['ok' => false, 'error' => 'El producto ya no esta en el inventario']);
+                exit;
+            }
+        }
+
+        echo json_encode([
+            'ok'         => true,
+            'codigo'     => $codigo,
+            'codigo_sat' => $sat,
+            'mensaje'    => $sat === null ? 'Se quitó la clave del SAT.' : 'Clave del SAT guardada.',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // ---------- Guardar los cambios ----------
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);

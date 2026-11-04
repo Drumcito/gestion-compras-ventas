@@ -260,6 +260,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const desde = htmlPrecioDesde(p);
 
+            // Clave del SAT: se muestra siempre, con clave o sin ella, porque lo
+            // util es ver de un vistazo a cuales les falta.
+            const sat = (p.codigo_sat || '').trim();
+
             fila.innerHTML =
                 (window.ES_ADMIN ? botonMiniatura(p.codigo_interno, p.imagen) : '') +
                 '<div class="venta-fila-datos">' +
@@ -272,6 +276,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<div class="venta-fila-derecha">' +
                     '<div class="precios-producto">' + precios +
                         (desde ? '<span class="precio-fecha">' + desde + '</span>' : '') +
+                        '<span class="precio-fecha">' +
+                            (sat
+                                ? 'SAT ' + esc(sat)
+                                : '<span class="sat-falta">Sin clave SAT</span>') +
+                        '</span>' +
                     '</div>' +
                     (window.ES_ADMIN
                         ? '<div class="producto-acciones">' +
@@ -279,6 +288,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                   'data-codigo="' + esc(p.codigo_interno) + '" ' +
                                   'title="Cambiar solo el porcentaje de este producto">Editar %</span>' +
                               '<span class="chip btn-editar-precio">Editar</span>' +
+                              '<span class="chip btn-sat" ' +
+                                  'data-codigo="' + esc(p.codigo_interno) + '" ' +
+                                  'data-visible="' + esc(codigoVisible(p)) + '" ' +
+                                  'data-nombre="' + esc(p.nombre) + '" ' +
+                                  'data-sat="' + esc(sat) + '" ' +
+                                  'title="Clave del SAT para facturar">SAT</span>' +
                               '<button type="button" class="btn-borrar-prod" ' +
                                   'title="Borrar producto" aria-label="Borrar producto" ' +
                                   'data-codigo="' + esc(p.codigo_interno) + '" ' +
@@ -1850,6 +1865,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // La "x" vive dentro de la fila, así que hay que atenderla antes de que el
         // clic caiga en la fila y abra el editor de precio.
+        const chipSat = e.target.closest('.btn-sat');
+        if (chipSat) {
+            e.stopPropagation();
+            const d = chipSat.dataset;
+
+            SatEditor.abrir({
+                codigo:  d.codigo,
+                visible: d.visible,
+                nombre:  d.nombre,
+                sat:     d.sat,
+                ruta:    RUTA_EDITAR,
+                alGuardar: (satNuevo, mensaje) => {
+                    mostrarAviso(mensaje, 'ok');
+                    cargarProductos();
+                },
+            });
+            return;
+        }
+
         const borrar = e.target.closest('.btn-borrar-prod');
         if (borrar) {
             e.stopPropagation();

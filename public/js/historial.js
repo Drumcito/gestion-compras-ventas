@@ -1054,6 +1054,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const filas = v.items.map((i) => {
             const sat = (i.codigo_sat || '').trim();
 
+            // Capturar o corregir la clave toca el catalogo, asi que el lapiz es
+            // solo del admin. El vendedor la ve y la copia, nada mas.
+            const lapiz = window.ES_ADMIN
+                ? '<button type="button" class="chip chip-mini btn-editar-sat" ' +
+                      'data-codigo="' + esc(i.codigo_interno_producto) + '" ' +
+                      'data-visible="' + esc(codigoVisible(i)) + '" ' +
+                      'data-nombre="' + esc(i.nombre_producto) + '" ' +
+                      'data-sat="' + esc(sat) + '" ' +
+                      'title="' + (sat ? 'Cambiar esta clave' : 'Capturar la clave') + '">' +
+                      '<i class="ph ph-pencil-simple"></i></button>'
+                : '';
+
             return '<tr>' +
                 '<td><span class="codigo-prod">' + esc(codigoVisible(i)) + '</span></td>' +
                 '<td>' + esc(i.nombre_producto) + '</td>' +
@@ -1064,6 +1076,7 @@ document.addEventListener('DOMContentLoaded', () => {
                               'data-sat="' + esc(sat) + '" title="Copiar esta clave">' +
                               '<i class="ph ph-copy"></i></button>'
                         : '<span class="sat-falta">Sin clave</span>') +
+                    lapiz +
                 '</td>' +
             '</tr>';
         }).join('');
@@ -2417,6 +2430,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (e.target.id === 'btn-volver-sat') {
             verDetalle(ventaDelSat);
+            return;
+        }
+
+        const editarSat = e.target.closest('.btn-editar-sat');
+        if (editarSat) {
+            const d = editarSat.dataset;
+
+            SatEditor.abrir({
+                codigo:  d.codigo,
+                visible: d.visible,
+                nombre:  d.nombre,
+                sat:     d.sat,
+                ruta:    '../../app/controllers/EditarProductoController.php',
+                // Se vuelve a pedir la venta en lugar de parchar el renglon a
+                // mano: asi el conteo de "piezas sin clave" y el boton de copiar
+                // todas quedan al dia sin repetir la cuenta aqui.
+                alGuardar: async (satNuevo, mensaje) => {
+                    mostrarAviso(mensaje, 'ok');
+
+                    const r = await fetch(
+                        '../../app/controllers/HistorialController.php?accion=detalle&id=' + ventaDelSat);
+                    const datos = await r.json();
+
+                    if (datos.ok) pintarSat(datos.venta);
+                },
+            });
             return;
         }
 

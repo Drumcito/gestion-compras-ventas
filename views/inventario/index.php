@@ -113,6 +113,7 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
     </div>
 
     <script>window.ES_ADMIN = <?php echo $esAdmin ? 'true' : 'false'; ?>;</script>
+    <script src="<?= recurso('js/sat.js') ?>"></script>
     <script src="<?= recurso('js/inventario.js') ?>"></script>
 </body>
 </html>

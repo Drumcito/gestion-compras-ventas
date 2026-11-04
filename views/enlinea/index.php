@@ -145,6 +145,7 @@ $esAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
         // nacieron de un pedido del catálogo, con todas sus funciones.
         window.SOLO_EN_LINEA = true;
     </script>
+    <script src="<?= recurso('js/sat.js') ?>"></script>
     <script src="<?= recurso('js/historial.js') ?>"></script>
     <script src="<?= recurso('js/enlinea.js') ?>"></script>
 </body>
