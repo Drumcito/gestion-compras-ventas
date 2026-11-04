@@ -53,9 +53,11 @@ return [
         'cache_minutos'  => 10,
         // Marcas que salen como filtro rapido (las de mas productos).
         'marcas_rapidas' => 10,
-        // Productos por pagina. 10 llena dos filas de 5 en computadora y cinco
-        // de 2 en celular.
-        'por_pagina'     => 10,
+        // Productos por pagina. 20 llena cuatro filas de 5 en computadora y diez
+        // de 2 en celular. Van todos en el navegador desde que carga el
+        // catalogo, asi que subirlo no cuesta otra consulta: solo dibuja mas
+        // tarjetas de golpe.
+        'por_pagina'     => 20,
         // Productos distintos que caben en el carrito (cada uno con las piezas
         // que quiera, hasta 999). Todo se manda en un solo mensaje de WhatsApp;
         // con mas de ~30 el enlace se vuelve muy largo para algunos celulares.
