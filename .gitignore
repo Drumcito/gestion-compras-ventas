@@ -37,9 +37,9 @@ config/smtp.prod.php
 # Notas PDF generadas al vuelo (no se versionan)
 public/notas/
 
-# Imagenes de producto: se suben directo al servidor (pesan); solo va el README
-public/img/productos/*
-!public/img/productos/README.md
+# Las imagenes de producto SI se versionan: el despliegue (cp -R en
+# .cpanel.yml) las lleva solo, y subirlas a mano por File Manager era el
+# unico paso manual que quedaba. Pesan ~10 MB en total y cambian poco.
 
 # Catalogo en linea: lista de productos generada (se rehace sola)
 catalogo/cache/*

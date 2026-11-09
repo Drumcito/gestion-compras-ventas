@@ -25,4 +25,9 @@ Una imagen con otra proporción no se deforma: se ajusta completa dentro del
 cuadro y deja franjas en blanco. Si un producto no tiene imagen, el PDF dibuja un
 recuadro gris del mismo tamaño.
 
-Las imágenes no se suben a Git (ver `.gitignore`): se copian directo al servidor.
+Las imágenes **sí se versionan**: el despliegue las copia al servidor junto con
+el resto del proyecto, así que no hay que subirlas a mano.
+
+Ojo con el cargador del sistema: si se reemplaza aquí la foto de un producto que
+ya está en el repositorio, el siguiente despliegue la regresa a la del repo. Hay
+que cambiarla en los dos lados, o solo en el repositorio.
