@@ -3978,3 +3978,34 @@ select.form-control {
     margin: 0.9rem 0 0.6rem;
     font-size: 0.85rem;
 }
+
+/* ===== Publicar un producto en el catálogo en línea ===== */
+
+/* El interruptor dentro del formulario de editar producto. La casilla y su
+   texto van en el mismo renglón; la explicación, debajo y en gris. */
+.ed-publicar-linea {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.ed-publicar-linea input {
+    width: 1.05rem;
+    height: 1.05rem;
+    accent-color: #08660b;
+    cursor: pointer;
+}
+
+.ed-publicar .detalle-sub {
+    display: block;
+    margin-top: 0.25rem;
+}
+
+/* El chip del renglón cambia de ancho al pasar de "Publicar" a "En catálogo", y
+   los botones de al lado brincaban. Con un ancho mínimo se quedan quietos. */
+.btn-catalogo {
+    min-width: 6.5rem;
+    text-align: center;
+}

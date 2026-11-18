@@ -118,7 +118,7 @@ try {
 
         $stmt = $pdo->prepare(
             "SELECT codigo_interno, codigo_proveedor, nombre, marca, categoria,
-                    codigo_sat, precio_mayoreo
+                    codigo_sat, precio_mayoreo, en_catalogo
                FROM `{$tabla}` WHERE codigo_interno = :codigo AND activo = 1 LIMIT 1"
         );
         $stmt->execute(['codigo' => $codigo]);
@@ -200,6 +200,63 @@ try {
         exit;
     }
 
+    // ---------- Prender o apagar el producto en el catalogo en linea ----------
+    // Publicar es de una en una y se hace seguido (hay 28 mil productos y solo
+    // unos cientos valen la pena en el sitio), asi que tiene su propia accion:
+    // abrir el formulario completo para mover un interruptor es mucho tramite.
+    // Toca UNICAMENTE en_catalogo.
+    if (($_GET['accion'] ?? '') === 'guardar_catalogo') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['ok' => false, 'error' => 'Metodo no permitido']);
+            exit;
+        }
+
+        $datos  = json_decode(file_get_contents('php://input'), true);
+        $codigo = (string) ($datos['codigo'] ?? '');
+        $tabla  = tablaDeProducto($codigo);
+
+        if ($tabla === null) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Codigo de producto no valido']);
+            exit;
+        }
+
+        $enCatalogo = !empty($datos['en_catalogo']) ? 1 : 0;
+
+        $stmt = $pdo->prepare(
+            "UPDATE `{$tabla}` SET en_catalogo = :en WHERE codigo_interno = :codigo AND activo = 1"
+        );
+        $stmt->execute(['en' => $enCatalogo, 'codigo' => $codigo]);
+
+        if ($stmt->rowCount() === 0) {
+            // rowCount da 0 tanto si ya estaba en ese valor como si el producto
+            // se borro mientras tanto; hay que distinguirlos.
+            $existe = $pdo->prepare(
+                "SELECT 1 FROM `{$tabla}` WHERE codigo_interno = :codigo AND activo = 1"
+            );
+            $existe->execute(['codigo' => $codigo]);
+
+            if (!$existe->fetchColumn()) {
+                http_response_code(404);
+                echo json_encode(['ok' => false, 'error' => 'El producto ya no esta en el inventario']);
+                exit;
+            }
+        }
+
+        echo json_encode([
+            'ok'          => true,
+            'codigo'      => $codigo,
+            'en_catalogo' => $enCatalogo,
+            // El sitio lee de una cache de 10 minutos, asi que conviene decirlo:
+            // si no, parece que el cambio no sirvio.
+            'mensaje'     => $enCatalogo
+                ? 'Se publicó en el catálogo. Tarda unos minutos en verse en el sitio.'
+                : 'Se quitó del catálogo. Tarda unos minutos en dejar de verse.',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // ---------- Guardar los cambios ----------
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
@@ -248,6 +305,9 @@ try {
         // entra en ningun precio ni en la busqueda.
         'codigo_sat'       => limpiar($datos['codigo_sat'] ?? '', 20) ?: null,
         'precio_mayoreo'   => $nuevoPrecio,
+        // Si sale en el catalogo en linea. De fabrica NO (ver migracion 014):
+        // un producto nuevo nace apagado y se publica a mano.
+        'en_catalogo'      => !empty($datos['en_catalogo']) ? 1 : 0,
     ];
 
     // Que el producto exista y siga activo antes de tocarlo.
@@ -277,7 +337,8 @@ try {
                 marca            = :marca,
                 categoria        = :categoria,
                 codigo_sat       = :codigo_sat,
-                precio_mayoreo   = :precio_mayoreo
+                precio_mayoreo   = :precio_mayoreo,
+                en_catalogo      = :en_catalogo
              WHERE codigo_interno = :codigo"
         )->execute($campos + ['codigo' => $codigo]);
 
@@ -300,12 +361,19 @@ try {
     $pdo->beginTransaction();
 
     try {
-        $columnas = ['codigo_proveedor', 'nombre', 'marca', 'categoria', 'codigo_sat', 'precio_mayoreo'];
+        $columnas = ['codigo_proveedor', 'nombre', 'marca', 'categoria', 'codigo_sat',
+                     'precio_mayoreo', 'en_catalogo'];
 
         $pdo->prepare(
             "INSERT INTO `{$tablaDestino}` (" . implode(', ', $columnas) . ")
-             VALUES (:codigo_proveedor, :nombre, :marca, :categoria, :codigo_sat, :precio_mayoreo)"
+             VALUES (:codigo_proveedor, :nombre, :marca, :categoria, :codigo_sat,
+                     :precio_mayoreo, :en_catalogo)"
         )->execute($campos);
+
+        // OJO: el codigo interno cambia al mover de casa (BNS03-01270 ->
+        // BNS05-00042) y la imagen es un archivo nombrado con el codigo, asi
+        // que el producto llega a su casa nueva publicado pero SIN foto. Hay
+        // que volver a subirsela.
 
         $idNuevo = (int) $pdo->lastInsertId();
 

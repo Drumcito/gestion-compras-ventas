@@ -63,6 +63,7 @@ function obtenerTopOfertas(PDO $pdo, int $dias, int $limite): array
            JOIN historial_precios h ON h.id = p.primer_id
            JOIN vista_catalogo v    ON v.codigo_interno = p.codigo
           WHERE v.activo = 1
+            AND v.en_catalogo = 1
             AND v.precio_mayoreo > 0
             AND v.precio_mayoreo < h.precio_anterior
           ORDER BY (1 - v.precio_mayoreo / h.precio_anterior) DESC,
@@ -113,6 +114,7 @@ function obtenerMasVendidos(PDO $pdo, int $dias, int $limite, string $criterio =
       LEFT JOIN (" . SQL_PRIMER_CAMBIO . ") p ON p.codigo = t.codigo
       LEFT JOIN historial_precios h ON h.id = p.primer_id
           WHERE v.activo = 1
+            AND v.en_catalogo = 1
             AND v.precio_mayoreo > 0
           ORDER BY {$orden}, v.codigo_interno
           LIMIT :limite"
@@ -147,7 +149,8 @@ function obtenerMuestra(PDO $pdo, int $limite, int $saltar, array $descuentos): 
     $stmt = $pdo->prepare(
         "SELECT codigo_interno, codigo_casa, nombre, marca, precio_mayoreo, porcentaje_neto
            FROM vista_catalogo
-          WHERE activo = 1 AND precio_mayoreo BETWEEN 80 AND 3000
+          WHERE activo = 1 AND en_catalogo = 1
+            AND precio_mayoreo BETWEEN 80 AND 3000
           ORDER BY codigo_interno
           LIMIT :limite OFFSET :saltar"
     );
@@ -254,9 +257,13 @@ function miniaturaProducto(string $codigoInterno): ?string
 }
 
 /**
- * Catalogo completo para el sitio publico (carpeta catalogo/): todos los
- * productos activos con precio, con su neto y, si bajo de precio en la ventana
- * de ofertas, su "Antes".
+ * Catalogo completo para el sitio publico (carpeta catalogo/): los productos
+ * PUBLICADOS (en_catalogo = 1), activos y con precio, con su neto y, si bajo de
+ * precio en la ventana de ofertas, su "Antes".
+ *
+ * Publicar es una decision a mano, producto por producto: lo que no se prende
+ * no existe para el sitio. Antes salia todo lo activo, y el sitio parecia un
+ * almacen. Ver la migracion 014.
  *
  * NO incluye la casa ni el codigo del proveedor: es lo mismo que se le oculta
  * al vendedor en Inventario, y con mas razon a cualquiera en internet.
@@ -274,6 +281,7 @@ function obtenerCatalogoPublico(PDO $pdo, int $diasOfertas): array
       LEFT JOIN (" . SQL_PRIMER_CAMBIO . ") p ON p.codigo = v.codigo_interno
       LEFT JOIN historial_precios h ON h.id = p.primer_id
           WHERE v.activo = 1
+            AND v.en_catalogo = 1
             AND v.precio_mayoreo > 0
           ORDER BY v.nombre, v.codigo_interno"
     );

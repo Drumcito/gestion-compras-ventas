@@ -264,6 +264,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // util es ver de un vistazo a cuales les falta.
             const sat = (p.codigo_sat || '').trim();
 
+            // Si sale en el sitio publico. Apagado de fabrica: se publica a
+            // mano, producto por producto (migracion 014).
+            const publicado = Number(p.en_catalogo) === 1;
+
             fila.innerHTML =
                 (window.ES_ADMIN ? botonMiniatura(p.codigo_interno, p.imagen) : '') +
                 '<div class="venta-fila-datos">' +
@@ -288,6 +292,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                   'data-codigo="' + esc(p.codigo_interno) + '" ' +
                                   'title="Cambiar solo el porcentaje de este producto">Editar %</span>' +
                               '<span class="chip btn-editar-precio">Editar</span>' +
+                              '<span class="chip btn-catalogo' + (publicado ? ' chip-activo' : '') + '" ' +
+                                  'data-codigo="' + esc(p.codigo_interno) + '" ' +
+                                  'data-nombre="' + esc(p.nombre) + '" ' +
+                                  'data-publicado="' + (publicado ? '1' : '0') + '" ' +
+                                  'title="' + (publicado
+                                      ? 'Sale en el catálogo en línea. Clic para quitarlo.'
+                                      : 'No sale en el catálogo en línea. Clic para publicarlo.') + '">' +
+                                  (publicado ? 'En catálogo' : 'Publicar') + '</span>' +
                               '<span class="chip btn-sat" ' +
                                   'data-codigo="' + esc(p.codigo_interno) + '" ' +
                                   'data-visible="' + esc(codigoVisible(p)) + '" ' +
@@ -772,6 +784,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<select id="ed-casa" class="form-control">' + opciones + '</select>' +
                 '</div>' +
             '</div>' +
+            '<div class="form-group ed-publicar">' +
+                '<label class="ed-publicar-linea">' +
+                    '<input type="checkbox" id="ed-catalogo"' + (Number(p.en_catalogo) === 1 ? ' checked' : '') + '>' +
+                    '<span>Mostrar en el catálogo en línea</span>' +
+                '</label>' +
+                '<span class="detalle-sub">Los productos nuevos no se publican solos. ' +
+                    'La foto es aparte: se puede publicar sin ella, pero se ve mejor con una.</span>' +
+            '</div>' +
             '<p id="ed-neto" class="detalle-sub"></p>' +
             '<div id="ed-aviso-mover" class="aviso aviso-info" hidden></div>' +
             '<p class="aviso aviso-info">El precio de venta (neto) se calcula solo, sumándole el porcentaje de la casa. ' +
@@ -836,6 +856,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     categoria:        document.getElementById('ed-categoria').value,
                     codigo_sat:       document.getElementById('ed-sat').value,
                     precio_mayoreo:   document.getElementById('ed-mayoreo').value,
+                    en_catalogo:      document.getElementById('ed-catalogo').checked ? 1 : 0,
                 }),
             })).json();
 
@@ -1860,11 +1881,64 @@ document.addEventListener('DOMContentLoaded', () => {
         if (paginaActual < totalPaginas) { paginaActual++; cargarProductos(); window.scrollTo(0, 0); }
     });
 
+    /**
+     * Prende o apaga un producto en el catálogo en línea.
+     *
+     * Se pinta el chip ANTES de que conteste el servidor: publicar es de una en
+     * una y en tandas, y esperar medio segundo por cada clic se siente pesado.
+     * Si falla, se regresa a como estaba y se avisa.
+     */
+    async function alternarCatalogo(chip) {
+        const codigo   = chip.dataset.codigo;
+        const prender  = chip.dataset.publicado !== '1';
+
+        pintarChipCatalogo(chip, prender);
+        chip.style.pointerEvents = 'none';
+
+        try {
+            const datos = await (await fetch(RUTA_EDITAR + '?accion=guardar_catalogo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codigo: codigo, en_catalogo: prender ? 1 : 0 }),
+            })).json();
+
+            if (!datos.ok) {
+                pintarChipCatalogo(chip, !prender);
+                mostrarAviso(datos.error || 'No se pudo cambiar.', 'error');
+                return;
+            }
+
+            mostrarAviso(datos.mensaje, 'ok');
+
+        } catch (e) {
+            pintarChipCatalogo(chip, !prender);
+            mostrarAviso('Error de conexión.', 'error');
+        } finally {
+            chip.style.pointerEvents = '';
+        }
+    }
+
+    function pintarChipCatalogo(chip, publicado) {
+        chip.dataset.publicado = publicado ? '1' : '0';
+        chip.classList.toggle('chip-activo', publicado);
+        chip.textContent = publicado ? 'En catálogo' : 'Publicar';
+        chip.title = publicado
+            ? 'Sale en el catálogo en línea. Clic para quitarlo.'
+            : 'No sale en el catálogo en línea. Clic para publicarlo.';
+    }
+
     listaProductos.addEventListener('click', (e) => {
         if (!window.ES_ADMIN) return;
 
         // La "x" vive dentro de la fila, así que hay que atenderla antes de que el
         // clic caiga en la fila y abra el editor de precio.
+        const chipCat = e.target.closest('.btn-catalogo');
+        if (chipCat) {
+            e.stopPropagation();
+            alternarCatalogo(chipCat);
+            return;
+        }
+
         const chipSat = e.target.closest('.btn-sat');
         if (chipSat) {
             e.stopPropagation();

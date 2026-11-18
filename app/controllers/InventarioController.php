@@ -111,7 +111,8 @@ try {
     // sin emulacion no acepta marcadores en esa posicion.
     $stmt = $pdo->prepare(
         "SELECT codigo_interno, codigo_proveedor, nombre, marca, categoria,
-                codigo_sat, precio_mayoreo, porcentaje_neto, fecha_creacion
+                codigo_sat, precio_mayoreo, porcentaje_neto, fecha_creacion,
+                en_catalogo
            FROM {$tabla}
           WHERE activo = 1{$filtro}
           ORDER BY {$orden}
